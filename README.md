@@ -60,6 +60,28 @@ cd lumos
 # package.path = package.path .. ";/path/to/lumos/?.lua;/path/to/lumos/?/init.lua"
 ```
 
+
+
+## 📋 Tableaux encadrés (Table)
+
+Lumos permet de créer facilement des tableaux encadrés pour afficher des listes ou des cadres dans votre CLI :
+
+```lua
+local tbl = require('lumos.table')
+local items = {"Un", "Deux", "Trois"}
+print(tbl.boxed(items))
+--[[
+Affiche :
+┌───────┐
+│ Un    │
+│ Deux  │
+│ Trois │
+└───────┘
+]]
+```
+
+Voir `test/table.lua` pour plus d'exemples.
+
 ## 🚀 Quick Example
 
 After installing with `luarocks install lumos`:

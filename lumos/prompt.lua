@@ -66,87 +66,121 @@ function prompt.confirm(message, default)
 end
 
 -- Selection prompt from a list of options
+-- Interactive select with arrow keys
 function prompt.select(message, options, default)
     print(message)
-    for i, option in ipairs(options) do
-        local marker = (default == i) and ">" or " "
-        print(string.format("%s %d) %s", marker, i, option))
-    end
-    
-    while true do
-        io.write("Choose an option")
-        if default then
-            io.write(" [" .. default .. "]")
+    local current = default or 1
+    local function render_menu()
+        io.write(message .. "\n")
+        for i, option in ipairs(options) do
+            local marker = (i == current) and ">" or " "
+            io.write(string.format("%s %d) %s\n", marker, i, option))
         end
-        io.write(": ")
+        io.write("Utilisez ↑/↓ pour naviguer, Entrée pour valider.\n")
         io.flush()
-        
-        local input = io.read("*l")
-        
-        if input == "" and default then
-            return default, options[default]
+    end
+    local function update_selection()
+        -- Remonte le curseur de n+1 lignes (n options + instructions)
+        io.write(string.format("\27[%dA", #options + 1))
+        for i, option in ipairs(options) do
+            local marker = (i == current) and ">" or " "
+            io.write(string.format("\r%s %d) %s\27[K\n", marker, i, option))
         end
-        
-        local choice = tonumber(input)
-        if choice and choice >= 1 and choice <= #options then
-            return choice, options[choice]
-        else
-            print(color.red("Invalid choice. Please enter a number between 1 and " .. #options))
+        io.write("\rUtilisez ↑/↓ pour naviguer, Entrée pour valider.\27[K\n")
+        io.flush()
+    end
+    os.execute("stty -icanon -echo")
+    io.write("\27[?25l") -- cache le curseur
+    render_menu()
+    local result = nil
+    while not result do
+        local c = io.read(1)
+        if c == "\27" then -- escape
+            local c2 = io.read(1)
+            if c2 == "[" then
+                local c3 = io.read(1)
+                if c3 == "A" then -- up
+                    current = current > 1 and current - 1 or #options
+                    update_selection()
+                elseif c3 == "B" then -- down
+                    current = current < #options and current + 1 or 1
+                    update_selection()
+                end
+            end
+        elseif c == "\r" or c == "\n" then -- enter
+            result = {current, options[current]}
         end
     end
+    io.write("\27[?25h") -- affiche le curseur
+    os.execute("stty sane")
+    io.write("\n")
+    return result[1], result[2]
 end
 
 -- Multi-selection prompt
+-- Interactive multiselect with arrow keys and space
 function prompt.multiselect(message, options)
     print(message)
-    print("(Use space to select/deselect, enter to confirm)")
-    
     local selected = {}
-    for i = 1, #options do
-        selected[i] = false
-    end
-    
+    for i = 1, #options do selected[i] = false end
     local current = 1
-    
-    -- This is a simplified version - a full implementation would require
-    -- terminal manipulation for real-time updates
-    while true do
-        -- Display options
+    local function render_menu()
+        io.write(message .. "\n")
         for i, option in ipairs(options) do
             local marker = selected[i] and "[x]" or "[ ]"
             local pointer = (i == current) and ">" or " "
-            print(string.format("%s %s %s", pointer, marker, option))
+            io.write(string.format("%s %s %s\n", pointer, marker, option))
         end
-        
-        print("\nControls: [space] toggle, [enter] confirm, [q] quit")
-        io.write("Command: ")
+        io.write("Utilisez ↑/↓ pour naviguer, Espace pour sélectionner, Entrée pour valider, q pour quitter.\n")
         io.flush()
-        
-        local input = io.read("*l"):lower()
-        
-        if input == "" then
-            -- Return selected items
-            local result = {}
-            for i, sel in ipairs(selected) do
-                if sel then
-                    table.insert(result, {index = i, value = options[i]})
+    end
+    local function update_selection()
+        io.write(string.format("\27[%dA", #options + 1))
+        for i, option in ipairs(options) do
+            local marker = selected[i] and "[x]" or "[ ]"
+            local pointer = (i == current) and ">" or " "
+            io.write(string.format("\r%s %s %s\27[K\n", pointer, marker, option))
+        end
+        io.write("\rUtilisez ↑/↓ pour naviguer, Espace pour sélectionner, Entrée pour valider, q pour quitter.\27[K\n")
+        io.flush()
+    end
+    os.execute("stty -icanon -echo")
+    io.write("\27[?25l") -- cache le curseur
+    render_menu()
+    local done = false
+    local quit = false
+    while not done and not quit do
+        local c = io.read(1)
+        if c == "\27" then -- escape
+            local c2 = io.read(1)
+            if c2 == "[" then
+                local c3 = io.read(1)
+                if c3 == "A" then -- up
+                    current = current > 1 and current - 1 or #options
+                    update_selection()
+                elseif c3 == "B" then -- down
+                    current = current < #options and current + 1 or 1
+                    update_selection()
                 end
             end
-            return result
-        elseif input == " " or input == "space" then
+        elseif c == " " then -- space
             selected[current] = not selected[current]
-        elseif input == "q" or input == "quit" then
-            return {}
-        elseif tonumber(input) then
-            local choice = tonumber(input)
-            if choice >= 1 and choice <= #options then
-                selected[choice] = not selected[choice]
-            end
+            update_selection()
+        elseif c == "q" then
+            quit = true
+        elseif c == "\r" or c == "\n" then -- enter
+            done = true
         end
-        
-        -- Clear screen (simple version)
-        print(string.rep("\n", 10))
     end
+    io.write("\27[?25h") -- affiche le curseur
+    os.execute("stty sane")
+    io.write("\n")
+    if quit then return {} end
+    local result = {}
+    for i, sel in ipairs(selected) do
+        if sel then table.insert(result, {index = i, value = options[i]}) end
+    end
+    return result
 end
 
 -- Simple validation function
