@@ -9,6 +9,7 @@ local loader = require('lumos.loader')
 local progress = require('lumos.progress')
 local prompt = require('lumos.prompt')
 local lumos_table = require('lumos.table')
+local json = require('lumos.json')
 
 -- Export the main interface
 return {
@@ -21,5 +22,6 @@ return {
     progress = progress,
     prompt = prompt,
     table = lumos_table,
-    version = "0.1.0"
+    json = json,
+    version = "0.2.0"
 }

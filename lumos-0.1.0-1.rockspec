@@ -38,6 +38,7 @@ build = {
       ["lumos.progress"] = "lumos/progress.lua",
       ["lumos.prompt"] = "lumos/prompt.lua",
       ["lumos.table"] = "lumos/table.lua",
-      ["lumos.loader"] = "lumos/loader.lua"
+      ["lumos.loader"] = "lumos/loader.lua",
+      ["lumos.json"] = "lumos/json.lua"
    }
 }

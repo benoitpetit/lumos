@@ -1,9 +1,15 @@
 # Lumos CLI Framework
 
-**Lumos** (Latin for "light") is a modern CLI framework for Lua, inspired by Cobra for Go. It simplifies command-line application development with an elegant, fluent API, complete with argument parsing, automatic help generation, color support, progress bars, and interactive prompts.
+
+<p align="center">
+    <img src="lumos.png" alt="Lumos Logo" width="200">
+</p>
+
+**Lumos** (Latin for "light") is a modern, enhanced CLI framework for Lua, inspired by Cobra for Go. It simplifies command-line application development with an elegant, fluent API, complete with argument parsing, automatic help generation, color support, progress bars, interactive prompts, and advanced features like JSON output and input validation.
 
 ## 🌟 Key Features
 
+### Core Features
 - **POSIX-compliant argument parsing** - Supports short (`-h`) and long (`--help`) flags
 - **Fluent command definition API** - Chainable method calls for easy setup
 - **Automatic help generation** - Generates help text with examples
@@ -12,6 +18,13 @@
 - **Interactive prompts** - Supports text input, password entry, confirmations, and selections
 - **Global and local flags** - Flags with inheritance and scope control
 - **Comprehensive error handling** - Clear error messages with robust validation
+
+### Enhanced Features (v2.0+)
+- **✨ Subcommand support** - Nested commands for complex CLI applications
+- **📄 JSON output** - Built-in JSON serialization for structured data output
+- **✅ Advanced input validation** - Pre-defined validators for common input types (email, numbers, etc.)
+- **🎨 Enhanced color helpers** - Contextual color functions for status messages and logs
+- **🔧 Performance optimizations** - Improved parsing and execution performance
 
 ## 📦 Installation
 
@@ -94,6 +107,7 @@ local cmd = app:command("commandname", "Command description")
 - `cmd:arg(name, description)` - Add positional argument
 - `cmd:flag(spec, description)` - Add boolean flag
 - `cmd:option(spec, description)` - Add flag with value
+- `cmd:subcommand(name, description)` - Add a subcommand (NEW)
 - `cmd:action(function)` - Set command action
 
 #### Flag Specifications
@@ -277,6 +291,100 @@ loader.start("Loading", "dots")      -- .  , .. , ...
 loader.start("Loading", "bounce")    -- ◜, ◠, ◝, ◞, ◡, ◟
 ```
 
+## 🆕 Enhanced Features (v2.0+)
+
+### Subcommands
+
+Lumos now supports nested subcommands for building complex CLI applications:
+
+```lua
+local app = lumos.new_app({name = "myapp"})
+
+-- Create a parent command
+local user_cmd = app:command("user", "User management")
+
+-- Add subcommands
+local create_user = user_cmd:subcommand("create", "Create a new user")
+create_user:arg("username", "Username for the new user")
+create_user:flag("-a --admin", "Grant admin privileges")
+
+create_user:action(function(ctx)
+    local username = ctx.args[1]
+    local is_admin = ctx.flags.admin
+    print("Creating user: " .. username .. (is_admin and " (admin)" or ""))
+    return true
+end)
+
+-- Usage: myapp user create alice --admin
+```
+
+### JSON Output
+
+Built-in JSON serialization for structured data output:
+
+```lua
+local json = require('lumos.json')
+
+-- Add global JSON flag
+app:flag("-j --json", "Output in JSON format")
+
+cmd:action(function(ctx)
+    local data = {name = "Alice", age = 30}
+    
+    if ctx.flags.json then
+        print(json.encode(data))
+    else
+        print("Name: " .. data.name .. ", Age: " .. data.age)
+    end
+    return true
+end)
+```
+
+### Enhanced Input Validation
+
+Pre-defined validators for common input types:
+
+```lua
+local prompt = require('lumos.prompt')
+
+-- Email validation
+local email = prompt.input("Enter your email:")
+local valid, error_msg = prompt.validate(email, prompt.validators.email, "Invalid email format")
+
+if not valid then
+    print(color.red(error_msg))
+end
+
+-- Number validation
+local age = prompt.input("Enter your age:")
+local valid_age, _ = prompt.validate(age, prompt.validators.number, "Age must be a number")
+```
+
+### Enhanced Color Helpers
+
+Contextual color functions for better UX:
+
+```lua
+local color = require('lumos.color')
+
+-- Status colors
+print(color.status.success("Operation completed!"))
+print(color.status.error("Something went wrong"))
+print(color.status.warning("Be careful"))
+print(color.status.info("Just so you know"))
+
+-- Log-style colors
+print(color.log.debug("Debug information"))
+print(color.log.info("Information message"))
+print(color.log.warn("Warning message"))
+print(color.log.error("Error message"))
+
+-- Progress-based coloring
+local percentage = 75
+local color_name = color.progress_color(percentage) -- Returns "yellow" for 75%
+print(color.colorize("Progress: " .. percentage .. "%", color_name))
+```
+
 ## 🚀 Quick Example
 
 After installing with `luarocks install lumos`:
@@ -352,6 +460,24 @@ lua examples/colors_demo.lua
 ```bash
 # Demonstrate various progress bar types
 lua examples/progress_demo.lua
+```
+
+#### Enhanced Features Examples
+```bash
+# JSON output and input validation
+lua examples/json_validation_demo.lua --help
+lua examples/json_validation_demo.lua list --json
+lua examples/json_validation_demo.lua validate
+
+# Subcommands demonstration
+lua examples/subcommand_demo.lua --help
+lua examples/subcommand_demo.lua user list
+lua examples/subcommand_demo.lua user create alice --admin --json
+
+# Advanced features showcase
+lua examples/advanced_features.lua --help
+lua examples/advanced_features.lua user create
+lua examples/advanced_features.lua interactive
 ```
 
 ### Running Tests
@@ -472,3 +598,12 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 **Lumos** - *Bringing light to CLI development in Lua* ✨
+
+```
+    ██╗     ██╗   ██╗███╗   ███╗ ██████╗ ███████╗
+    ██║     ██║   ██║████╗ ████║██╔═══██╗██╔════╝
+    ██║     ██║   ██║██╔████╔██║██║   ██║███████╗
+    ██║     ██║   ██║██║╚██╔╝██║██║   ██║╚════██║
+    ███████╗╚██████╔╝██║ ╚═╝ ██║╚██████╔╝███████║
+    ╚══════╝ ╚═════╝ ╚═╝     ╚═╝ ╚═════╝ ╚══════╝
+```

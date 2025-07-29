@@ -143,4 +143,30 @@ function color.is_enabled()
     return color_enabled
 end
 
+-- Contextual color helpers
+color.status = {
+    success = function(text) return color.green(text) end,
+    error = function(text) return color.red(text) end,
+    warning = function(text) return color.yellow(text) end,
+    info = function(text) return color.blue(text) end
+}
+
+color.log = {
+    debug = function(text) return color.dim("[DEBUG] " .. text) end,
+    info = function(text) return color.blue("[INFO] " .. text) end,
+    warn = function(text) return color.yellow("[WARN] " .. text) end,
+    error = function(text) return color.red("[ERROR] " .. text) end
+}
+
+-- Progress-based coloring
+function color.progress_color(percentage)
+    if percentage < 33 then
+        return "red"
+    elseif percentage < 66 then
+        return "yellow"
+    else
+        return "green"
+    end
+end
+
 return color

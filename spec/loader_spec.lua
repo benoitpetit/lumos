@@ -15,11 +15,15 @@ describe('Loader Module', function()
   end)
 
   after_each(function()
+    -- Stop any active loader while mocks are still active
+    if loader and type(loader.stop) == 'function' then
+      loader.stop()
+    end
+    -- Clear the captured output so it doesn't leak
+    written_output = ""
     -- Restore original functions
-    io.write = original_io_write
+    io.write = original_io_write  
     io.flush = original_io_flush
-    -- Stop any active loader
-    loader.stop()
   end)
 
   describe('loader lifecycle', function()

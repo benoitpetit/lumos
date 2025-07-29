@@ -13,6 +13,21 @@ function Command:arg(name, description)
     return self
 end
 
+-- Add subcommand support to Command
+function Command:subcommand(name, description)
+    self.subcommands = self.subcommands or {}
+    local subcmd = setmetatable({
+        name = name,
+        description = description,
+        flags = {},
+        args = {},
+        parent = self
+    }, Command)
+    
+    table.insert(self.subcommands, subcmd)
+    return subcmd
+end
+
 function Command:flag(spec, description)
     self.flags = self.flags or {}
     local short, long = spec:match("^%-([a-zA-Z])%s+%-%-([a-zA-Z%-]+)$")
@@ -107,29 +122,44 @@ function lumos.new_app(config)
         return self
     end
 
-    function app:run(args)
-        args = args or {}
-        
-        -- Handle global flags first
-        local parsed = core.parse_arguments(args)
-        
-        -- Check for version flag
-        if parsed.flags.version or parsed.flags.v then
+local json = require('lumos.json')
+
+function app:run(args)
+    args = args or {}
+    
+    -- Handle global flags first
+    local parsed = core.parse_arguments(args)
+    
+    -- Check for global JSON output flag
+    if parsed.flags.json then
+        parsed.output_json = true
+    end
+
+    -- Check for version flag
+    if parsed.flags.version or parsed.flags.v then
+        if parsed.output_json then
+            print(json.encode({version = self.version, name = self.name}))
+        else
             print(self.name .. " v" .. self.version)
-            return true
         end
-        
-        -- Check for global help
-        if parsed.flags.help or parsed.flags.h then
-            if not parsed.command then
+        return true
+    end
+    
+    -- Check for global help
+    if parsed.flags.help or parsed.flags.h then
+        if parsed.output_json then
+            print(json.encode({commands = self.commands, flags = parsed.flags}))
+        else
+            if not parsed.command then 
                 core.show_help(self)
                 return true
             end
         end
-        
-        -- Execute command
-        return core.execute_command(self, parsed)
     end
+    
+    -- Execute command
+    return core.execute_command(self, parsed)
+end
 
     return app
 end
