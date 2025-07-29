@@ -1,64 +1,64 @@
 #!/usr/bin/env lua
 
--- Démonstration du module color de Lumos
--- Montre toutes les capacités de colorisation et stylage
+-- Demonstration of the Lumos color module
+-- Shows all coloring and styling capabilities
 
--- Ajouter le répertoire parent au chemin de recherche
+-- Add parent directory to search path
 package.path = package.path .. ';./?.lua;./?/init.lua'
 
 local color = require('lumos.color')
 
-print("=== Démonstration du module Color de Lumos ===\n")
+print("=== Demonstration of the Lumos Color module ===\n")
 
 -- Couleurs de base
-print("Couleurs de base:")
-print("• " .. color.red("Rouge"))
-print("• " .. color.green("Vert"))
-print("• " .. color.blue("Bleu"))
-print("• " .. color.yellow("Jaune"))
+print("Basic colors:")
+print("• " .. color.red("Red"))
+print("• " .. color.green("Green"))
+print("• " .. color.blue("Blue"))
+print("• " .. color.yellow("Yellow"))
 print("• " .. color.magenta("Magenta"))
 print("• " .. color.cyan("Cyan"))
-print("• " .. color.black("Noir"))
-print("• " .. color.format("{white}Blanc{reset}"))
+print("• " .. color.black("Black"))
+print("• " .. color.format("{white}White{reset}"))
 print()
 
 -- Couleurs vives
-print("Couleurs vives:")
-print("• " .. color.colorize("Rouge vif", "bright_red"))
-print("• " .. color.colorize("Vert vif", "bright_green"))
-print("• " .. color.colorize("Bleu vif", "bright_blue"))
-print("• " .. color.colorize("Jaune vif", "bright_yellow"))
-print("• " .. color.colorize("Magenta vif", "bright_magenta"))
-print("• " .. color.colorize("Cyan vif", "bright_cyan"))
+print("Bright colors:")
+print("• " .. color.colorize("Bright red", "bright_red"))
+print("• " .. color.colorize("Bright green", "bright_green"))
+print("• " .. color.colorize("Bright blue", "bright_blue"))
+print("• " .. color.colorize("Bright yellow", "bright_yellow"))
+print("• " .. color.colorize("Bright magenta", "bright_magenta"))
+print("• " .. color.colorize("Bright cyan", "bright_cyan"))
 print()
 
 -- Couleurs de fond
-print("Couleurs de fond:")
-print("• " .. color.colorize("Fond rouge", "bg_red"))
-print("• " .. color.colorize("Fond vert", "bg_green"))
-print("• " .. color.colorize("Fond bleu", "bg_blue"))
-print("• " .. color.colorize("Fond jaune", "bg_yellow"))
+print("Background colors:")
+print("• " .. color.colorize("Red background", "bg_red"))
+print("• " .. color.colorize("Green background", "bg_green"))
+print("• " .. color.colorize("Blue background", "bg_blue"))
+print("• " .. color.colorize("Yellow background", "bg_yellow"))
 print()
 
 -- Styles de texte
-print("Styles de texte:")
-print("• " .. color.bold("Texte en gras"))
-print("• " .. color.dim("Texte estompé"))
-print("• " .. color.colorize("Texte italique", "italic"))
-print("• " .. color.colorize("Texte souligné", "underline"))
-print("• " .. color.colorize("Texte barré", "strikethrough"))
+print("Text styles:")
+print("• " .. color.bold("Bold text"))
+print("• " .. color.dim("Dimmed text"))
+print("• " .. color.colorize("Italic text", "italic"))
+print("• " .. color.colorize("Underlined text", "underline"))
+print("• " .. color.colorize("Strikethrough text", "strikethrough"))
 print()
 
 -- Formatage avec templates
-print("Formatage avec templates:")
-print(color.format("{red}Erreur:{reset} Quelque chose s'est mal passé"))
-print(color.format("{green}{bold}Succès!{reset} L'opération est terminée"))
-print(color.format("{blue}Info:{reset} {dim}Détails supplémentaires{reset}"))
-print(color.format("{yellow}Attention:{reset} Vérifiez votre configuration"))
+print("Formatting with templates:")
+print(color.format("{red}Error:{reset} Something went wrong"))
+print(color.format("{green}{bold}Success!{reset} The operation is finished"))
+print(color.format("{blue}Info:{reset} {dim}Additional details{reset}"))
+print(color.format("{yellow}Warning:{reset} Check your configuration"))
 print()
 
 -- Exemples pratiques
-print("Exemples pratiques:")
+print("Practical examples:")
 
 -- Simulation d'un log
 local function log_message(level, message)
@@ -72,14 +72,14 @@ local function log_message(level, message)
     print(color.format(template))
 end
 
-log_message("ERROR", "Connexion à la base de données échouée")
-log_message("WARN", "Configuration par défaut utilisée")
-log_message("INFO", "Traitement en cours...")
-log_message("SUCCESS", "Fichier sauvegardé avec succès")
+log_message("ERROR", "Database connection failed")
+log_message("WARN", "Default configuration used")
+log_message("INFO", "Processing...")
+log_message("SUCCESS", "File saved successfully")
 print()
 
 -- Barre de progression colorée
-print("Barre de progression colorée:")
+print("Colored progress bar:")
 local function colored_progress(percentage)
     local filled = math.floor(percentage / 2)  -- 50 chars max
     local empty = 50 - filled
@@ -98,15 +98,15 @@ end
 print()
 
 -- Test de détection du terminal
-print("État des couleurs:")
-print("• Couleurs activées: " .. (color.is_enabled() and "✓" or "✗"))
-print("• Contrôle: utilisez LUMOS_NO_COLOR=1 pour désactiver")
+print("Color status:")
+print("• Colors enabled: " .. (color.is_enabled() and "✓" or "✗"))
+print("• Control: use LUMOS_NO_COLOR=1 to disable")
 print()
 
 -- Fonction pour désactiver/réactiver les couleurs
-print("Test d'activation/désactivation:")
-print("Avec couleurs: " .. color.red("Texte rouge"))
+print("Enable/disable test:")
+print("With colors: " .. color.red("Red text"))
 color.disable()
-print("Sans couleurs: " .. color.red("Texte rouge"))
+print("Without colors: " .. color.red("Red text"))
 color.enable()
-print("Avec couleurs: " .. color.red("Texte rouge"))
+print("With colors: " .. color.red("Red text"))

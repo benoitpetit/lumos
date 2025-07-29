@@ -1,28 +1,28 @@
 #!/usr/bin/env lua
 
--- Démonstration du module loader de Lumos
--- Montre différents styles de loaders et statuts
+-- Demonstration of the Lumos loader module
+-- Shows different loader styles and statuses
 
--- Ajouter le répertoire parent au chemin de recherche
+-- Add parent directory to search path
 package.path = package.path .. ';./?.lua;./?/init.lua'
 
 local loader = require('lumos.loader')
 local color = require('lumos.color')
 
-print("=== Démonstration du module Loader de Lumos ===\n")
+print("=== Demonstration of the Lumos Loader module ===\n")
 
--- Fonction utilitaire pour simuler du travail
+-- Utility function to simulate work
 local function simulate_work(duration)
     local start_time = os.clock()
     local target_duration = duration or 0.1
     while os.clock() - start_time < target_duration do
-        -- Simulation de travail
+        -- Simulate work
     end
 end
 
--- 1. Loader standard avec succès
-print("1. Loader standard avec succès:")
-loader.start("Connexion à la base de données", "standard")
+-- 1. Standard loader with success
+print("1. Standard loader with success:")
+loader.start("Database connection", "standard")
 for i = 1, 15 do
     loader.next()
     simulate_work(0.1)
@@ -30,9 +30,9 @@ end
 loader.success()
 print()
 
--- 2. Loader dots avec échec
-print("2. Loader dots avec échec:")
-loader.start("Téléchargement du fichier", "dots")
+-- 2. Dots loader with failure
+print("2. Dots loader with failure:")
+loader.start("File download", "dots")
 for i = 1, 8 do
     loader.next()
     simulate_work(0.15)
@@ -40,9 +40,9 @@ end
 loader.fail()
 print()
 
--- 3. Loader bounce avec arrêt
-print("3. Loader bounce avec arrêt:")
-loader.start("Traitement des données", "bounce")
+-- 3. Bounce loader with stop
+print("3. Bounce loader with stop:")
+loader.start("Data processing", "bounce")
 for i = 1, 6 do
     loader.next()
     simulate_work(0.12)
@@ -50,15 +50,15 @@ end
 loader.stop()
 print()
 
--- 4. Simulation de différentes tâches avec différents styles
-print("4. Simulation de tâches multiples:")
+-- 4. Simulation of multiple tasks with different styles
+print("4. Simulation of multiple tasks:")
 
 local tasks = {
-    {message = "Initialisation du système", style = "standard", duration = 0.08, iterations = 12, result = "success"},
-    {message = "Chargement des modules", style = "dots", duration = 0.1, iterations = 10, result = "success"},
-    {message = "Vérification des permissions", style = "bounce", duration = 0.06, iterations = 15, result = "success"},
-    {message = "Configuration réseau", style = "standard", duration = 0.12, iterations = 8, result = "fail"},
-    {message = "Sauvegarde des paramètres", style = "dots", duration = 0.09, iterations = 11, result = "success"},
+    {message = "System initialization", style = "standard", duration = 0.08, iterations = 12, result = "success"},
+    {message = "Module loading", style = "dots", duration = 0.1, iterations = 10, result = "success"},
+    {message = "Permission check", style = "bounce", duration = 0.06, iterations = 15, result = "success"},
+    {message = "Network configuration", style = "standard", duration = 0.12, iterations = 8, result = "fail"},
+    {message = "Saving parameters", style = "dots", duration = 0.09, iterations = 11, result = "success"},
 }
 
 for _, task in ipairs(tasks) do
@@ -78,11 +78,11 @@ for _, task in ipairs(tasks) do
 end
 
 print()
-print("5. Démonstration des différents styles de loaders:")
+print("5. Demonstration of different loader styles:")
 
 -- Style standard
-print("\n   Style STANDARD:")
-loader.start("   Exemple standard", "standard")
+print("\n   STANDARD style:")
+loader.start("   Standard example", "standard")
 for i = 1, 8 do
     loader.next()
     simulate_work(0.1)
@@ -90,8 +90,8 @@ end
 loader.success()
 
 -- Style dots
-print("\n   Style DOTS:")
-loader.start("   Exemple avec points", "dots")
+print("\n   DOTS style:")
+loader.start("   Dots example", "dots")
 for i = 1, 8 do
     loader.next()
     simulate_work(0.1)
@@ -99,8 +99,8 @@ end
 loader.success()
 
 -- Style bounce
-print("\n   Style BOUNCE:")
-loader.start("   Exemple avec rebond", "bounce")
+print("\n   BOUNCE style:")
+loader.start("   Bounce example", "bounce")
 for i = 1, 8 do
     loader.next()
     simulate_work(0.1)
@@ -108,17 +108,17 @@ end
 loader.success()
 
 print()
-print("=== Résumé des fonctionnalités ===\n")
-print(color.bold("Styles disponibles:"))
-print("  • standard : | / - \\")
+print("=== Feature summary ===\n")
+print(color.bold("Available styles:"))
+print("  • standard : | / - \")
 print("  • dots     : .   ..  ...")
 print("  • bounce   : ◜ ◠ ◝ ◞ ◡ ◟")
 print()
-print(color.bold("Méthodes disponibles:"))
-print("  • loader.start(message, style) - Démarre un loader")
-print("  • loader.next()                 - Anime le loader")
-print("  • loader.success()              - Termine avec succès")
-print("  • loader.fail()                 - Termine avec échec")
-print("  • loader.stop()                 - Arrête le loader")
+print(color.bold("Available methods:"))
+print("  • loader.start(message, style) - Starts a loader")
+print("  • loader.next()                 - Animates the loader")
+print("  • loader.success()              - Ends with success")
+print("  • loader.fail()                 - Ends with failure")
+print("  • loader.stop()                 - Stops the loader")
 print()
-print(color.green("✓ Démonstration des loaders terminée avec succès!"))
+print(color.green("✓ Loader demonstration completed successfully!"))

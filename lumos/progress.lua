@@ -117,14 +117,14 @@ function progress.simple(current, total, width)
 end
 
 -- Styles helpers
--- color_fn peut être une string (nom de couleur) ou une fonction personnalisée
+-- color_fn can be a function or a string
 function progress.color_bar(bar, current, total, color_fn)
     if type(color_fn) == "function" then
         return color_fn(bar, current, total)
     elseif type(color_fn) == "string" and color[color_fn] then
         return color[color_fn](bar)
     else
-        -- fallback dynamique comme avant
+        -- dynamic fallback as before
         local ratio = current / total
         if ratio < 0.33 then
             return color.red(bar)
@@ -137,7 +137,7 @@ function progress.color_bar(bar, current, total, color_fn)
 end
 
 function progress.table_bar(bar, current, total)
-    -- Affichage tabulaire simple, sans dépendance à lumos_table.format
+    -- show in table format 
     return string.format("| Progress | %s | %d/%d |", bar, current, total)
 end
 

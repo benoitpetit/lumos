@@ -1,30 +1,30 @@
 #!/usr/bin/env lua
 
--- Exemple basique d'utilisation du framework Lumos
--- Démontre les fonctionnalités principales : commandes, arguments, flags
+-- Basic example using the Lumos framework
+-- Demonstrates main features: commands, arguments, flags
 
--- Ajouter le répertoire parent au chemin de recherche
+-- Add parent directory to search path
 package.path = package.path .. ';./?.lua;./?/init.lua'
 
 local lumos = require('lumos')
 local color = require('lumos.color')
 
--- Créer l'application
+-- Create the application
 local app = lumos.new_app({
     name = "myapp",
     version = "1.0.0", 
-    description = "Exemple basique d'utilisation de Lumos"
+    description = "Basic example using Lumos"
 })
 
--- Ajouter des flags globaux
-app:flag("-v --verbose", "Active la sortie détaillée")
-app:flag("--debug", "Active le mode debug")
+-- Add global flags
+app:flag("-v --verbose", "Enable detailed output")
+app:flag("--debug", "Enable debug mode")
 
--- Commande "greet" pour saluer
-local greet = app:command("greet", "Salue une personne")
-greet:arg("name", "Nom de la personne à saluer")
-greet:flag("-u --uppercase", "Affiche en majuscules") 
-greet:flag("-c --colorful", "Affiche en couleur")
+-- "greet" command to greet someone
+local greet = app:command("greet", "Greet a person")
+greet:arg("name", "Name of the person to greet")
+greet:flag("-u --uppercase", "Display in uppercase") 
+greet:flag("-c --colorful", "Display in color")
 greet:examples({
     "myapp greet Alice",
     "myapp greet Bob --uppercase",
@@ -32,8 +32,8 @@ greet:examples({
 })
 
 greet:action(function(ctx)
-    local name = ctx.args[1] or "Monde"
-    local message = "Bonjour, " .. name .. " !"
+    local name = ctx.args[1] or "World"
+    local message = "Hello, " .. name .. "!"
     
     if ctx.flags.uppercase then
         message = message:upper()
@@ -44,15 +44,15 @@ greet:action(function(ctx)
     end
     
     if ctx.flags.verbose then
-        print(color.dim("Mode verbose activé"))
-        print(color.dim("Arguments reçus: " .. table.concat(ctx.args or {}, ", ")))
+        print(color.dim("Verbose mode enabled"))
+        print(color.dim("Received arguments: " .. table.concat(ctx.args or {}, ", ")))
     end
     
     print(message)
     return true
 end)
 
--- Commande "info" pour des informations
+-- "info" command for information
 local info = app:command("info", "Affiche des informations sur l'application")
 info:flag("-a --all", "Affiche toutes les informations")
 

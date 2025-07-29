@@ -76,7 +76,7 @@ function prompt.select(message, options, default)
             local marker = (i == current) and ">" or " "
             io.write(string.format("%s %d) %s\n", marker, i, option))
         end
-        io.write("Utilisez ↑/↓ pour naviguer, Entrée pour valider.\n")
+        io.write("Use ↑/↓ to navigate, Enter to confirm.\n")
         io.flush()
     end
     local function update_selection()
@@ -86,11 +86,11 @@ function prompt.select(message, options, default)
             local marker = (i == current) and ">" or " "
             io.write(string.format("\r%s %d) %s\27[K\n", marker, i, option))
         end
-        io.write("\rUtilisez ↑/↓ pour naviguer, Entrée pour valider.\27[K\n")
+        io.write("\rUse ↑/↓ to navigate, Enter to confirm.\27[K\n")
         io.flush()
     end
     os.execute("stty -icanon -echo")
-    io.write("\27[?25l") -- cache le curseur
+    io.write("\27[?25l") -- hide cursor
     render_menu()
     local result = nil
     while not result do
@@ -111,7 +111,7 @@ function prompt.select(message, options, default)
             result = {current, options[current]}
         end
     end
-    io.write("\27[?25h") -- affiche le curseur
+    io.write("\27[?25h") -- show cursor
     os.execute("stty sane")
     io.write("\n")
     return result[1], result[2]
@@ -131,7 +131,7 @@ function prompt.multiselect(message, options)
             local pointer = (i == current) and ">" or " "
             io.write(string.format("%s %s %s\n", pointer, marker, option))
         end
-        io.write("Utilisez ↑/↓ pour naviguer, Espace pour sélectionner, Entrée pour valider, q pour quitter.\n")
+        io.write("Use ↑/↓ to navigate, Space to select, Enter to confirm, q to quit.\n")
         io.flush()
     end
     local function update_selection()
@@ -141,11 +141,11 @@ function prompt.multiselect(message, options)
             local pointer = (i == current) and ">" or " "
             io.write(string.format("\r%s %s %s\27[K\n", pointer, marker, option))
         end
-        io.write("\rUtilisez ↑/↓ pour naviguer, Espace pour sélectionner, Entrée pour valider, q pour quitter.\27[K\n")
+        io.write("\rUse ↑/↓ to navigate, Space to select, Enter to confirm, q to quit.\27[K\n")
         io.flush()
     end
     os.execute("stty -icanon -echo")
-    io.write("\27[?25l") -- cache le curseur
+    io.write("\27[?25l") -- hide cursor
     render_menu()
     local done = false
     local quit = false

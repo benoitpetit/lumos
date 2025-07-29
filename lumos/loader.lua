@@ -1,6 +1,6 @@
 -- lumos/loader.lua
--- Loader CLI avec plusieurs styles et gestion de statut
-
+-- Loader CLI which displays a loading animation in the terminal.
+-- It supports different styles and can indicate success or failure.
 local loader = {}
 
 local styles = {
@@ -22,7 +22,7 @@ function loader.start(msg, style_name)
     current.active = true
     current.style = styles[style_name] or styles.standard
     current.idx = 1
-    current.message = msg or "Chargement"
+    current.message = msg or "Loading"
     current.status = "loading"
     io.write("\r" .. current.message .. " " .. current.style[current.idx] .. string.rep(" ", 20) .. "\r")
     io.flush()

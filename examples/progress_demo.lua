@@ -1,71 +1,71 @@
 #!/usr/bin/env lua
 
--- Démonstration du module progress de Lumos
--- Montre différents types de barres de progression
+-- Demonstration of the Lumos progress module
+-- Shows different types of progress bars
 
--- Ajouter le répertoire parent au chemin de recherche
+-- Add parent directory to search path
 package.path = package.path .. ';./?.lua;./?/init.lua'
 
 local progress = require('lumos.progress')
 local color = require('lumos.color')
 
-print("=== Démonstration du module Progress de Lumos ===\n")
+print("=== Demonstration of the Lumos Progress module ===\n")
 
--- Fonction utilitaire pour simuler du travail
+-- Utility function to simulate work
 local function simulate_work(duration)
-    -- Utiliser une méthode plus précise pour des délais courts
+    -- Use a more precise method for short delays
     local start_time = os.clock()
     local target_duration = duration or 0.1
     while os.clock() - start_time < target_duration do
-        -- Simulation de travail
+        -- Simulate work
     end
 end
 
--- 1. Barre de progression simple
-print("1. Barre de progression simple:")
+-- 1. Simple progress bar
+print("1. Simple progress bar:")
 for i = 1, 10 do
     progress.simple(i, 10)
-    simulate_work(0.05)  -- Réduit de 200ms à 50ms
+    simulate_work(0.05)  -- Reduced from 200ms to 50ms
 end
 print()
 
--- 2. Barre de progression avancée avec configuration personnalisée
-print("2. Barre de progression avancée:")
+-- 2. Advanced progress bar with custom configuration
+print("2. Advanced progress bar:")
 local bar1 = progress.new({
     total = 20,
     width = 40,
     format = "[{bar}] {percentage}% ({current}/{total}) {eta}",
     fill = "█",
     empty = "░",
-    prefix = "Traitement: ",
-    suffix = " Terminé"
+    prefix = "Processing: ",
+    suffix = " Finished"
 })
 
 for i = 1, 20 do
     bar1:update(i)
-    simulate_work(0.03)  -- Réduit de 100ms à 30ms
+    simulate_work(0.03)  -- Reduced from 100ms to 30ms
 end
 print()
 
--- 3. Différents styles de barres
-print("3. Différents styles:")
+-- 3. Different bar styles
+print("3. Different styles:")
 
--- Style classique
-print("Style classique:")
+-- Classic style
+print("Classic style:")
 local bar_classic = progress.new({
     total = 15,
     width = 30,
     style = "classic",
-    format = "Classique: [{bar}] {percentage}%"
+    format = "Classic: [{bar}] {percentage}%"
 })
 for i = 1, 15 do
     bar_classic:update(i)
-    simulate_work(0.02)  -- Réduit à 20ms
+    simulate_work(0.02)  -- Reduced to 20ms
 end
 print()
 
--- Style Unicode
-print("Style Unicode:")
+-- Unicode style
+print("Unicode style:")
 local bar_unicode = progress.new({
     total = 15,
     width = 30,
@@ -74,30 +74,30 @@ local bar_unicode = progress.new({
 })
 for i = 1, 15 do
     bar_unicode:update(i)
-    simulate_work(0.02)  -- Réduit à 20ms
+    simulate_work(0.02)  -- Reduced to 20ms
 end
 print()
 
--- Style blocs
-print("Style blocs:")
+-- Blocks style
+print("Blocks style:")
 local bar_blocks = progress.new({
     total = 15,
     width = 30,
     style = "blocks",
-    format = "Blocs: [{bar}] {percentage}%"
+    format = "Blocks: [{bar}] {percentage}%"
 })
 for i = 1, 15 do
     bar_blocks:update(i)
-    simulate_work(0.02)  -- Réduit à 20ms
+    simulate_work(0.02)  -- Reduced to 20ms
 end
 print()
 
--- 4. Barre avec couleurs dynamiques
-print("4. Barre avec couleurs dynamiques:")
+-- 4. Bar with dynamic colors
+print("4. Bar with dynamic colors:")
 local bar_colored = progress.new({
     total = 30,
     width = 50,
-    format = "Coloré: [{bar}] {percentage}%",
+    format = "Colored: [{bar}] {percentage}%",
     color_fn = function(bar, current, total)
         local ratio = current / total
         if ratio < 0.33 then
@@ -112,55 +112,55 @@ local bar_colored = progress.new({
 
 for i = 1, 30 do
     bar_colored:update(i)
-    simulate_work(0.015)  -- Réduit à 15ms
+    simulate_work(0.015)  -- Reduced to 15ms
 end
 print()
 
--- 5. Utilisation avec increment au lieu d'update
-print("5. Utilisation avec increment:")
+-- 5. Usage with increment instead of update
+print("5. Usage with increment:")
 local bar_increment = progress.new({
-    total = 50,  -- Réduit de 100 à 50 pour être plus rapide
+    total = 50,  -- Reduced from 100 to 50 for faster demo
     width = 40,
-    format = "Incrémental: [{bar}] {current}/{total}"
+    format = "Incremental: [{bar}] {current}/{total}"
 })
 
--- Simulation de traitement par lots
-local batch_sizes = {5, 10, 15, 20}  -- Réduit le nombre de lots
+-- Simulate batch processing
+local batch_sizes = {5, 10, 15, 20}  -- Reduced number of batches
 for _, batch_size in ipairs(batch_sizes) do
     for j = 1, batch_size do
         bar_increment:increment()
-        simulate_work(0.01)  -- Réduit à 10ms
+        simulate_work(0.01)  -- Reduced to 10ms
     end
-    simulate_work(0.05)  -- Réduit la pause entre les lots
+    simulate_work(0.05)  -- Reduced pause between batches
 end
 
--- S'assurer que la barre est complète
+-- Ensure the bar is complete
 bar_increment:finish()
 print()
 
--- 6. Plusieurs barres en parallèle (simulation)
-print("6. Simulation de barres multiples:")
-print("Tâche A:")
+-- 6. Multiple bars in parallel (simulation)
+print("6. Multiple bars simulation:")
+print("Task A:")
 local task_a = progress.new({
     total = 8,
     format = "  A: [{bar}] {percentage}%"
 })
 
-print("Tâche B:")
+print("Task B:")
 local task_b = progress.new({
     total = 12,
     format = "  B: [{bar}] {percentage}%"
 })
 
--- Simulation de tâches en parallèle
+-- Simulation of parallel tasks
 for i = 1, 12 do
     if i <= 8 then
         task_a:update(i)
     end
     task_b:update(i)
-    simulate_work(0.05)  -- Réduit de 100ms à 50ms
+    simulate_work(0.05)  -- Reduced from 100ms to 50ms
 end
 
 print()
-print("Démonstration terminée!")
-print(color.green("✓ Toutes les barres de progression ont été testées avec succès"))
+print("Demonstration finished!")
+print(color.green("✓ All progress bars have been successfully tested"))

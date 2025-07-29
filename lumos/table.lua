@@ -1,10 +1,10 @@
 
 -- lumos/table.lua
--- Module pour créer des tableaux encadrés dans le CLI
+-- Module to create boxed tables in the CLI
 
 local tbl = {}
 
--- Crée un tableau encadré à partir d'une liste de chaînes
+-- Creates a boxed table from a list of strings
 -- options: {header=..., footer=..., align="left"|"center"|"right"}
 local function to_string(val)
     if type(val) == "table" then
@@ -32,7 +32,7 @@ function tbl.boxed(items, options)
     local header = options.header and to_string(options.header) or nil
     local footer = options.footer and to_string(options.footer) or nil
 
-    -- Calcule la largeur maximale
+    -- Compute maximum width
     local all_items = {}
     if header then table.insert(all_items, header) end
     for _, v in ipairs(str_items) do table.insert(all_items, v) end
@@ -42,7 +42,7 @@ function tbl.boxed(items, options)
         if #item > max_len then max_len = #item end
     end
 
-    -- Si option big, adapte la largeur au terminal
+    -- If 'large' option, adapt width to terminal
     if options.large then
         local term_width = 0
         local fh = io.popen('tput cols 2>/dev/null')
@@ -52,7 +52,7 @@ function tbl.boxed(items, options)
             term_width = tonumber(w) or 0
         end
         if term_width > 10 then
-            max_len = term_width - 4 -- 2 pour chaque bordure
+            max_len = term_width - 4 -- 2 for each border
             if max_len < 1 then max_len = 1 end
         end
     end
