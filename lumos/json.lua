@@ -59,4 +59,80 @@ function json.encode(obj)
     return encode_value(obj)
 end
 
+-- Simple JSON decoder (basic implementation)
+function json.decode(str)
+    -- Remove whitespace
+    str = str:gsub("^%s+", ""):gsub("%s+$", "")
+    
+    -- Handle null
+    if str == "null" then
+        return nil
+    end
+    
+    -- Handle boolean
+    if str == "true" then
+        return true
+    elseif str == "false" then
+        return false
+    end
+    
+    -- Handle number
+    local num = tonumber(str)
+    if num then
+        return num
+    end
+    
+    -- Handle string
+    if str:match('^".*"$') then
+        return str:sub(2, -2):gsub('\\(.)', {
+            ['"'] = '"',
+            ['\\'] = '\\',
+            ['n'] = '\n',
+            ['r'] = '\r',
+            ['t'] = '\t'
+        })
+    end
+    
+    -- Handle object
+    if str:match('^{.*}$') then
+        local obj = {}
+        local content = str:sub(2, -2):gsub("^%s+", ""):gsub("%s+$", "")
+        
+        if content == "" then
+            return obj
+        end
+        
+        -- Simple key-value parsing
+        for pair in content:gmatch('([^,]+)') do
+            local key, value = pair:match('"([^"]+)"%s*:%s*(.+)')
+            if key and value then
+                value = value:gsub("^%s+", ""):gsub("%s+$", "")
+                obj[key] = json.decode(value)
+            end
+        end
+        
+        return obj
+    end
+    
+    -- Handle array
+    if str:match('^%[.*%]$') then
+        local arr = {}
+        local content = str:sub(2, -2):gsub("^%s+", ""):gsub("%s+$", "")
+        
+        if content == "" then
+            return arr
+        end
+        
+        for item in content:gmatch('([^,]+)') do
+            item = item:gsub("^%s+", ""):gsub("%s+$", "")
+            table.insert(arr, json.decode(item))
+        end
+        
+        return arr
+    end
+    
+    -- Fallback to string
+    return str
+end
+
 return json

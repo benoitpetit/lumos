@@ -23,5 +23,6 @@ return {
     prompt = prompt,
     table = lumos_table,
     json = json,
-    version = "0.2.0"
+    version = "0.3.0",
+    load_config = core.load_config
 }

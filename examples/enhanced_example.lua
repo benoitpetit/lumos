@@ -39,7 +39,7 @@ end)
 app:flag("-j --json", "Output in JSON format")
 
 -- Utilize input validators
-local email = prompt.input("Enter your email:")
+local email = prompt.input("Enter your email")
 local valid, result = prompt.validate(email, prompt.validators.email)
 if valid then
     print("Valid email: " .. result)

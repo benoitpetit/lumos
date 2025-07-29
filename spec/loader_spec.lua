@@ -30,7 +30,7 @@ describe('Loader Module', function()
     it('starts with default message and style', function()
       loader.start()
       
-      assert.is_not_nil(written_output:match("Chargement"))
+      assert.is_not_nil(written_output:match("Loading"))
       assert.is_not_nil(written_output:match("[|/%-\\]"))  -- Should contain spinner chars
     end)
 

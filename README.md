@@ -5,31 +5,46 @@
     <img src="lumosb&wclear.png" alt="Lumos Logo" width="250">
 </p>
 
-**Lumos** (Latin for "light") is a modern, enhanced CLI framework for Lua, inspired by Cobra for Go. It simplifies command-line application development with an elegant, fluent API, complete with argument parsing, automatic help generation, color support, progress bars, interactive prompts, and advanced features like JSON output and input validation.
+**Lumos** (Latin for "light") is a modern, enterprise-grade CLI framework for Lua, inspired by Cobra for Go. It provides a comprehensive toolkit for building sophisticated command-line applications with advanced features like typed flags, configuration management, command aliases, and robust validation.
 ## 🌟 Key Features
 
-Lumos CLI Framework offers a comprehensive set of features for building modern command-line applications in Lua:
+Lumos CLI Framework offers a comprehensive set of enterprise-ready features:
 
-- **POSIX-compliant argument parsing**: Supports both short (`-h`) and long (`--help`) flags.
-- **Fluent API for commands**: Chainable methods for defining commands, arguments, flags, and actions.
-- **Automatic help generation**: Built-in help text with usage examples.
-- **Color and styling support**: ANSI color output, styling helpers, and terminal detection.
-- **Progress bars**: Simple and advanced progress indicators for CLI feedback.
-- **Interactive prompts**: Text input, password entry, confirmations, selections, and validation.
-- **Global and local flags**: Flexible flag definitions with inheritance and scope control.
-- **Comprehensive error handling**: Clear error messages and robust input validation.
-- **Subcommand support**: Nested commands for complex CLI structures.
-- **JSON output**: Built-in serialization for structured data.
-- **Advanced input validation**: Pre-defined validators for emails, numbers, and more.
-- **Enhanced color helpers**: Contextual color functions for status and log messages.
-- **Performance optimizations**: Fast argument parsing and efficient execution.
+### 🚀 **Core Features**
+- **POSIX-compliant argument parsing**: Supports both short (`-h`) and long (`--help`) flags
+- **Fluent API**: Chainable methods for defining commands, arguments, flags, and actions
+- **Automatic help generation**: Built-in help text with usage examples
+- **Subcommand support**: Nested commands for complex CLI structures
+
+### 🎯 **Advanced Flag System** (NEW in v0.3.0)
+- **Typed flags**: `flag_int()`, `flag_email()`, `flag_string()` with automatic validation
+- **Flag validation**: Min/max constraints, required flags, format validation
+- **Persistent flags**: Flags inherited by subcommands
+- **Command aliases**: Multiple names for the same command (`add`, `a`, `create`)
+
+### ⚙️ **Configuration Management** (NEW in v0.3.0)
+- **External configuration**: Load from JSON files and environment variables
+- **Priority hierarchy**: Flags > Environment > Config file > Defaults
+- **Built-in JSON codec**: Complete encode/decode support
+
+### 🎨 **Rich UI Components**
+- **Color and styling**: ANSI colors with terminal detection and contextual helpers
+- **Progress bars**: Simple and advanced progress indicators with ETA
+- **Interactive prompts**: Input, password, confirmations, selections with validation
+- **Loading animations**: Spinners with customizable styles
+- **Boxed tables**: Formatted output with headers and alignment
+
+### 🛡️ **Robust Validation**
+- **Input validators**: Email, URL, number, path validation
+- **Error handling**: Clear error messages and graceful failure
+- **Type safety**: Automatic type conversion and validation
 
 ## 📦 Installation
 
 
 ### Requirements
 - Lua 5.1+ or LuaJIT
-- LuaRocks package manager
+- LuaRocks package manager (recommended)
 - Unix-like system (Linux, macOS) or Windows
 
 ### Install from LuaRocks
@@ -60,7 +75,7 @@ To contribute to Lumos or use the latest version:
 # Clone the repository and install
 git clone https://github.com/benoitpetit/lumos.git
 cd lumos
-luarocks make lumos-0.1.0-1.rockspec
+luarocks make lumos-0.3.0-1.rockspec
 ```
 
 ### Manual Installation (without LuaRocks)
@@ -290,7 +305,120 @@ loader.start("Loading", "dots")      -- .  , .. , ...
 loader.start("Loading", "bounce")    -- ◜, ◠, ◝, ◞, ◡, ◟
 ```
 
-## 🆕 Enhanced Features (v2.0+)
+## 🆕 New Features in v0.3.0
+
+### 🎯 Typed Flags with Validation
+
+Define flags with specific types and automatic validation:
+
+```lua
+local cmd = app:command("create", "Create a resource")
+
+-- Integer flags with min/max constraints
+cmd:flag_int("--port", "Port number", 1, 65535)
+cmd:flag_int("--timeout", "Timeout in seconds", 1, 3600)
+
+-- Email validation
+cmd:flag_email("--email", "Contact email address")
+
+-- String flags (equivalent to :option())
+cmd:flag_string("--name", "Resource name")
+```
+
+**Supported Types:**
+- `flag_int(spec, desc, min, max)` - Integer with range validation
+- `flag_email(spec, desc)` - Email format validation  
+- `flag_string(spec, desc)` - String value (same as option)
+- `flag(spec, desc)` - Boolean flag
+
+### 🔗 Command Aliases
+
+Create multiple names for the same command:
+
+```lua
+local add = app:command("add", "Add an item")
+add:alias("a")        -- Short alias: 'a'
+add:alias("create")   -- Alternative: 'create'
+add:alias("new")      -- Another option: 'new'
+
+-- All of these work:
+-- myapp add item
+-- myapp a item  
+-- myapp create item
+-- myapp new item
+```
+
+### 🔄 Persistent Flags
+
+Define flags that are inherited by all subcommands:
+
+```lua
+-- App-level persistent flags
+app:persistent_flag("-v --verbose", "Enable verbose output")
+app:persistent_flag("--dry-run", "Show what would be done")
+
+-- Command-level persistent flags
+local deploy = app:command("deploy", "Deploy application")
+deploy:persistent_flag("--env", "Deployment environment")
+
+-- All subcommands inherit these flags automatically
+```
+
+### ⚙️ Configuration Management
+
+Load configuration from multiple sources with automatic merging:
+
+```lua
+local config = require('lumos.config')
+
+-- Load from JSON file
+local file_config, err = config.load_file("config.json")
+
+-- Load from environment variables
+local env_config = config.load_env("MYAPP") -- Reads MYAPP_* vars
+
+-- Merge with priority: flags > env > config > defaults
+local final_config = config.merge_configs(
+    {timeout = 30},  -- defaults
+    file_config,     -- from config.json
+    env_config,      -- from MYAPP_* env vars
+    ctx.flags        -- from command line (highest priority)
+)
+```
+
+**Example config.json:**
+```json
+{
+    "timeout": 60,
+    "environment": "production",
+    "debug": false
+}
+```
+
+### 🛡️ Advanced Validation
+
+Robust validation with clear error messages:
+
+```lua
+-- Validation happens automatically for typed flags
+cmd:flag_int("--port", "Port number", 1, 65535)
+
+-- If user provides: --port 70000
+-- Output: Error: Flag --port must be <= 65535
+
+-- If user provides: --port abc  
+-- Output: Error: Flag --port must be an integer
+```
+
+**Built-in Validators:**
+- Email format validation
+- URL format validation
+- Integer with min/max range
+- Number validation
+- Path validation
+- Required flag validation
+
+### 📋 Enhanced Features (v2.0+)
 
 ### Subcommands
 
@@ -434,47 +562,74 @@ app:run(arg)
 
 ## 🧪 Testing and Examples
 
-### Running Examples
+### 📚 Example Applications
 
-All examples are located in the `examples/` directory and should be run from the project root:
+All examples are located in the `examples/` directory and demonstrate different Lumos features:
 
-#### Basic Application Example
+#### 🔰 Basic Examples
+
+**Basic Application** (`basic_app.lua`)
 ```bash
 # Show help
 lua examples/basic_app.lua --help
 
-# Run commands
+# Run commands with different flags
 lua examples/basic_app.lua greet Alice
 lua examples/basic_app.lua greet Bob --uppercase --colorful
-lua examples/basic_app.lua info --all
+lua examples/basic_app.lua info --all --verbose
 ```
 
-#### Color Demonstration
+**UI Components Demos**
 ```bash
-# Show all color capabilities
+# Color and styling showcase
 lua examples/colors_demo.lua
-```
 
-#### Progress Bar Examples
-```bash
-# Demonstrate various progress bar types
+# Progress bars and loaders
 lua examples/progress_demo.lua
+lua examples/loader_demo.lua
 ```
 
-#### Enhanced Features Examples
-```bash
-# JSON output and input validation
-lua examples/json_validation_demo.lua --help
-lua examples/json_validation_demo.lua list --json
-lua examples/json_validation_demo.lua validate
+#### 🎯 Advanced Examples (v0.3.0)
 
+**Typed Flags with Validation**
+```bash
+# Demonstrates integer, email, and other typed flags
+lua examples/typed_flags.lua create myapp --port 8080 --email admin@example.com
+lua examples/typed_flags.lua create webapp --port 70000  # Shows validation error
+```
+
+**Command Aliases and Persistent Flags**
+```bash
+# Multiple ways to call the same command
+lua examples/aliases_persistent.lua add book --verbose
+lua examples/aliases_persistent.lua a book --count 5 --dry-run
+lua examples/aliases_persistent.lua create book --verbose
+lua examples/aliases_persistent.lua new book
+```
+
+**Configuration Management**
+```bash
+# Load configuration from file and environment
+lua examples/config_example.lua deploy staging --config examples/config.json
+lua examples/config_example.lua deploy production --config examples/config.json --dry-run
+```
+
+#### 🚀 Advanced Features
+
+**Subcommands and JSON Output**
+```bash
 # Subcommands demonstration
-lua examples/subcommand_demo.lua --help
 lua examples/subcommand_demo.lua user list
 lua examples/subcommand_demo.lua user create alice --admin --json
 
-# Advanced features showcase
-lua examples/advanced_features.lua --help
+# JSON validation and output
+lua examples/json_validation_demo.lua list --json
+lua examples/json_validation_demo.lua validate
+```
+
+**Interactive Features**
+```bash
+# Full interactive demo with prompts and validation
 lua examples/advanced_features.lua user create
 lua examples/advanced_features.lua interactive
 ```
@@ -575,7 +730,7 @@ git clone https://github.com/benoitpetit/lumos.git
 cd lumos
 
 # Install for development
-luarocks make lumos-0.1.0-1.rockspec
+luarocks make lumos-0.3.0-1.rockspec
 
 # Run tests
 busted spec/

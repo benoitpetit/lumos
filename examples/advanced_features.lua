@@ -37,7 +37,7 @@ create_user:action(function(ctx)
     end
     
     -- Interactive prompts with validation
-    local email = prompt.input("Enter email address:")
+    local email = prompt.input("Enter email address")
     local valid_email, _ = prompt.validate(email, prompt.validators.email, "Invalid email format")
     
     if not valid_email then
@@ -158,7 +158,7 @@ interactive_cmd:action(function(ctx)
     -- Email validation
     local email
     repeat
-        email = prompt.input("Enter your email:")
+        email = prompt.input("Enter your email")
         local valid, error_msg = prompt.validate(email, prompt.validators.email, "Please enter a valid email address")
         if not valid then
             print(color.red(error_msg))
@@ -170,7 +170,7 @@ interactive_cmd:action(function(ctx)
     -- Number validation
     local age
     repeat
-        age = prompt.input("Enter your age:")
+        age = prompt.input("Enter your age")
         local valid, error_msg = prompt.validate(age, prompt.validators.number, "Please enter a valid number")
         if not valid then
             print(color.red(error_msg))
@@ -186,12 +186,12 @@ interactive_cmd:action(function(ctx)
     -- Selection
     local languages = {"Lua", "Python", "JavaScript", "Go", "Rust"}
     print("Choose your favorite programming language:")
-    local choice, language = prompt.select("Select:", languages, 1)
+    local choice, language = prompt.select("Select", languages, 1)
     
     -- Multi-selection
     print("Select your skills (use space to select, enter to confirm):")
     local skills = {"Programming", "Design", "Marketing", "Management", "Testing"}
-    local selected_skills = prompt.multiselect("Skills:", skills)
+    local selected_skills = prompt.multiselect("Skills", skills)
     
     -- Summary
     local summary = {

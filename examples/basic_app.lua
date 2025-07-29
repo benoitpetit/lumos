@@ -53,22 +53,22 @@ greet:action(function(ctx)
 end)
 
 -- "info" command for information
-local info = app:command("info", "Affiche des informations sur l'application")
-info:flag("-a --all", "Affiche toutes les informations")
+local info = app:command("info", "Display application information")
+info:flag("-a --all", "Show all information")
 
 info:action(function(ctx)
-    print(color.bold("Informations sur l'application:"))
-    print("Nom: " .. color.cyan("myapp"))
+    print(color.bold("Application Information:"))
+    print("Name: " .. color.cyan("myapp"))
     print("Version: " .. color.yellow("1.0.0"))
     
     if ctx.flags.all then
         print("Framework: " .. color.magenta("Lumos"))
-        print("Langage: " .. color.blue("Lua"))
-        print("Commandes disponibles: greet, info")
+        print("Language: " .. color.blue("Lua"))
+        print("Available commands: greet, info")
     end
     
     return true
 end)
 
--- Lancer l'application avec les arguments de la ligne de commande
+-- Run the application with command line arguments
 app:run(arg)

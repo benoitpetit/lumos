@@ -30,21 +30,26 @@ end
 
 function Command:flag(spec, description)
     self.flags = self.flags or {}
-    local short, long = spec:match("^%-([a-zA-Z])%s+%-%-([a-zA-Z%-]+)$")
+    local short, long = spec:match("^%-([a-zA-Z])%s+%-%-([a-zA-Z][a-zA-Z%-]*)$")
     if not short then
-        long = spec:match("^%-%-([a-zA-Z%-]+)$")
+        long = spec:match("^%-%-([a-zA-Z][a-zA-Z%-]*)$")
     end
     if not long then
         short = spec:match("^%-([a-zA-Z])$")
     end
-    
+
+    -- Handle the case where we couldn't parse anything
+    if not long and not short then
+        error("Invalid flag specification: " .. spec)
+    end
+
     local flag = {
         short = short,
         long = long or short,
         description = description,
         type = "boolean"
     }
-    
+
     self.flags[long or short] = flag
     return self
 end
@@ -80,6 +85,102 @@ function Command:action(func)
     return self
 end
 
+-- Add aliases support
+function Command:alias(alias_name)
+    self.aliases = self.aliases or {}
+    table.insert(self.aliases, alias_name)
+    return self
+end
+
+-- Add typed flag methods
+function Command:flag_int(spec, description, min, max)
+    self.flags = self.flags or {}
+    local short, long = spec:match("^%-([a-zA-Z])%s+%-%-([a-zA-Z%-]+)$")
+    if not short then
+        long = spec:match("^%-%-([a-zA-Z%-]+)$")
+    end
+    if not long then
+        short = spec:match("^%-([a-zA-Z])$")
+    end
+
+    local flag = {
+        short = short,
+        long = long or short,
+        description = description,
+        type = "int",
+        min = min,
+        max = max
+    }
+
+    self.flags[long or short] = flag
+    return self
+end
+
+function Command:flag_string(spec, description)
+    self.flags = self.flags or {}
+    local short, long = spec:match("^%-([a-zA-Z])%s+%-%-([a-zA-Z%-]+)$")
+    if not short then
+        long = spec:match("^%-%-([a-zA-Z%-]+)$")
+    end
+    if not long then
+        short = spec:match("^%-([a-zA-Z])$")
+    end
+    
+    local flag = {
+        short = short,
+        long = long or short,
+        description = description,
+        type = "string"
+    }
+    
+    self.flags[long or short] = flag
+    return self
+end
+
+function Command:flag_email(spec, description)
+    self.flags = self.flags or {}
+    local short, long = spec:match("^%-([a-zA-Z])%s+%-%-([a-zA-Z%-]+)$")
+    if not short then
+        long = spec:match("^%-%-([a-zA-Z%-]+)$")
+    end
+    if not long then
+        short = spec:match("^%-([a-zA-Z])$")
+    end
+    
+    local flag = {
+        short = short,
+        long = long or short,
+        description = description,
+        type = "email"
+    }
+    
+    self.flags[long or short] = flag
+    return self
+end
+
+-- Add persistent flag support (inherited by subcommands)
+function Command:persistent_flag(spec, description)
+    self.persistent_flags = self.persistent_flags or {}
+    local short, long = spec:match("^%-([a-zA-Z])%s+%-%-([a-zA-Z%-]+)$")
+    if not short then
+        long = spec:match("^%-%-([a-zA-Z%-]+)$")
+    end
+    if not long then
+        short = spec:match("^%-([a-zA-Z])$")
+    end
+    
+    local flag = {
+        short = short,
+        long = long or short,
+        description = description,
+        type = "boolean",
+        persistent = true
+    }
+    
+    self.persistent_flags[long or short] = flag
+    return self
+end
+
 function lumos.new_app(config)
     config = config or {}
     local app = {
@@ -87,7 +188,10 @@ function lumos.new_app(config)
         version = config.version or "0.1.0",
         description = config.description or "A Lua CLI application",
         commands = {},
-        global_flags = {}
+        global_flags = {},
+        persistent_flags = {},
+        config_file = config.config_file,
+        env_prefix = config.env_prefix
     }
 
     function app:command(name, description)
@@ -95,14 +199,18 @@ function lumos.new_app(config)
             name = name,
             description = description,
             flags = {},
-            args = {}
+            args = {},
+            aliases = {},
+            persistent_flags = {}
         }, Command)
         
         table.insert(self.commands, cmd)
         return cmd
     end
-
-    function app:flag(spec, description)
+    
+    -- Add persistent flag support at app level
+    function app:persistent_flag(spec, description)
+        self.persistent_flags = self.persistent_flags or {}
         local short, long = spec:match("^%-([a-zA-Z])%s+%-%-([a-zA-Z%-]+)$")
         if not short then
             long = spec:match("^%-%-([a-zA-Z%-]+)$")
@@ -115,14 +223,36 @@ function lumos.new_app(config)
             short = short,
             long = long or short,
             description = description,
-            type = "boolean"
+            type = "boolean",
+            persistent = true
         }
         
-        self.global_flags[long or short] = flag
+        self.persistent_flags[long or short] = flag
         return self
     end
 
+function app:flag(spec, description)
+    local short, long = spec:match("^%-([a-zA-Z])%s+%-%-([a-zA-Z%-]+)$")
+    if not short then
+        long = spec:match("^%-%-([a-zA-Z%-]+)$")
+    end
+    if not long then
+        short = spec:match("^%-([a-zA-Z])$")
+    end
+
+    local flag = {
+        short = short,
+        long = long or short,
+        description = description,
+        type = "boolean"
+    }
+
+    self.global_flags[long or short] = flag
+    return self
+end
+
 local json = require('lumos.json')
+local config = require('lumos.config')
 
 function app:run(args)
     args = args or {}

@@ -3,6 +3,14 @@ local flags = require('lumos.flags')
 
 local core = {}
 
+-- Configuration file loader
+function core.load_config(file_path)
+    -- Placeholder logic for loading a config file (YAML, JSON, etc.)
+    -- This function would parse the file and add config variables
+    -- to the application's settings or flags.
+    print("Loading configuration from " .. file_path)
+end
+
 -- Parse command line arguments into structured data with subcommand support
 function core.parse_arguments(args)
     local parsed = {
@@ -34,31 +42,35 @@ function core.parse_arguments(args)
             parsed.command = arg
             command_count = 1
             i = i + 1
-elseif command_count == 1 and not arg:match('^%-') then
-    -- Check if this could be a subcommand
-    parsed.subcommand = arg
-    table.insert(parsed.subcommands, arg)
-    command_count = 2
-    i = i + 1
-else
-    -- All remaining non-flag arguments are positional arguments
-    table.insert(parsed.args, arg)
-    i = i + 1
+        else
+            -- All remaining non-flag arguments are positional arguments
+            table.insert(parsed.args, arg)
+            i = i + 1
         end
     end
     
     return parsed
 end
 
--- Find and return the matching command from the app
+-- Find and return the matching command from the app (including aliases)
 function core.find_command(app, command_name)
     if not command_name then
         return nil
     end
     
     for _, cmd in ipairs(app.commands) do
+        -- Check main command name
         if cmd.name == command_name then
             return cmd
+        end
+        
+        -- Check aliases
+        if cmd.aliases then
+            for _, alias in ipairs(cmd.aliases) do
+                if alias == command_name then
+                    return cmd
+                end
+            end
         end
     end
     
@@ -78,6 +90,62 @@ function core.find_subcommand(command, subcommand_name)
     end
     
     return nil
+end
+
+-- Validate and merge flags (including persistent flags)
+function core.validate_and_merge_flags(app, cmd, parsed_flags)
+    local merged_flags = {}
+    local errors = {}
+    
+    -- Helper function to validate a flag
+    local function validate_single_flag(flag_name, flag_value, flag_def)
+        local valid, result = flags.validate_flag(flag_def, flag_value)
+        if not valid then
+            table.insert(errors, "Flag --" .. flag_name .. " " .. result)
+            return false
+        end
+        merged_flags[flag_name] = result
+        return true
+    end
+    
+    -- Start with app-level persistent flags
+    if app.persistent_flags then
+        for flag_name, flag_def in pairs(app.persistent_flags) do
+            local value = parsed_flags[flag_name] or parsed_flags[flag_def.short]
+            if value ~= nil then
+                validate_single_flag(flag_name, value, flag_def)
+            end
+        end
+    end
+    
+    -- Add command-level persistent flags
+    if cmd and cmd.persistent_flags then
+        for flag_name, flag_def in pairs(cmd.persistent_flags) do
+            local value = parsed_flags[flag_name] or parsed_flags[flag_def.short]
+            if value ~= nil then
+                validate_single_flag(flag_name, value, flag_def)
+            end
+        end
+    end
+    
+    -- Add command-specific flags
+    if cmd and cmd.flags then
+        for flag_name, flag_def in pairs(cmd.flags) do
+            local value = parsed_flags[flag_name] or parsed_flags[flag_def.short]
+            if value ~= nil then
+                validate_single_flag(flag_name, value, flag_def)
+            end
+        end
+    end
+    
+    -- Copy remaining parsed flags that weren't validated
+    for flag_name, flag_value in pairs(parsed_flags) do
+        if merged_flags[flag_name] == nil then
+            merged_flags[flag_name] = flag_value
+        end
+    end
+    
+    return merged_flags, errors
 end
 
 -- Execute the appropriate command with parsed arguments
@@ -130,11 +198,20 @@ function core.execute_command(app, parsed_args)
         return true
     end
     
+    -- Validate and merge flags
+    local validated_flags, validation_errors = core.validate_and_merge_flags(app, cmd, parsed_args.flags)
+    if #validation_errors > 0 then
+        for _, error in ipairs(validation_errors) do
+            print("Error: " .. error)
+        end
+        return false
+    end
+    
     -- Execute the command action if it exists
     if cmd.action then
         local context = {
             args = parsed_args.args,
-            flags = parsed_args.flags,
+            flags = validated_flags,
             command = cmd
         }
         return cmd.action(context)
