@@ -2,31 +2,30 @@
 
 
 <p align="center">
-    <img src="lumosb&w.png" alt="Lumos Logo" width="250">
+    <img src="lumosb&wclear.png" alt="Lumos Logo" width="250">
 </p>
 
 **Lumos** (Latin for "light") is a modern, enhanced CLI framework for Lua, inspired by Cobra for Go. It simplifies command-line application development with an elegant, fluent API, complete with argument parsing, automatic help generation, color support, progress bars, interactive prompts, and advanced features like JSON output and input validation.
-
 ## 🌟 Key Features
 
-### Core Features
-- **POSIX-compliant argument parsing** - Supports short (`-h`) and long (`--help`) flags
-- **Fluent command definition API** - Chainable method calls for easy setup
-- **Automatic help generation** - Generates help text with examples
-- **Color and styling support** - ANSI colors with terminal detection and styling options
-- **Progress bars** - Simple and dynamic progress indicators
-- **Interactive prompts** - Supports text input, password entry, confirmations, and selections
-- **Global and local flags** - Flags with inheritance and scope control
-- **Comprehensive error handling** - Clear error messages with robust validation
+Lumos CLI Framework offers a comprehensive set of features for building modern command-line applications in Lua:
 
-### Enhanced Features (v2.0+)
-- **✨ Subcommand support** - Nested commands for complex CLI applications
-- **📄 JSON output** - Built-in JSON serialization for structured data output
-- **✅ Advanced input validation** - Pre-defined validators for common input types (email, numbers, etc.)
-- **🎨 Enhanced color helpers** - Contextual color functions for status messages and logs
-- **🔧 Performance optimizations** - Improved parsing and execution performance
+- **POSIX-compliant argument parsing**: Supports both short (`-h`) and long (`--help`) flags.
+- **Fluent API for commands**: Chainable methods for defining commands, arguments, flags, and actions.
+- **Automatic help generation**: Built-in help text with usage examples.
+- **Color and styling support**: ANSI color output, styling helpers, and terminal detection.
+- **Progress bars**: Simple and advanced progress indicators for CLI feedback.
+- **Interactive prompts**: Text input, password entry, confirmations, selections, and validation.
+- **Global and local flags**: Flexible flag definitions with inheritance and scope control.
+- **Comprehensive error handling**: Clear error messages and robust input validation.
+- **Subcommand support**: Nested commands for complex CLI structures.
+- **JSON output**: Built-in serialization for structured data.
+- **Advanced input validation**: Pre-defined validators for emails, numbers, and more.
+- **Enhanced color helpers**: Contextual color functions for status and log messages.
+- **Performance optimizations**: Fast argument parsing and efficient execution.
 
 ## 📦 Installation
+
 
 ### Requirements
 - Lua 5.1+ or LuaJIT
@@ -598,12 +597,3 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 **Lumos** - *Bringing light to CLI development in Lua* ✨
-
-```
-    ██╗     ██╗   ██╗███╗   ███╗ ██████╗ ███████╗
-    ██║     ██║   ██║████╗ ████║██╔═══██╗██╔════╝
-    ██║     ██║   ██║██╔████╔██║██║   ██║███████╗
-    ██║     ██║   ██║██║╚██╔╝██║██║   ██║╚════██║
-    ███████╗╚██████╔╝██║ ╚═╝ ██║╚██████╔╝███████║
-    ╚══════╝ ╚═════╝ ╚═╝     ╚═╝ ╚═════╝ ╚══════╝
-```
