@@ -27,3 +27,6 @@ Thumbs.db
 
 # Coverage reports
 *.stats.out
+
+# tmp folder
+tmp/

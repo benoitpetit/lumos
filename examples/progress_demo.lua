@@ -4,7 +4,7 @@
 -- Shows different types of progress bars
 
 -- Add parent directory to search path
-package.path = package.path .. ';./?.lua;./?/init.lua'
+package.path = package.path .. ";../?.lua;../?/init.lua;"
 
 local progress = require('lumos.progress')
 local color = require('lumos.color')

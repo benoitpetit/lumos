@@ -12,7 +12,7 @@ function core.load_config(file_path)
 end
 
 -- Parse command line arguments into structured data with subcommand support
-function core.parse_arguments(args)
+function core.parse_arguments(args, app)
     local parsed = {
         command = nil,
         subcommand = nil,
@@ -42,6 +42,25 @@ function core.parse_arguments(args)
             parsed.command = arg
             command_count = 1
             i = i + 1
+        elseif command_count == 1 and app then
+            -- Check if this could be a subcommand
+            local cmd = core.find_command(app, parsed.command)
+            if cmd and cmd.subcommands then
+                local subcmd = core.find_subcommand(cmd, arg)
+                if subcmd then
+                    parsed.subcommand = arg
+                    command_count = 2
+                    i = i + 1
+                else
+                    -- Not a subcommand, treat as positional argument
+                    table.insert(parsed.args, arg)
+                    i = i + 1
+                end
+            else
+                -- No subcommands possible, treat as positional argument
+                table.insert(parsed.args, arg)
+                i = i + 1
+            end
         else
             -- All remaining non-flag arguments are positional arguments
             table.insert(parsed.args, arg)

@@ -3,7 +3,7 @@
 -- Lumos Subcommand Demo
 -- Demonstrates subcommand functionality
 
-package.path = package.path .. ';./?.lua;./?/init.lua'
+package.path = package.path .. ";../?.lua;../?/init.lua;"
 
 local lumos = require('lumos')
 local color = require('lumos.color')

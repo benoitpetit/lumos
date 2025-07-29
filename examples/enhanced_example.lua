@@ -3,7 +3,7 @@
 -- Lumos Enhanced Example
 -- Demonstrates subcommands, JSON output, and input validation
 
-package.path = package.path .. ';../lumos/?.lua;../lumos/?/init.lua'
+package.path = package.path .. ";../?.lua;../?/init.lua;"
 
 local lumos = require('lumos')
 local prompt = require('lumos.prompt')

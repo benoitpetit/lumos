@@ -4,7 +4,7 @@
 -- Demonstrates flags validation, aliases, and persistent flags
 
 -- Add parent directory to search path
-package.path = package.path .. ';./?.lua;./?/init.lua'
+package.path = package.path .. ";../?.lua;../?/init.lua;"
 
 local lumos = require('lumos')
 local color = require('lumos.color')

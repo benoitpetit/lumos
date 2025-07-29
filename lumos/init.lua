@@ -10,6 +10,9 @@ local progress = require('lumos.progress')
 local prompt = require('lumos.prompt')
 local lumos_table = require('lumos.table')
 local json = require('lumos.json')
+local completion = require('lumos.completion')
+local manpage = require('lumos.manpage')
+local markdown = require('lumos.markdown')
 
 -- Export the main interface
 return {
@@ -23,6 +26,9 @@ return {
     prompt = prompt,
     table = lumos_table,
     json = json,
-    version = "0.3.0",
+    completion = completion,
+    manpage = manpage,
+    markdown = markdown,
+    version = "1.0.0",
     load_config = core.load_config
 }

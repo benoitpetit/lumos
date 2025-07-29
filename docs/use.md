@@ -1,0 +1,510 @@
+# Lumos Usage Examples
+
+Real-world examples demonstrating Lumos CLI framework features.
+
+## Basic CLI Application
+
+A simple file utility CLI:
+
+```lua
+local lumos = require('lumos')
+local color = require('lumos.color')
+local lfs = require('lfs')
+
+local app = lumos.new_app({
+    name = "fileutil",
+    version = "1.0.0",
+    description = "File utilities CLI"
+})
+
+-- Global flags
+app:flag("-v --verbose", "Enable verbose output")
+
+-- List files command
+local list = app:command("list", "List files in directory")
+list:arg("directory", "Directory to list (default: current)")
+list:flag("-l --long", "Show detailed information")
+list:flag("-a --all", "Show hidden files")
+
+list:action(function(ctx)
+    local dir = ctx.args[1] or "."
+    
+    for file in lfs.dir(dir) do
+        if file ~= "." and file ~= ".." then
+            if not ctx.flags.all and file:sub(1,1) == "." then
+                goto continue
+            end
+            
+            if ctx.flags.long then
+                local attr = lfs.attributes(dir .. "/" .. file)
+                if attr then
+                    local size = attr.size or 0
+                    local mode = attr.mode or "unknown"
+                    print(string.format("%s %8d %s", mode, size, file))
+                end
+            else
+                local file_color = lfs.attributes(dir .. "/" .. file, "mode") == "directory" 
+                    and color.blue or color.white
+                print(file_color(file))
+            end
+            ::continue::
+        end
+    end
+    return true
+end)
+
+app:run(arg)
+```
+
+## Advanced CLI with Subcommands
+
+A deployment tool with nested commands:
+
+```lua
+local lumos = require('lumos')
+local color = require('lumos.color')
+local prompt = require('lumos.prompt')
+local progress = require('lumos.progress')
+
+local app = lumos.new_app({
+    name = "deploy",
+    version = "2.0.0",
+    description = "Application deployment tool"
+})
+
+-- Global persistent flags
+app:persistent_flag("--dry-run", "Show what would be done")
+app:persistent_flag("--config", "Configuration file path")
+
+-- Application management
+local app_cmd = app:command("app", "Application management")
+app_cmd:persistent_flag("--env", "Environment (staging/production)")
+
+-- Deploy application
+local deploy_cmd = app_cmd:subcommand("deploy", "Deploy application")
+deploy_cmd:arg("version", "Version to deploy")
+deploy_cmd:flag("-f --force", "Force deployment")
+deploy_cmd:flag_int("--timeout", "Deployment timeout", 30, 3600)
+
+deploy_cmd:action(function(ctx)
+    local version = ctx.args[1]
+    local env = ctx.flags.env or "staging"
+    local timeout = ctx.flags.timeout or 300
+    
+    if not version then
+        print(color.red("Error: Version is required"))
+        return false
+    end
+    
+    print(color.cyan("Deploying " .. version .. " to " .. env))
+    
+    if ctx.flags.force or prompt.confirm("Continue with deployment?", false) then
+        if ctx.flags.dry_run then
+            print(color.yellow("Dry run: Would deploy " .. version))
+        else
+            local bar = progress.new({
+                total = 100,
+                format = "[{bar}] {percentage}% - Deploying...",
+                width = 40
+            })
+            
+            for i = 1, 100 do
+                bar:update(i)
+                -- Simulate deployment work
+                os.execute("sleep 0.02")
+            end
+            
+            print(color.green("Deployment successful!"))
+        end
+    else
+        print("Deployment cancelled")
+    end
+    
+    return true
+end)
+
+-- Rollback command
+local rollback_cmd = app_cmd:subcommand("rollback", "Rollback deployment")
+rollback_cmd:flag_int("--steps", "Number of steps to rollback", 1, 10)
+
+rollback_cmd:action(function(ctx)
+    local steps = ctx.flags.steps or 1
+    local env = ctx.flags.env or "staging"
+    
+    print(color.yellow("Rolling back " .. steps .. " steps in " .. env))
+    
+    if ctx.flags.dry_run then
+        print(color.yellow("Dry run: Would rollback " .. steps .. " steps"))
+    else
+        print(color.green("Rollback completed"))
+    end
+    
+    return true
+end)
+
+-- Database management
+local db_cmd = app:command("db", "Database management")
+db_cmd:persistent_flag("--host", "Database host")
+db_cmd:persistent_flag("--port", "Database port")
+
+local migrate_cmd = db_cmd:subcommand("migrate", "Run database migrations")
+migrate_cmd:flag("--up", "Run up migrations")
+migrate_cmd:flag("--down", "Run down migrations")
+
+migrate_cmd:action(function(ctx)
+    local host = ctx.flags.host or "localhost"
+    local port = ctx.flags.port or "5432"
+    
+    print(color.blue("Connecting to " .. host .. ":" .. port))
+    
+    if ctx.flags.up then
+        print(color.green("Running UP migrations"))
+    elseif ctx.flags.down then
+        print(color.yellow("Running DOWN migrations"))
+    else
+        print(color.red("Error: Specify --up or --down"))
+        return false
+    end
+    
+    return true
+end)
+
+app:run(arg)
+```
+
+## Interactive CLI Application
+
+A task manager with interactive features:
+
+```lua
+local lumos = require('lumos')
+local color = require('lumos.color')
+local prompt = require('lumos.prompt')
+local json = require('lumos.json')
+local tbl = require('lumos.table')
+
+local app = lumos.new_app({
+    name = "tasks",
+    version = "1.0.0",
+    description = "Simple task manager"
+})
+
+local tasks_file = "tasks.json"
+
+-- Load tasks from file
+local function load_tasks()
+    local file = io.open(tasks_file, "r")
+    if not file then
+        return {}
+    end
+    
+    local content = file:read("*all")
+    file:close()
+    
+    local ok, tasks = pcall(json.decode, content)
+    return ok and tasks or {}
+end
+
+-- Save tasks to file
+local function save_tasks(tasks)
+    local file = io.open(tasks_file, "w")
+    if file then
+        file:write(json.encode(tasks))
+        file:close()
+        return true
+    end
+    return false
+end
+
+-- Add task command
+local add_cmd = app:command("add", "Add a new task")
+add_cmd:arg("title", "Task title")
+add_cmd:flag("--priority", "Task priority")
+
+add_cmd:action(function(ctx)
+    local title = ctx.args[1]
+    if not title then
+        title = prompt.input("Task title:")
+    end
+    
+    if not title or title == "" then
+        print(color.red("Error: Task title is required"))
+        return false
+    end
+    
+    local priority = ctx.flags.priority or 
+        prompt.select("Priority:", {"Low", "Medium", "High"}, 2)
+    
+    local tasks = load_tasks()
+    table.insert(tasks, {
+        id = #tasks + 1,
+        title = title,
+        priority = priority,
+        completed = false,
+        created = os.date("%Y-%m-%d %H:%M")
+    })
+    
+    if save_tasks(tasks) then
+        print(color.green("Task added: " .. title))
+    else
+        print(color.red("Failed to save task"))
+        return false
+    end
+    
+    return true
+end)
+
+-- List tasks command
+local list_cmd = app:command("list", "List all tasks")
+list_cmd:flag("--completed", "Show only completed tasks")
+list_cmd:flag("--pending", "Show only pending tasks")
+list_cmd:flag("--json", "Output in JSON format")
+
+list_cmd:action(function(ctx)
+    local tasks = load_tasks()
+    
+    if #tasks == 0 then
+        print("No tasks found")
+        return true
+    end
+    
+    -- Filter tasks
+    local filtered = {}
+    for _, task in ipairs(tasks) do
+        if ctx.flags.completed and not task.completed then
+            goto continue
+        end
+        if ctx.flags.pending and task.completed then
+            goto continue
+        end
+        table.insert(filtered, task)
+        ::continue::
+    end
+    
+    if ctx.flags.json then
+        print(json.encode(filtered))
+    else
+        local data = {{"ID", "Title", "Priority", "Status", "Created"}}
+        
+        for _, task in ipairs(filtered) do
+            local status = task.completed and color.green("Done") or color.yellow("Pending")
+            local priority_color = task.priority == "High" and color.red or 
+                                 task.priority == "Medium" and color.yellow or color.white
+            
+            table.insert(data, {
+                tostring(task.id),
+                task.title,
+                priority_color(task.priority),
+                status,
+                task.created
+            })
+        end
+        
+        print(tbl.table(data, {headers = true}))
+    end
+    
+    return true
+end)
+
+-- Complete task command
+local complete_cmd = app:command("complete", "Mark task as completed")
+complete_cmd:arg("id", "Task ID")
+
+complete_cmd:action(function(ctx)
+    local id = tonumber(ctx.args[1])
+    if not id then
+        print(color.red("Error: Task ID is required"))
+        return false
+    end
+    
+    local tasks = load_tasks()
+    local found = false
+    
+    for _, task in ipairs(tasks) do
+        if task.id == id then
+            task.completed = true
+            found = true
+            print(color.green("Task completed: " .. task.title))
+            break
+        end
+    end
+    
+    if not found then
+        print(color.red("Task not found: " .. id))
+        return false
+    end
+    
+    return save_tasks(tasks)
+end)
+
+-- Interactive mode
+local interactive_cmd = app:command("interactive", "Interactive task management")
+
+interactive_cmd:action(function(ctx)
+    while true do
+        local action = prompt.select("What would you like to do?", {
+            "Add task",
+            "List tasks",
+            "Complete task",
+            "Exit"
+        }, 1)
+        
+        if action == 1 then
+            -- Add task
+            local title = prompt.input("Task title:")
+            if title and title ~= "" then
+                local priority = prompt.select("Priority:", {"Low", "Medium", "High"}, 2)
+                local tasks = load_tasks()
+                table.insert(tasks, {
+                    id = #tasks + 1,
+                    title = title,
+                    priority = priority,
+                    completed = false,
+                    created = os.date("%Y-%m-%d %H:%M")
+                })
+                save_tasks(tasks)
+                print(color.green("Task added!"))
+            end
+            
+        elseif action == 2 then
+            -- List tasks
+            local tasks = load_tasks()
+            if #tasks > 0 then
+                for _, task in ipairs(tasks) do
+                    local status = task.completed and "[DONE]" or "[TODO]"
+                    local status_color = task.completed and color.green or color.yellow
+                    print(task.id .. ". " .. task.title .. " " .. status_color(status))
+                end
+            else
+                print("No tasks found")
+            end
+            
+        elseif action == 3 then
+            -- Complete task
+            local id_str = prompt.input("Task ID to complete:")
+            local id = tonumber(id_str)
+            if id then
+                local tasks = load_tasks()
+                for _, task in ipairs(tasks) do
+                    if task.id == id then
+                        task.completed = true
+                        save_tasks(tasks)
+                        print(color.green("Task completed!"))
+                        break
+                    end
+                end
+            end
+            
+        else
+            -- Exit
+            break
+        end
+        
+        print() -- Empty line for spacing
+    end
+    
+    print(color.cyan("Goodbye!"))
+    return true
+end)
+
+app:run(arg)
+```
+
+## Configuration-Driven CLI
+
+A deployment tool that uses configuration files:
+
+```lua
+local lumos = require('lumos')
+local color = require('lumos.color')
+local config = require('lumos.config')
+local json = require('lumos.json')
+
+local app = lumos.new_app({
+    name = "configapp",
+    version = "1.0.0",
+    description = "Configuration-driven deployment tool"
+})
+
+-- Global configuration flag
+app:persistent_flag("-c --config", "Configuration file")
+
+-- Deploy command with configuration
+local deploy_cmd = app:command("deploy", "Deploy with configuration")
+deploy_cmd:arg("environment", "Target environment")
+deploy_cmd:flag("--timeout", "Override timeout setting")
+deploy_cmd:flag("--dry-run", "Show what would be done")
+
+deploy_cmd:action(function(ctx)
+    local env = ctx.args[1] or "staging"
+    
+    -- Load configuration with priority hierarchy
+    local default_config = {
+        timeout = 300,
+        retries = 3,
+        parallel = false,
+        environments = {
+            staging = {host = "staging.example.com", port = 8080},
+            production = {host = "prod.example.com", port = 80}
+        }
+    }
+    
+    local file_config = {}
+    if ctx.flags.config then
+        file_config = config.load_file(ctx.flags.config) or {}
+    end
+    
+    local env_config = config.load_env("DEPLOY") -- DEPLOY_* variables
+    
+    -- Merge configurations: defaults < file < environment < flags
+    local final_config = config.merge_configs(
+        default_config,
+        file_config,
+        env_config,
+        {timeout = ctx.flags.timeout} -- command line overrides
+    )
+    
+    print(color.cyan("Deployment Configuration:"))
+    print(json.encode(final_config))
+    print()
+    
+    local env_config = final_config.environments[env]
+    if not env_config then
+        print(color.red("Error: Unknown environment: " .. env))
+        return false
+    end
+    
+    print(color.blue("Deploying to " .. env .. "..."))
+    print("Host: " .. env_config.host)
+    print("Port: " .. env_config.port)
+    print("Timeout: " .. final_config.timeout .. "s")
+    
+    if ctx.flags.dry_run then
+        print(color.yellow("Dry run completed"))
+    else
+        print(color.green("Deployment successful"))
+    end
+    
+    return true
+end)
+
+app:run(arg)
+```
+
+## Usage Examples
+
+These examples show different patterns:
+
+1. **Basic CLI**: Simple commands with file operations
+2. **Advanced CLI**: Nested subcommands with interactive prompts
+3. **Interactive CLI**: Menu-driven interface with persistent data
+4. **Configuration CLI**: External configuration with environment variables
+
+Each example demonstrates key Lumos features:
+- Command and subcommand definition
+- Flag parsing and validation
+- Interactive prompts and progress bars
+- Configuration management
+- Error handling and colored output
+- JSON data handling
+- Table formatting

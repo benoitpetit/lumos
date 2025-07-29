@@ -1,0 +1,33 @@
+# Lumos Project Configuration
+# This file contains metadata and configuration for the Lumos project
+
+[project]
+name = "lumos"
+version = "1.0.0"
+description = "A modern CLI framework for Lua"
+homepage = "https://github.com/benoitpetit/lumos"
+license = "MIT"
+
+[build]
+main_rockspec = "lumos-1.0.0-1.rockspec"
+dev_rockspec = "lumos-dev-1.rockspec"
+
+[directories]
+source = "lumos/"
+binary = "bin/"
+examples = "examples/"
+tests = "spec/"
+scripts = "scripts/"
+
+[dependencies]
+lua = ">= 5.1"
+luafilesystem = ">= 1.6.3"
+
+[development]
+test_framework = "busted"
+coverage_tool = "luacov"
+documentation = "markdown"
+
+[release]
+git_tag_prefix = "v"
+luarocks_upload = true

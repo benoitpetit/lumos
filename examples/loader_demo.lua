@@ -4,7 +4,7 @@
 -- Shows different loader styles and statuses
 
 -- Add parent directory to search path
-package.path = package.path .. ';./?.lua;./?/init.lua'
+package.path = package.path .. ";../?.lua;../?/init.lua;"
 
 local loader = require('lumos.loader')
 local color = require('lumos.color')

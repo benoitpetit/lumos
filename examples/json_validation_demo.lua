@@ -3,7 +3,7 @@
 -- Lumos JSON and Validation Demo
 -- Demonstrates JSON output and input validation
 
-package.path = package.path .. ';./?.lua;./?/init.lua'
+package.path = package.path .. ";../?.lua;../?/init.lua;"
 
 local lumos = require('lumos')
 local color = require('lumos.color')

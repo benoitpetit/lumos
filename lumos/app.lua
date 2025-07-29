@@ -3,6 +3,35 @@ local core = require('lumos.core')
 
 local lumos = {}
 
+-- Utility function to parse flag specifications
+local function parse_flag_spec(spec)
+    -- Try -s --long format
+    local short, long = spec:match("^%-([a-zA-Z])%s+%-%-([a-zA-Z%-]+)$")
+    if short and long then
+        return short, long
+    end
+    
+    -- Try --long -s format
+    long, short = spec:match("^%-%-([a-zA-Z%-]+)%s+%-([a-zA-Z])$")
+    if long and short then
+        return short, long
+    end
+    
+    -- Try --long only
+    long = spec:match("^%-%-([a-zA-Z%-]+)$")
+    if long then
+        return nil, long
+    end
+    
+    -- Try -s only
+    short = spec:match("^%-([a-zA-Z])$")
+    if short then
+        return short, nil
+    end
+    
+    return nil, nil
+end
+
 -- Command class for fluent API
 local Command = {}
 Command.__index = Command
@@ -30,13 +59,7 @@ end
 
 function Command:flag(spec, description)
     self.flags = self.flags or {}
-    local short, long = spec:match("^%-([a-zA-Z])%s+%-%-([a-zA-Z][a-zA-Z%-]*)$")
-    if not short then
-        long = spec:match("^%-%-([a-zA-Z][a-zA-Z%-]*)$")
-    end
-    if not long then
-        short = spec:match("^%-([a-zA-Z])$")
-    end
+    local short, long = parse_flag_spec(spec)
 
     -- Handle the case where we couldn't parse anything
     if not long and not short then
@@ -95,12 +118,10 @@ end
 -- Add typed flag methods
 function Command:flag_int(spec, description, min, max)
     self.flags = self.flags or {}
-    local short, long = spec:match("^%-([a-zA-Z])%s+%-%-([a-zA-Z%-]+)$")
-    if not short then
-        long = spec:match("^%-%-([a-zA-Z%-]+)$")
-    end
-    if not long then
-        short = spec:match("^%-([a-zA-Z])$")
+    local short, long = parse_flag_spec(spec)
+    
+    if not long and not short then
+        error("Invalid flag specification: " .. spec)
     end
 
     local flag = {
@@ -118,12 +139,10 @@ end
 
 function Command:flag_string(spec, description)
     self.flags = self.flags or {}
-    local short, long = spec:match("^%-([a-zA-Z])%s+%-%-([a-zA-Z%-]+)$")
-    if not short then
-        long = spec:match("^%-%-([a-zA-Z%-]+)$")
-    end
-    if not long then
-        short = spec:match("^%-([a-zA-Z])$")
+    local short, long = parse_flag_spec(spec)
+    
+    if not long and not short then
+        error("Invalid flag specification: " .. spec)
     end
     
     local flag = {
@@ -139,12 +158,10 @@ end
 
 function Command:flag_email(spec, description)
     self.flags = self.flags or {}
-    local short, long = spec:match("^%-([a-zA-Z])%s+%-%-([a-zA-Z%-]+)$")
-    if not short then
-        long = spec:match("^%-%-([a-zA-Z%-]+)$")
-    end
-    if not long then
-        short = spec:match("^%-([a-zA-Z])$")
+    local short, long = parse_flag_spec(spec)
+    
+    if not long and not short then
+        error("Invalid flag specification: " .. spec)
     end
     
     local flag = {
@@ -211,13 +228,7 @@ function lumos.new_app(config)
     -- Add persistent flag support at app level
     function app:persistent_flag(spec, description)
         self.persistent_flags = self.persistent_flags or {}
-        local short, long = spec:match("^%-([a-zA-Z])%s+%-%-([a-zA-Z%-]+)$")
-        if not short then
-            long = spec:match("^%-%-([a-zA-Z%-]+)$")
-        end
-        if not long then
-            short = spec:match("^%-([a-zA-Z])$")
-        end
+        local short, long = parse_flag_spec(spec)
         
         local flag = {
             short = short,
@@ -227,6 +238,9 @@ function lumos.new_app(config)
             persistent = true
         }
         
+        if not long and not short then
+            error("Invalid flag specification: " .. spec)
+        end
         self.persistent_flags[long or short] = flag
         return self
     end
@@ -253,12 +267,15 @@ end
 
 local json = require('lumos.json')
 local config = require('lumos.config')
+local completion = require('lumos.completion')
+local manpage = require('lumos.manpage')
+local markdown = require('lumos.markdown')
 
 function app:run(args)
     args = args or {}
     
     -- Handle global flags first
-    local parsed = core.parse_arguments(args)
+    local parsed = core.parse_arguments(args, self)
     
     -- Check for global JSON output flag
     if parsed.flags.json then
@@ -290,6 +307,53 @@ function app:run(args)
     -- Execute command
     return core.execute_command(self, parsed)
 end
+
+    -- Phase 3: Shell Integration methods
+    function app:generate_completion(shell, output_dir, verbose)
+        if shell == "bash" then
+            return completion.generate_bash(self)
+        elseif shell == "zsh" then
+            return completion.generate_zsh(self)
+        elseif shell == "fish" then
+            return completion.generate_fish(self)
+        elseif shell == "all" then
+            completion.generate_all(self, output_dir, verbose)
+            return nil
+        else
+            error("Unsupported shell: " .. (shell or "nil") .. ". Supported: bash, zsh, fish, all")
+        end
+    end
+    
+    function app:generate_manpage(command, output_dir)
+        if command then
+            local cmd = core.find_command(self, command)
+            if not cmd then
+                error("Command not found: " .. command)
+            end
+            return manpage.generate_command(self, cmd)
+        else
+            if output_dir then
+                manpage.generate_all(self, output_dir)
+                return nil
+            else
+                return manpage.generate_main(self)
+            end
+        end
+    end
+    
+    function app:generate_docs(format, output_dir, verbose)
+        format = format or "markdown"
+        if format == "markdown" then
+            if output_dir then
+                markdown.generate_all(self, output_dir, verbose)
+                return nil
+            else
+                return markdown.generate_main(self)
+            end
+        else
+            error("Unsupported documentation format: " .. format .. ". Supported: markdown")
+        end
+    end
 
     return app
 end
