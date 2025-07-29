@@ -29,7 +29,7 @@ setup:
 # Install from rockspec for production
 install-prod:
 	@echo "Installing Lumos from production rockspec..."
-	@luarocks make --local lumos-1.0.0-1.rockspec
+	@luarocks make --local lumos-0.1.0-1.rockspec
 
 # Build documentation
 doc:
@@ -70,4 +70,4 @@ test-cli:
 check-rockspec:
 	@echo "Checking rockspec syntax..."
 	@luarocks lint lumos-dev-1.rockspec
-	@luarocks lint lumos-1.0.0-1.rockspec
+	@luarocks lint lumos-0.1.0-1.rockspec

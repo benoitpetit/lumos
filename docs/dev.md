@@ -62,7 +62,7 @@ echo 'set -gx PATH $HOME/.luarocks/bin $PATH' >> ~/.config/fish/config.fish
 lumos version
 
 # Should output:
-# Lumos CLI Framework v1.0.0
+# Lumos CLI Framework v0.1.0
 # A modern CLI framework for Lua
 # https://github.com/benoitpetit/lumos
 ```
@@ -249,7 +249,7 @@ When ready to publish:
 
 2. **Test production build**:
    ```bash
-   luarocks make --local lumos-1.0.0-1.rockspec
+   luarocks make --local lumos-0.1.0-1.rockspec
    ```
 
 3. **Run full test suite**:
@@ -260,7 +260,7 @@ When ready to publish:
 
 4. **Publish to LuaRocks**:
    ```bash
-   luarocks upload lumos-1.0.0-1.rockspec
+   luarocks upload lumos-0.1.0-1.rockspec
    ```
 
 ## Troubleshooting

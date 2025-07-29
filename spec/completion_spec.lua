@@ -11,7 +11,7 @@ describe("Shell Completion Generation", function()
         it("should generate bash completion script", function()
             local app = lumos.new_app({
                 name = "testapp",
-                version = "1.0.0",
+                version = "0.1.0",
                 description = "Test application"
             })
             
@@ -44,7 +44,7 @@ describe("Shell Completion Generation", function()
         it("should generate zsh completion script", function()
             local app = lumos.new_app({
                 name = "testapp",
-                version = "1.0.0",
+                version = "0.1.0",
                 description = "Test application"
             })
             
@@ -77,7 +77,7 @@ describe("Shell Completion Generation", function()
         it("should generate fish completion script", function()
             local app = lumos.new_app({
                 name = "testapp",
-                version = "1.0.0",
+                version = "0.1.0",
                 description = "Test application"
             })
             

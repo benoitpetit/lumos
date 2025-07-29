@@ -20,7 +20,7 @@ Creates a new CLI application.
 local lumos = require('lumos')
 local app = lumos.new_app({
     name = "myapp",
-    version = "1.0.0",
+    version = "0.1.0",
     description = "My CLI application"
 })
 ```

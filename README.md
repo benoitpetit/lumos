@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-    <strong>A modern, enterprise-grade CLI framework for Lua</strong><br>
+    <strong>A modern CLI framework for Lua</strong><br>
     Build powerful command-line applications with ease
 </p>
 
@@ -62,7 +62,7 @@ local color = require('lumos.color')
 
 local app = lumos.new_app({
     name = "my-awesome-cli",
-    version = "1.0.0",
+    version = "0.1.0",
     description = "My awesome CLI application"
 })
 
@@ -108,7 +108,7 @@ cd lumos
 luarocks make --local lumos-dev-1.rockspec
 
 # Or install for production
-luarocks make --local lumos-1.0.0-1.rockspec
+luarocks make --local lumos-0.1.0-1.rockspec
 ```
 
 ### Prerequisites
@@ -203,7 +203,7 @@ make install && make test
 
 ## Project Status
 
-- **Version:** 1.0.0
+- **Version:** 0.1.0
 - **License:** MIT
 - **Lua Versions:** 5.1, 5.2, 5.3, 5.4, LuaJIT
 - **Platforms:** Linux, macOS, Windows (WSL)

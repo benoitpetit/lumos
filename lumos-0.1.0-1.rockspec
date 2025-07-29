@@ -1,6 +1,6 @@
 rockspec_format = "3.0"
 package = "lumos"
-version = "1.0.0-1"
+version = "0.1.0-1"
 
 source = {
    url = "git+https://github.com/benoitpetit/lumos.git",

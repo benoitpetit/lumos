@@ -11,7 +11,7 @@ describe("Man Page Generation", function()
         it("should generate main man page", function()
             local app = lumos.new_app({
                 name = "testapp",
-                version = "1.0.0",
+                version = "0.1.0",
                 description = "Test application"
             })
             
@@ -64,7 +64,7 @@ describe("Man Page Generation", function()
         it("should generate command-specific man page", function()
             local app = lumos.new_app({
                 name = "testapp",
-                version = "1.0.0",
+                version = "0.1.0",
                 description = "Test application"
             })
             
@@ -91,7 +91,7 @@ describe("Man Page Generation", function()
         it("should format flags correctly in man pages", function()
             local app = lumos.new_app({
                 name = "testapp",
-                version = "1.0.0",
+                version = "0.1.0",
                 description = "Test application"
             })
             
@@ -122,7 +122,7 @@ describe("Man Page Generation", function()
         it("should include persistent flags in command man pages", function()
             local app = lumos.new_app({
                 name = "testapp",
-                version = "1.0.0",
+                version = "0.1.0",
                 description = "Test application"
             })
             
@@ -194,7 +194,7 @@ describe("Man Page Generation", function()
         it("should generate all man pages to directory", function()
             local app = lumos.new_app({
                 name = "testapp",
-                version = "1.0.0",
+                version = "0.1.0",
                 description = "Test application"
             })
             

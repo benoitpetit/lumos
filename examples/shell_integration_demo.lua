@@ -8,7 +8,7 @@ local lumos = require('lumos')
 -- Create a sample application with rich commands
 local app = lumos.new_app({
     name = "gitlike",
-    version = "1.0.0",
+    version = "0.1.0",
     description = "A Git-like CLI tool demonstrating Lumos shell integration features"
 })
 

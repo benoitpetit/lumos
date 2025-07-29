@@ -29,6 +29,6 @@ return {
     completion = completion,
     manpage = manpage,
     markdown = markdown,
-    version = "1.0.0",
+    version = "0.1.0",
     load_config = core.load_config
 }

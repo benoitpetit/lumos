@@ -9,7 +9,7 @@ Lumos uses semantic versioning (MAJOR.MINOR.PATCH):
 - **MINOR**: New features, backward compatible
 - **PATCH**: Bug fixes, backward compatible
 
-Current version: **1.0.0** (stored in `VERSION` file)
+Current version: **0.1.0** (stored in `VERSION` file)
 
 ## Rockspec Files
 
@@ -21,11 +21,11 @@ The project maintains two rockspec files:
 - Uses current working directory files
 - Install with: `luarocks make --local lumos-dev-1.rockspec`
 
-### 2. `lumos-1.0.0-1.rockspec` (Production)
+### 2. `lumos-0.1.0-1.rockspec` (Production)
 - Used for installation from GitHub
 - Points to `main` branch on GitHub
 - Used when project is published online
-- Install with: `luarocks make --local lumos-1.0.0-1.rockspec`
+- Install with: `luarocks make --local lumos-0.1.0-1.rockspec`
 
 ## Release Process
 
@@ -46,13 +46,13 @@ The project maintains two rockspec files:
 echo "1.1.0" > VERSION
 
 # 2. Update bin/lumos version
-sed -i 's/version = "1.0.0"/version = "1.1.0"/' bin/lumos
-sed -i 's/v1.0.0/v1.1.0/' bin/lumos
+sed -i 's/version = "0.1.0"/version = "1.1.0"/' bin/lumos
+sed -i 's/v0.1.0/v1.1.0/' bin/lumos
 
 # 3. Create new production rockspec
-cp lumos-1.0.0-1.rockspec lumos-1.1.0-1.rockspec
-sed -i 's/1.0.0/1.1.0/g' lumos-1.1.0-1.rockspec
-sed -i 's/v1.0.0/v1.1.0/g' lumos-1.1.0-1.rockspec
+cp lumos-0.1.0-1.rockspec lumos-1.1.0-1.rockspec
+sed -i 's/0.1.0/1.1.0/g' lumos-1.1.0-1.rockspec
+sed -i 's/v0.1.0/v1.1.0/g' lumos-1.1.0-1.rockspec
 
 # 4. Test the release
 make install-prod
@@ -83,7 +83,7 @@ make test
 ### Testing Production Build
 ```bash
 # Test production rockspec
-make install-prod     # installs lumos-1.0.0-1.rockspec
+make install-prod     # installs lumos-0.1.0-1.rockspec
 make test
 ```
 
@@ -92,7 +92,7 @@ make test
 | Command | Rockspec | Purpose |
 |---------|----------|---------|
 | `make install` | `lumos-dev-1.rockspec` | Development |
-| `make install-prod` | `lumos-1.0.0-1.rockspec` | Production testing |
+| `make install-prod` | `lumos-0.1.0-1.rockspec` | Production testing |
 | `make setup` | `lumos-dev-1.rockspec` | Full system setup |
 
 ## File Structure
@@ -102,7 +102,7 @@ lumos/
 ├── VERSION                    # Current version number
 ├── .lumos                     # Project configuration
 ├── lumos-dev-1.rockspec      # Development rockspec
-├── lumos-1.0.0-1.rockspec    # Production rockspec (versioned)
+├── lumos-0.1.0-1.rockspec    # Production rockspec (versioned)
 ├── bin/lumos                  # CLI executable
 ├── lumos/                     # Framework source code
 ├── scripts/install.sh         # Installation script

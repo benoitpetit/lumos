@@ -3,7 +3,7 @@
 # Script to publish Lumos on LuaRocks
 
 # Define the rockspec file
-ROCKSPEC="lumos-1.0.0-1.rockspec"
+ROCKSPEC="lumos-0.1.0-1.rockspec"
 
 # Check if the rockspec file exists
 if [ ! -f "$ROCKSPEC" ]; then

@@ -62,15 +62,15 @@ luarocks install --local luafilesystem || {
 
 # Install Lumos
 echo -e "${BLUE}Installing Lumos framework...${NC}"
-if [ -f "lumos-1.0.0-1.rockspec" ]; then
+if [ -f "lumos-0.1.0-1.rockspec" ]; then
     # Install from local source directory (production build)
-    luarocks make --local lumos-1.0.0-1.rockspec || {
+    luarocks make --local lumos-0.1.0-1.rockspec || {
         echo -e "${RED}Failed to install Lumos from production rockspec${NC}"
         exit 1
     }
 elif [ -f "lumos-dev-1.rockspec" ]; then
     # Install from local development directory
-    echo -e "${YELLOW}Using development rockspec (consider using lumos-1.0.0-1.rockspec for production)${NC}"
+    echo -e "${YELLOW}Using development rockspec (consider using lumos-0.1.0-1.rockspec for production)${NC}"
     luarocks make --local lumos-dev-1.rockspec || {
         echo -e "${RED}Failed to install Lumos from development rockspec${NC}"
         exit 1

@@ -219,7 +219,7 @@ end
 -- Main CLI application
 local app = lumos.new_app({
     name = "lumos",
-    version = "1.0.0",
+    version = "0.1.0",
     description = "Lumos CLI framework and project generator"
 })
 
@@ -317,7 +317,7 @@ config.local.lua
 
 app:command("version", "Show Lumos version")
     :action(function(ctx)
-        print("Lumos CLI Framework v1.0.0")
+        print("Lumos CLI Framework v0.1.0")
         print("A modern CLI framework for Lua")
         print("https://github.com/benoitpetit/lumos")
         return true

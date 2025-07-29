@@ -12,7 +12,7 @@ local color = require('lumos.color')
 -- Create the application
 local app = lumos.new_app({
     name = "aliases_demo",
-    version = "1.0.0",
+    version = "0.1.0",
     description = "Demonstrates command aliases and persistent flags"
 })
 

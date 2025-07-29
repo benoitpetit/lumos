@@ -12,7 +12,7 @@ local color = require('lumos.color')
 -- Create the application
 local app = lumos.new_app({
     name = "typed_flags_demo",
-    version = "1.0.0",
+    version = "0.1.0",
     description = "Demonstrates typed flags with validation"
 })
 

@@ -12,7 +12,7 @@ local color = require('lumos.color')
 -- Create the application
 local app = lumos.new_app({
     name = "myapp",
-    version = "1.0.0", 
+    version = "0.1.0", 
     description = "Basic example using Lumos"
 })
 
@@ -59,7 +59,7 @@ info:flag("-a --all", "Show all information")
 info:action(function(ctx)
     print(color.bold("Application Information:"))
     print("Name: " .. color.cyan("myapp"))
-    print("Version: " .. color.yellow("1.0.0"))
+    print("Version: " .. color.yellow("0.1.0"))
     
     if ctx.flags.all then
         print("Framework: " .. color.magenta("Lumos"))

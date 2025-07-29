@@ -18,7 +18,7 @@ describe('Lumos Main Module', function()
     end)
 
     it('has correct version', function()
-      assert.are.equal('1.0.0', lumos.version)
+      assert.are.equal('0.1.0', lumos.version)
     end)
 
     it('can create an application', function()
@@ -31,7 +31,7 @@ describe('Lumos Main Module', function()
     it('creates a functional application with all features', function()
       local app = lumos.new_app({
         name = 'integration-test',
-        version = '1.0.0'
+        version = '0.1.0'
       })
       
       -- Add global flag
@@ -47,7 +47,7 @@ describe('Lumos Main Module', function()
       
       -- Verify structure
       assert.are.equal('integration-test', app.name)
-      assert.are.equal('1.0.0', app.version)
+      assert.are.equal('0.1.0', app.version)
       assert.is_table(app.global_flags.verbose)
       assert.are.equal(1, #app.commands)
       assert.are.equal('test', app.commands[1].name)

@@ -11,7 +11,7 @@ describe("Documentation Generation", function()
         it("should generate markdown documentation", function()
             local app = lumos.new_app({
                 name = "testapp",
-                version = "1.0.0",
+                version = "0.1.0",
                 description = "Test application"
             })
             

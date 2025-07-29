@@ -3,13 +3,13 @@
 
 [project]
 name = "lumos"
-version = "1.0.0"
+version = "0.1.0"
 description = "A modern CLI framework for Lua"
 homepage = "https://github.com/benoitpetit/lumos"
 license = "MIT"
 
 [build]
-main_rockspec = "lumos-1.0.0-1.rockspec"
+main_rockspec = "lumos-0.1.0-1.rockspec"
 dev_rockspec = "lumos-dev-1.rockspec"
 
 [directories]

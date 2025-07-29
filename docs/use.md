@@ -13,7 +13,7 @@ local lfs = require('lfs')
 
 local app = lumos.new_app({
     name = "fileutil",
-    version = "1.0.0",
+    version = "0.1.0",
     description = "File utilities CLI"
 })
 
@@ -185,7 +185,7 @@ local tbl = require('lumos.table')
 
 local app = lumos.new_app({
     name = "tasks",
-    version = "1.0.0",
+    version = "0.1.0",
     description = "Simple task manager"
 })
 
@@ -422,7 +422,7 @@ local json = require('lumos.json')
 
 local app = lumos.new_app({
     name = "configapp",
-    version = "1.0.0",
+    version = "0.1.0",
     description = "Configuration-driven deployment tool"
 })
 
