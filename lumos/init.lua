@@ -13,6 +13,7 @@ local json = require('lumos.json')
 local completion = require('lumos.completion')
 local manpage = require('lumos.manpage')
 local markdown = require('lumos.markdown')
+local format = require('lumos.format')
 
 -- Export the main interface
 return {
@@ -29,6 +30,7 @@ return {
     completion = completion,
     manpage = manpage,
     markdown = markdown,
+    format = format,
     version = "0.1.0",
     load_config = core.load_config
 }

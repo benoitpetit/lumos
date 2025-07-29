@@ -207,7 +207,7 @@ make install && make test
 - **License:** MIT
 - **Lua Versions:** 5.1, 5.2, 5.3, 5.4, LuaJIT
 - **Platforms:** Linux, macOS, Windows (WSL)
-- **Tests:** 125 passing tests
+- **Tests:** 147 passing tests
 - **Dependencies:** luafilesystem
 
 ## Acknowledgments

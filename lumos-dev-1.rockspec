@@ -48,7 +48,8 @@ build = {
       ["lumos.table"] = "lumos/table.lua",
       ["lumos.completion"] = "lumos/completion.lua",
       ["lumos.manpage"] = "lumos/manpage.lua",
-      ["lumos.markdown"] = "lumos/markdown.lua"
+      ["lumos.markdown"] = "lumos/markdown.lua",
+      ["lumos.format"] = "lumos/format.lua"
    },
    install = {
       bin = {

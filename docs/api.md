@@ -25,6 +25,24 @@ local app = lumos.new_app({
 })
 ```
 
+### Available Modules
+
+Lumos exports the following modules:
+
+- `lumos.app` - Application builder
+- `lumos.core` - Core utilities
+- `lumos.flags` - Flag parsing
+- `lumos.color` - Color output
+- `lumos.format` - Text formatting
+- `lumos.loader` - Loading animations
+- `lumos.progress` - Progress bars
+- `lumos.prompt` - User prompts
+- `lumos.table` - Table formatting
+- `lumos.json` - JSON utilities
+- `lumos.completion` - Shell completion
+- `lumos.manpage` - Man page generation
+- `lumos.markdown` - Markdown documentation
+
 ## Application Methods
 
 ### `app:command(name, description)`
@@ -170,14 +188,19 @@ color.white("Normal text")
 color.black("Dark text")
 ```
 
-### Styles
+### Bright Colors
 
 ```lua
-color.bold("Bold text")
-color.dim("Dimmed text")
-color.italic("Italic text")
-color.underline("Underlined text")
-color.strikethrough("Strikethrough text")
+color.colorize("Bright red text", "bright_red")
+color.colorize("Bright green text", "bright_green")
+color.colorize("Bright blue text", "bright_blue")
+```
+
+### Text Styles (delegated to format module)
+
+```lua
+color.bold("Bold text")  -- Uses format.bold internally
+color.dim("Dimmed text") -- Uses format.dim internally
 ```
 
 ### Background Colors
@@ -201,6 +224,79 @@ color.format("{green}{bold}Success!{reset}")
 color.enable()     -- Force enable colors
 color.disable()    -- Force disable colors
 color.is_enabled() -- Check if colors are enabled
+```
+
+## Format Module (`lumos.format`)
+
+The format module handles ANSI text formatting and text transformations.
+
+### Text Styles
+
+```lua
+local format = require('lumos.format')
+
+format.bold("Bold text")
+format.italic("Italic text")
+format.underline("Underlined text")
+format.strikethrough("Strikethrough text")
+format.dim("Dimmed text")
+format.reverse("Reversed text")
+format.hidden("Hidden text")
+```
+
+### Template Formatting
+
+```lua
+format.format("{bold}This is bold{reset} and {italic}this is italic{reset}")
+format.format("{underline}Underlined{reset} with {strikethrough}strikethrough{reset}")
+```
+
+### Text Truncation
+
+```lua
+format.truncate("Very long text that needs truncation", 15)
+-- Returns: "Very long te..."
+
+format.truncate("Long text", 10, " [more]")
+-- Returns: "Lo [more]"
+```
+
+### Word Wrapping
+
+```lua
+local lines = format.wrap("This is a long sentence that should be wrapped", 20)
+-- Returns: {"This is a long", "sentence that should", "be wrapped"}
+
+for i, line in ipairs(lines) do
+    print(i .. ": " .. line)
+end
+```
+
+### Case Transformations
+
+```lua
+format.title_case("hello world")     -- "Hello World"
+format.camel_case("hello_world")     -- "helloWorld"
+format.snake_case("HelloWorld")      -- "hello_world"
+format.kebab_case("HelloWorld")      -- "hello-world"
+```
+
+### Format Combining
+
+```lua
+-- Combine multiple formats
+format.combine("Important text", "bold", "underline")
+
+-- Use functions
+format.combine("Styled text", format.italic, format.reverse)
+```
+
+### Format Control
+
+```lua
+format.enable()     -- Enable formatting
+format.disable()    -- Disable formatting
+format.is_enabled() -- Check if formatting is enabled
 ```
 
 ## Progress Module (`lumos.progress`)
@@ -324,13 +420,73 @@ local items = {"Item 1", "Item 2", "Item 3"}
 print(tbl.boxed(items))
 ```
 
-### Tables with Headers
+### Boxed Tables with Options
 
 ```lua
 print(tbl.boxed(items, {
     header = "My Items",
     footer = "Total: 3",
-    align = "center"
+    align = "center",  -- "left", "center", "right"
+    large = true       -- Adapt to terminal width
+}))
+```
+
+### Advanced Tables
+
+```lua
+local data = {
+    {Name = "Alice", Age = 30, Score = 95},
+    {Name = "Bob", Age = 25, Score = 87},
+    {Name = "Carol", Age = 28, Score = 92}
+}
+
+-- Table with borders
+print(tbl.create(data, {
+    headers = {"Name", "Age", "Score"},
+    align = {"left", "right", "center"},
+    min_width = 5,
+    max_width = 20
+}))
+```
+
+### Simple Tables (No Borders)
+
+```lua
+print(tbl.simple(data, {
+    headers = {"Name", "Age", "Score"},
+    separator = "  ",  -- Custom column separator
+    align = {"left", "right", "center"}
+}))
+```
+
+### Key-Value Tables
+
+```lua
+local config = {
+    host = "localhost",
+    port = 8080,
+    debug = true
+}
+
+-- Bordered key-value table
+print(tbl.key_value(config))
+
+-- Simple key-value table
+print(tbl.key_value(config, {simple = true}))
+```
+
+### Custom Borders
+
+```lua
+print(tbl.create(data, {
+    headers = {"Name", "Age", "Score"},
+    border = {
+        top_left = "╔", top_right = "╗",
+        bottom_left = "╚", bottom_right = "╝",
+        horizontal = "═", vertical = "║",
+        cross = "╬", top_tee = "╦",
+        bottom_tee = "╩", left_tee = "╠", right_tee = "╣"
+    }
 }))
 ```
 

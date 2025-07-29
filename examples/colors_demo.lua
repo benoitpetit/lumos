@@ -7,6 +7,7 @@
 package.path = package.path .. ";../?.lua;../?/init.lua;"
 
 local color = require('lumos.color')
+local format = require('lumos.format')
 
 print("=== Demonstration of the Lumos Color module ===\n")
 
@@ -40,13 +41,13 @@ print("• " .. color.colorize("Blue background", "bg_blue"))
 print("• " .. color.colorize("Yellow background", "bg_yellow"))
 print()
 
--- Styles de texte
+-- Styles de texte (maintenant dans le module format)
 print("Text styles:")
-print("• " .. color.bold("Bold text"))
-print("• " .. color.dim("Dimmed text"))
-print("• " .. color.colorize("Italic text", "italic"))
-print("• " .. color.colorize("Underlined text", "underline"))
-print("• " .. color.colorize("Strikethrough text", "strikethrough"))
+print("• " .. format.bold("Bold text"))
+print("• " .. format.dim("Dimmed text"))
+print("• " .. format.italic("Italic text"))
+print("• " .. format.underline("Underlined text"))
+print("• " .. format.strikethrough("Strikethrough text"))
 print()
 
 -- Formatage avec templates

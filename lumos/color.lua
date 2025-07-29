@@ -2,6 +2,7 @@
 -- Provides ANSI color support with automatic terminal detection
 
 local color = {}
+local format = require('lumos.format')
 
 -- ANSI color codes
 local colors = {
@@ -33,14 +34,7 @@ local colors = {
     bg_blue = "\27[44m",
     bg_magenta = "\27[45m",
     bg_cyan = "\27[46m",
-    bg_white = "\27[47m",
-    
-    -- Styles
-    bold = "\27[1m",
-    dim = "\27[2m",
-    italic = "\27[3m",
-    underline = "\27[4m",
-    strikethrough = "\27[9m"
+    bg_white = "\27[47m"
 }
 
 -- Check if terminal supports colors
@@ -122,12 +116,13 @@ function color.white(text)
     return color.colorize(text, "white")
 end
 
+-- Convenience functions for text formatting (delegated to format module)
 function color.bold(text)
-    return color.colorize(text, "bold")
+    return format.bold(text)
 end
 
 function color.dim(text)
-    return color.colorize(text, "dim")
+    return format.dim(text)
 end
 
 -- Enable/disable colors
@@ -152,7 +147,7 @@ color.status = {
 }
 
 color.log = {
-    debug = function(text) return color.dim("[DEBUG] " .. text) end,
+    debug = function(text) return format.dim(color.colorize("[DEBUG] " .. text, "reset")) end,
     info = function(text) return color.blue("[INFO] " .. text) end,
     warn = function(text) return color.yellow("[WARN] " .. text) end,
     error = function(text) return color.red("[ERROR] " .. text) end
