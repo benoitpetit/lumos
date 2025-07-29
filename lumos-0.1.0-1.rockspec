@@ -1,7 +1,7 @@
 package = "lumos"
 version = "0.1.0-1"
 source = {
-   url = "git+https://github.com/yourusername/lumos.git",
+   url = "git+https://github.com/benoitpetit/lumos.git",
    tag = "v0.1.0"
 }
 description = {
@@ -21,7 +21,7 @@ description = {
       - Global and local flags with inheritance
       - Robust error handling and validation
    ]],
-   homepage = "https://github.com/yourusername/lumos",
+   homepage = "https://github.com/benoitpetit/lumos",
    license = "MIT"
 }
 dependencies = {
@@ -36,6 +36,8 @@ build = {
       ["lumos.flags"] = "lumos/flags.lua",
       ["lumos.color"] = "lumos/color.lua",
       ["lumos.progress"] = "lumos/progress.lua",
-      ["lumos.prompt"] = "lumos/prompt.lua"
+      ["lumos.prompt"] = "lumos/prompt.lua",
+      ["lumos.table"] = "lumos/table.lua",
+      ["lumos.loader"] = "lumos/loader.lua"
    }
 }

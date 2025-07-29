@@ -114,6 +114,14 @@ function color.cyan(text)
     return color.colorize(text, "cyan")
 end
 
+function color.black(text)
+    return color.colorize(text, "black")
+end
+
+function color.white(text)
+    return color.colorize(text, "white")
+end
+
 function color.bold(text)
     return color.colorize(text, "bold")
 end

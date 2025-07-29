@@ -80,8 +80,7 @@ function lumos.new_app(config)
             name = name,
             description = description,
             flags = {},
-            args = {},
-            examples = {}
+            args = {}
         }, Command)
         
         table.insert(self.commands, cmd)

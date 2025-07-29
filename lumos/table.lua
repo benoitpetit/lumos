@@ -43,7 +43,7 @@ function tbl.boxed(items, options)
     end
 
     -- Si option big, adapte la largeur au terminal
-    if options.big then
+    if options.large then
         local term_width = 0
         local fh = io.popen('tput cols 2>/dev/null')
         if fh then

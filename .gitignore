@@ -1,0 +1,29 @@
+# lumos project .gitignore file
+
+# Lua bytecode files
+*.luac
+
+# LuaRocks build and install directories
+.luarocks/
+lua_modules/
+deps/
+
+# Temporary files
+*.bak
+*.tmp
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# IDE/editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+
+# Coverage reports
+*.stats.out

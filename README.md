@@ -1,17 +1,17 @@
 # Lumos CLI Framework
 
-**Lumos** (Latin for "light") is a modern CLI framework for Lua, inspired by Cobra for Go. It brings clarity and simplicity to command-line application development with an elegant, fluent API.
+**Lumos** (Latin for "light") is a modern CLI framework for Lua, inspired by Cobra for Go. It simplifies command-line application development with an elegant, fluent API, complete with argument parsing, automatic help generation, color support, progress bars, and interactive prompts.
 
 ## 🌟 Key Features
 
-- ✅ **POSIX-compliant argument parsing** - Short (`-h`) and long (`--help`) flags
-- ✅ **Fluent command definition API** - Chainable method calls for easy setup
-- ✅ **Automatic help generation** - Beautiful help text with examples
-- ✅ **Color and styling support** - ANSI colors with terminal detection
-- ✅ **Progress bars** - Simple and fancy progress indicators
-- ✅ **Interactive prompts** - Text input, confirmations, selections
-- ✅ **Global and local flags** - Cascade flags from parent to child commands
-- ✅ **Robust error handling** - Clear error messages and validation
+- **POSIX-compliant argument parsing** - Supports short (`-h`) and long (`--help`) flags
+- **Fluent command definition API** - Chainable method calls for easy setup
+- **Automatic help generation** - Generates help text with examples
+- **Color and styling support** - ANSI colors with terminal detection and styling options
+- **Progress bars** - Simple and dynamic progress indicators
+- **Interactive prompts** - Supports text input, password entry, confirmations, and selections
+- **Global and local flags** - Flags with inheritance and scope control
+- **Comprehensive error handling** - Clear error messages with robust validation
 
 ## 📦 Installation
 
@@ -27,23 +27,26 @@
 luarocks install lumos
 ```
 
-### Use in your projects
+### Usage in Your Projects
+
+To use Lumos, simply require the necessary modules in your Lua script:
 
 ```lua
--- Simply require Lumos (no path setup needed with LuaRocks)
 local lumos = require('lumos')
 local color = require('lumos.color')
-local prompt = require('lumos.prompt')
 local progress = require('lumos.progress')
+local prompt = require('lumos.prompt')
+local tbl = require('lumos.table')
+local loader = require('lumos.loader')
 ```
 
 ### Development Installation
 
-For development or to try the latest version:
+To contribute to Lumos or use the latest version:
 
 ```bash
-# Clone and install locally
-git clone https://github.com/yourusername/lumos.git
+# Clone the repository and install
+git clone https://github.com/benoitpetit/lumos.git
 cd lumos
 luarocks make lumos-0.1.0-1.rockspec
 ```
@@ -53,7 +56,7 @@ luarocks make lumos-0.1.0-1.rockspec
 If you can't use LuaRocks:
 
 ```bash
-git clone https://github.com/yourusername/lumos.git
+git clone https://github.com/benoitpetit/lumos.git
 cd lumos
 
 # Add to your Lua scripts:
@@ -61,73 +64,6 @@ cd lumos
 ```
 
 
-
-## 📋 Tableaux encadrés (Table)
-
-Lumos permet de créer facilement des tableaux encadrés pour afficher des listes ou des cadres dans votre CLI :
-
-```lua
-local tbl = require('lumos.table')
-local items = {"Un", "Deux", "Trois"}
-print(tbl.boxed(items))
---[[
-Affiche :
-┌───────┐
-│ Un    │
-│ Deux  │
-│ Trois │
-└───────┘
-]]
-```
-
-Voir `test/table.lua` pour plus d'exemples.
-
-## 🚀 Quick Example
-
-After installing with `luarocks install lumos`:
-
-```lua
-#!/usr/bin/env lua
-
--- No path setup needed with LuaRocks!
-local lumos = require('lumos')
-local color = require('lumos.color')
-
--- Create application
-local app = lumos.new_app({
-    name = "myapp",
-    version = "1.0.0",
-    description = "My awesome CLI application"
-})
-
--- Add global flags
-app:flag("-v --verbose", "Enable verbose output")
-
--- Define a command
-local greet = app:command("greet", "Greet someone")
-greet:arg("name", "Name of person to greet")
-greet:flag("-u --uppercase", "Use uppercase")
-greet:flag("-c --colorful", "Use colors")
-
-greet:action(function(ctx)
-    local name = ctx.args[1] or "World"
-    local message = "Hello, " .. name .. "!"
-    
-    if ctx.flags.uppercase then
-        message = message:upper()
-    end
-    
-    if ctx.flags.colorful then
-        message = color.format("{green}" .. message .. "{reset}")
-    end
-    
-    print(message)
-    return true
-end)
-
--- Run the app
-app:run(arg)
-```
 
 ## 📚 Complete API Reference
 
@@ -291,87 +227,182 @@ local valid, result = prompt.validate(input, function(val)
 end, "Input must be longer than 3 characters")
 ```
 
+### Boxed Tables (`lumos.table`)
+
+#### Creating Boxed Tables
+```lua
+local tbl = require('lumos.table')
+
+-- Simple boxed table
+local items = {"Item 1", "Item 2", "Item 3"}
+print(tbl.boxed(items))
+
+-- With header and footer
+print(tbl.boxed(items, {
+    header = "My Items",
+    footer = "End of List",
+    align = "center"
+}))
+```
+
+#### Table Options
+- `header` - Add a header row
+- `footer` - Add a footer row
+- `align` - Text alignment: "left", "center", "right"
+- `large` - Adapt width to terminal size
+
+### Loading Animations (`lumos.loader`)
+
+#### Basic Loader
+```lua
+local loader = require('lumos.loader')
+
+-- Start a loader
+loader.start("Processing files")
+
+-- Animate the loader (call in a loop)
+loader.next()
+
+-- Stop with different statuses
+loader.success()  -- Shows [OK]
+loader.fail()     -- Shows [FAIL]
+loader.stop()     -- Shows [STOP]
+```
+
+#### Loader Styles
+```lua
+-- Different animation styles
+loader.start("Loading", "standard")  -- |, /, -, \
+loader.start("Loading", "dots")      -- .  , .. , ...
+loader.start("Loading", "bounce")    -- ◜, ◠, ◝, ◞, ◡, ◟
+```
+
+## 🚀 Quick Example
+
+After installing with `luarocks install lumos`:
+
+```lua
+#!/usr/bin/env lua
+
+-- No path setup needed with LuaRocks!
+local lumos = require('lumos')
+local color = require('lumos.color')
+
+-- Create application
+local app = lumos.new_app({
+    name = "myapp",
+    version = "1.0.0",
+    description = "My awesome CLI application"
+})
+
+-- Add global flags
+app:flag("-v --verbose", "Enable verbose output")
+
+-- Define a command
+local greet = app:command("greet", "Greet someone")
+greet:arg("name", "Name of person to greet")
+greet:flag("-u --uppercase", "Use uppercase")
+greet:flag("-c --colorful", "Use colors")
+
+greet:action(function(ctx)
+    local name = ctx.args[1] or "World"
+    local message = "Hello, " .. name .. "!"
+    
+    if ctx.flags.uppercase then
+        message = message:upper()
+    end
+    
+    if ctx.flags.colorful then
+        message = color.format("{green}" .. message .. "{reset}")
+    end
+    
+    print(message)
+    return true
+end)
+
+-- Run the app
+app:run(arg)
+```
+
+
 ## 🧪 Testing and Examples
 
 ### Running Examples
 
-All commands should be run from the project root directory:
+All examples are located in the `examples/` directory and should be run from the project root:
 
-#### Basic Hello Example
+#### Basic Application Example
 ```bash
 # Show help
-lua examples/hello.lua --help
+lua examples/basic_app.lua --help
 
-# Greet someone
-lua examples/hello.lua greet Alice
-lua examples/hello.lua greet Bob --uppercase
-lua examples/hello.lua goodbye Charlie --formal
+# Run commands
+lua examples/basic_app.lua greet Alice
+lua examples/basic_app.lua greet Bob --uppercase --colorful
+lua examples/basic_app.lua info --all
 ```
 
-#### Comprehensive Demo
+#### Color Demonstration
 ```bash
-# Show all available commands
-lua test/demo-cli.lua --help
-
-# Test basic greeting
-lua test/demo-cli.lua greet Alice --colorful
-
-# Test colors
-lua test/demo-cli.lua colors --all
-
-# Test progress bars
-lua test/demo-cli.lua progress --duration 2
-
-# Test interactive prompts (requires terminal input)
-lua test/demo-cli.lua interactive
-
-# Get framework information
-lua test/demo-cli.lua info
-
-# Run feature tests
-lua test/demo-cli.lua test --all
+# Show all color capabilities
+lua examples/colors_demo.lua
 ```
 
-#### File Manager Example
+#### Progress Bar Examples
 ```bash
-# List files with colors
-lua test/filemanager.lua list . --color
-
-# Count Lua files
-lua test/filemanager.lua count . --type lua
-
-# Simulate backup (dry run)
-lua test/filemanager.lua backup ./test ./backup --dry-run
+# Demonstrate various progress bar types
+lua examples/progress_demo.lua
 ```
 
-#### Quick Test
+### Running Tests
+
+Lumos includes comprehensive tests using Busted:
+
 ```bash
-# Run basic functionality test
-lua test/quick-test.lua
+# Install test dependencies
+luarocks install busted
+luarocks install luacov
+
+# Run all tests
+busted spec/
+
+# Run tests with coverage
+busted --coverage spec/
 ```
 
 ## 🏗️ Project Structure
 
 ```
 lumos/
-├── lumos/
-│   ├── init.lua          # Main entry point
-│   ├── app.lua           # Application and command logic
-│   ├── core.lua          # Argument parsing and execution
-│   ├── flags.lua         # POSIX flag parsing
-│   ├── color.lua         # Color and styling
-│   ├── progress.lua      # Progress bars
-│   └── prompt.lua        # Interactive prompts
-├── examples/
-│   └── hello.lua         # Basic example
-├── test/
-│   ├── demo-cli.lua      # Comprehensive demo
-│   ├── filemanager.lua   # Realistic file manager example
-│   ├── quick-test.lua    # Quick functionality test
-│   └── README.md         # Test documentation
-├── presentation.md       # Project analysis (French)
-├── tech.md              # Technical specifications (French)
-└── README.md            # This file
+├── lumos/                  # Core framework modules
+│   ├── init.lua            # Main entry point and module exports
+│   ├── app.lua             # Application and command logic
+│   ├── core.lua            # Argument parsing and execution
+│   ├── flags.lua           # POSIX flag parsing utilities
+│   ├── color.lua           # ANSI color and styling support
+│   ├── progress.lua        # Progress bars (simple and advanced)
+│   ├── prompt.lua          # Interactive prompts and input
+│   ├── table.lua           # Boxed table formatting
+│   └── loader.lua          # Loading animations and spinners
+├── examples/               # Usage examples
+│   ├── basic_app.lua       # Basic CLI application example
+│   ├── colors_demo.lua     # Color and styling demonstration
+│   └── progress_demo.lua   # Progress bar examples
+├── spec/                   # Test suite (Busted framework)
+│   ├── init_spec.lua       # Main module tests
+│   ├── app_spec.lua        # Application logic tests
+│   ├── flags_spec.lua      # Flag parsing tests
+│   ├── color_spec.lua      # Color module tests
+│   ├── progress_spec.lua   # Progress bar tests
+│   ├── prompt_spec.lua     # Prompt functionality tests
+│   ├── table_spec.lua      # Table formatting tests
+│   └── loader_spec.lua     # Loader animation tests
+├── .busted                 # Busted test configuration
+├── lumos-0.1.0-1.rockspec # LuaRocks package specification
+├── LICENSE                 # MIT License
+├── README.md              # This documentation
+├── presentation.md         # Project presentation (French)
+└── tech.md                # Technical specifications (French)
 ```
 
 ## 🐛 Troubleshooting
@@ -415,14 +446,17 @@ Contributions are welcome! Please:
 
 ### Development Setup
 ```bash
-git clone https://github.com/your-repo/lumos.git
+git clone https://github.com/benoitpetit/lumos.git
 cd lumos
 
+# Install for development
+luarocks make lumos-0.1.0-1.rockspec
+
 # Run tests
-lua test/demo-cli.lua test --all
+busted spec/
 
 # Test examples
-lua examples/hello.lua --help
+lua examples/basic_app.lua --help
 ```
 
 ## 📝 License
