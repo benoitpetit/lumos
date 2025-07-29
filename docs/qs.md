@@ -4,22 +4,37 @@ Get started with Lumos CLI framework in 5 minutes.
 
 ## Installation
 
-### Quick Install
+### Quick Install (Recommended)
 ```bash
 git clone https://github.com/benoitpetit/lumos.git
 cd lumos
 bash scripts/install.sh
 ```
 
-### Manual Install
+### Manual Install (if script fails)
 ```bash
 git clone https://github.com/benoitpetit/lumos.git
 cd lumos
-luarocks install --local luafilesystem
-luarocks make --local lumos-dev-1.rockspec
+
+# Create directories
+mkdir -p $HOME/.luarocks/share/lua/5.1
+mkdir -p $HOME/.luarocks/bin
+
+# Copy modules and binary
+cp -r lumos $HOME/.luarocks/share/lua/5.1/
+cp bin/lumos $HOME/.luarocks/bin/
+chmod +x $HOME/.luarocks/bin/lumos
+
+# Add to PATH
 echo 'export PATH="$HOME/.luarocks/bin:$PATH"' >> ~/.bashrc
 source ~/.bashrc
 ```
+
+### Dependencies
+
+Lumos requires:
+- Lua 5.1+ (install with: `sudo apt-get install lua5.1` on Ubuntu/Debian)
+- luafilesystem (install with: `luarocks install luafilesystem` if LuaRocks works)
 
 ## Create Your First CLI
 

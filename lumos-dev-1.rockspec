@@ -3,7 +3,7 @@ package = "lumos"
 version = "dev-1"
 
 source = {
-   url = ".",
+   url = ".",  -- Used for local builds
    dir = "."
 }
 

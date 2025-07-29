@@ -4,7 +4,7 @@ version = "0.1.0-1"
 
 source = {
    url = "git+https://github.com/benoitpetit/lumos.git",
-   branch = "main"
+   tag = "v0.1.0"
 }
 
 description = {

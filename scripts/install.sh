@@ -57,6 +57,7 @@ echo -e "${BLUE}✓ Lua and LuaRocks found${NC}"
 echo -e "${BLUE}Installing dependencies...${NC}"
 luarocks install --local luafilesystem || {
     echo -e "${RED}Failed to install luafilesystem${NC}"
+    echo -e "${YELLOW}Please ensure LuaRocks is properly configured${NC}"
     exit 1
 }
 
@@ -70,15 +71,16 @@ if [ -f "lumos-0.1.0-1.rockspec" ]; then
     }
 elif [ -f "lumos-dev-1.rockspec" ]; then
     # Install from local development directory
-    echo -e "${YELLOW}Using development rockspec (consider using lumos-0.1.0-1.rockspec for production)${NC}"
+    echo -e "${YELLOW}Using development rockspec${NC}"
     luarocks make --local lumos-dev-1.rockspec || {
         echo -e "${RED}Failed to install Lumos from development rockspec${NC}"
         exit 1
     }
 else
-    # Install from LuaRocks repository (future)
+    # Install from LuaRocks repository
     luarocks install --local lumos || {
-        echo -e "${YELLOW}Lumos not found in LuaRocks repository. Please run this script from the Lumos source directory.${NC}"
+        echo -e "${RED}Failed to install Lumos from LuaRocks repository${NC}"
+        echo -e "${YELLOW}If running from source, ensure rockspec files are present${NC}"
         exit 1
     }
 fi
