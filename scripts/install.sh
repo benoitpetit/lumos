@@ -5,7 +5,7 @@
 
 set -e
 
-echo "🚀 Installing Lumos CLI Framework..."
+echo "Installing Lumos CLI Framework..."
 
 # Colors for output
 RED='\033[0;31m'
@@ -62,10 +62,17 @@ luarocks install --local luafilesystem || {
 
 # Install Lumos
 echo -e "${BLUE}Installing Lumos framework...${NC}"
-if [ -f "lumos-dev-1.rockspec" ]; then
+if [ -f "lumos-1.0.0-1.rockspec" ]; then
+    # Install from local source directory (production build)
+    luarocks make --local lumos-1.0.0-1.rockspec || {
+        echo -e "${RED}Failed to install Lumos from production rockspec${NC}"
+        exit 1
+    }
+elif [ -f "lumos-dev-1.rockspec" ]; then
     # Install from local development directory
+    echo -e "${YELLOW}Using development rockspec (consider using lumos-1.0.0-1.rockspec for production)${NC}"
     luarocks make --local lumos-dev-1.rockspec || {
-        echo -e "${RED}Failed to install Lumos from local rockspec${NC}"
+        echo -e "${RED}Failed to install Lumos from development rockspec${NC}"
         exit 1
     }
 else
@@ -153,9 +160,9 @@ export PATH="$LUAROCKS_BIN:$PATH"
 export LUA_PATH="$LUAROCKS_LUA_PATH/?.lua;$LUAROCKS_LUA_PATH/?/init.lua:$LUA_PATH"
 
 if "$LUAROCKS_BIN/lumos" version &>/dev/null; then
-    echo -e "${GREEN}✅ Installation successful!${NC}"
+    echo -e "${GREEN}Installation successful!${NC}"
     echo ""
-    echo -e "${GREEN}🎉 Lumos CLI Framework is now installed!${NC}"
+    echo -e "${GREEN}Lumos CLI Framework is now installed!${NC}"
     echo ""
     echo -e "${BLUE}To start using Lumos:${NC}"
     echo "1. Restart your terminal or run: source $SHELL_RC"
@@ -168,6 +175,6 @@ if "$LUAROCKS_BIN/lumos" version &>/dev/null; then
     echo "  make install"
     echo "  make run"
 else
-    echo -e "${RED}❌ Installation test failed. Please check the installation manually.${NC}"
+    echo -e "${RED}Installation test failed. Please check the installation manually.${NC}"
     exit 1
 fi
