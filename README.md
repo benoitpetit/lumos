@@ -2,7 +2,7 @@
 
 
 <p align="center">
-    <img src="lumos.png" alt="Lumos Logo" width="200">
+    <img src="lumosb&w.png" alt="Lumos Logo" width="250">
 </p>
 
 **Lumos** (Latin for "light") is a modern, enhanced CLI framework for Lua, inspired by Cobra for Go. It simplifies command-line application development with an elegant, fluent API, complete with argument parsing, automatic help generation, color support, progress bars, interactive prompts, and advanced features like JSON output and input validation.
