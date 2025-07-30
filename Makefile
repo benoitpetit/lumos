@@ -8,11 +8,13 @@ all: test
 # Run all tests
 test:
 	@echo "Running tests..."
-	@busted
+	@~/.luarocks/bin/busted
 
 # Install lumos locally for development
 install:
 	@echo "Installing Lumos locally for development..."
+	@luarocks install luafilesystem --local
+	@luarocks install busted --local
 	@luarocks make --local lumos-dev-1.rockspec
 
 # Full system installation with path configuration

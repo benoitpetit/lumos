@@ -257,7 +257,7 @@ app:command("new", "Create a new Lumos CLI project")
         -- Create Makefile
         write_file(project_name .. "/Makefile", [[install:
 	@echo "Installing dependencies"
-	@luarocks install busted --local || echo "Please install busted manually"
+	@luarocks install busted --local --lua-version=5.4 --force || echo "Please install busted manually"
 	@echo "Lumos is already installed globally or local to your user."
 
 test:

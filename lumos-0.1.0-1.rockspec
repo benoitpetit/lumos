@@ -30,6 +30,10 @@ dependencies = {
    "luafilesystem >= 1.6.3"
 }
 
+test_dependencies = {
+   "busted >= 2.0"
+}
+
 build = {
    type = "builtin",
    modules = {

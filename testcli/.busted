@@ -2,7 +2,7 @@ return {
   default = {
     verbose = true,
     coverage = false,
-    lpath = "lumos/?.lua;lumos/?/init.lua",
-    pattern = "_spec"
+    pattern = ".*_spec%.lua$",
+    ROOT = {"tests/"}
   }
 }

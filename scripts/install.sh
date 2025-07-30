@@ -105,8 +105,9 @@ fi
 echo -e "${GREEN}✓ Lumos installed successfully${NC}"
 
 # Configure shell PATH
+LUA_VERSION=$(lua -v | awk '{print $2}' | cut -d. -f1,2)
 LUAROCKS_BIN="$HOME/.luarocks/bin"
-LUAROCKS_LUA_PATH="$HOME/.luarocks/share/lua/5.1"
+LUAROCKS_LUA_PATH="$HOME/.luarocks/share/lua/$LUA_VERSION"
 
 # Function to add path if not already present
 add_to_path() {
@@ -160,12 +161,12 @@ fi
 echo -e "${BLUE}Creating system-wide launcher...${NC}"
 SYSTEM_BIN="/usr/local/bin/lumos"
 if [ -w "/usr/local/bin" ]; then
-    cat > "$SYSTEM_BIN" << 'EOF'
+    cat > "$SYSTEM_BIN" << EOF
 #!/bin/bash
 # Lumos CLI global launcher
-export PATH="$HOME/.luarocks/bin:$PATH"
-export LUA_PATH="$HOME/.luarocks/share/lua/5.1/?.lua;$HOME/.luarocks/share/lua/5.1/?/init.lua:$LUA_PATH"
-exec "$HOME/.luarocks/bin/lumos" "$@"
+export PATH="\$HOME/.luarocks/bin:\$PATH"
+export LUA_PATH="\$HOME/.luarocks/share/lua/$LUA_VERSION/?.lua;\$HOME/.luarocks/share/lua/$LUA_VERSION/?/init.lua:\$LUA_PATH"
+exec "\$HOME/.luarocks/bin/lumos" "\$@"
 EOF
     chmod +x "$SYSTEM_BIN"
     echo -e "${GREEN}✓ System-wide launcher created at $SYSTEM_BIN${NC}"
