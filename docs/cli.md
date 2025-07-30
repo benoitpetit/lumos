@@ -4,13 +4,26 @@ The Lumos CLI (`bin/lumos`) is the official generator for creating new CLI appli
 
 ## Installation
 
-Install Lumos with LuaRocks:
+There are several ways to install Lumos:
 
+### Quick Install (Recommended)
 ```bash
-luarocks install lumos
+# Clone and install using the provided script
+git clone https://github.com/benoitpetit/lumos.git
+cd lumos
+bash scripts/install.sh
 ```
 
-This installs the `lumos` binary globally, making it available as a CLI tool for creating new projects.
+This installs the `lumos` binary in `~/.luarocks/bin/`, making it available as a CLI tool for creating new projects.
+
+### Manual Installation
+```bash
+# For development
+luarocks make --local lumos-dev-1.rockspec
+
+# For production
+luarocks make --local lumos-0.1.0-1.rockspec
+```
 
 ---
 
@@ -130,8 +143,9 @@ The main application module with a sample command:
 local function setup_lua_paths()
     local home = os.getenv("HOME")
     if home then
-        local luarocks_path = home .. "/.luarocks/share/lua/5.1/?.lua"
-        local luarocks_cpath = home .. "/.luarocks/share/lua/5.1/?/init.lua"
+        local version = _VERSION:match("%d+%.%d+") or "5.1"
+        local luarocks_path = home .. "/.luarocks/share/lua/" .. version .. "/?.lua"
+        local luarocks_cpath = home .. "/.luarocks/share/lua/" .. version .. "/?/init.lua"
         if not package.path:find(luarocks_path, 1, true) then
             package.path = luarocks_path .. ";" .. luarocks_cpath .. ";" .. package.path
         end

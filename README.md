@@ -31,23 +31,36 @@
 
 ## Quick Start
 
-### 1. Install Lumos
+### For End Users (when Lumos is published on LuaRocks)
+
 ```bash
-luarocks install lumos
+# 1. Install Lumos from LuaRocks
+luarocks install --local lumos
+
+# 2. Create your first CLI project
+lumos new my-awesome-cli
+cd my-awesome-cli
+
+# 3. Test it out
+make install  # Install project dependencies
+lua src/main.lua greet World
 ```
 
-### 2. Create Your First CLI
-```bash
-lumos new
-# Follow the interactive prompts
-cd your-project-name
-```
+### For Developers (using Lumos from source)
 
-### 3. Test It Out
 ```bash
-make install  # Install dependencies
-lua src/main.lua --help
-lua src/main.lua greet "World"
+# 1. Clone and install Lumos
+git clone https://github.com/benoitpetit/lumos.git
+cd lumos
+bash scripts/install.sh
+
+# 2. Create a new CLI project
+lumos new my-awesome-cli
+cd my-awesome-cli
+
+# 3. Test it out
+make install  # Install project dependencies
+lua src/main.lua greet World
 ```
 
 **That's it!** You now have a fully functional CLI application.
@@ -93,28 +106,34 @@ app:run(arg)
 
 ## Installation
 
-### Via LuaRocks (Recommended)
-```bash
-luarocks install lumos
-```
+### Prerequisites
+- Lua 5.1+ or LuaJIT
+- LuaRocks >= 3.9
+- Git (for installation from source)
 
-### From Source (Development)
+### Option 1: Quick Install (Recommended)
 ```bash
-# Clone the repository
+# Clone and install using the provided script
 git clone https://github.com/benoitpetit/lumos.git
 cd lumos
+bash scripts/install.sh
+```
 
-# Install for development
+### Option 2: Manual Installation with LuaRocks
+```bash
+# For development (if you're modifying Lumos)
 luarocks make --local lumos-dev-1.rockspec
 
-# Or install for production
+# For production use
 luarocks make --local lumos-0.1.0-1.rockspec
 ```
 
-### Prerequisites
-- Lua 5.1+ or LuaJIT
-- LuaRocks
-- luafilesystem (installed automatically)
+### Option 3: From LuaRocks Repository (when published)
+```bash
+luarocks install --local lumos
+```
+
+**Note**: The `--local` flag installs Lumos in your user directory. For system-wide installation, run without `--local` using sudo.
 
 ## Key Features
 

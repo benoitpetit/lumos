@@ -101,8 +101,9 @@ local function get_module_template(name, description)
 local function setup_lua_paths()
     local home = os.getenv("HOME")
     if home then
-        local luarocks_path = home .. "/.luarocks/share/lua/5.1/?.lua"
-        local luarocks_cpath = home .. "/.luarocks/share/lua/5.1/?/init.lua"
+        local version = _VERSION:match("%%d+%%.%%d+") or "5.1"
+        local luarocks_path = home .. "/.luarocks/share/lua/" .. version .. "/?.lua"
+        local luarocks_cpath = home .. "/.luarocks/share/lua/" .. version .. "/?/init.lua"
         if not package.path:find(luarocks_path, 1, true) then
             package.path = luarocks_path .. ";" .. luarocks_cpath .. ";" .. package.path
         end
@@ -227,6 +228,18 @@ app:command("new", "Create a new Lumos CLI project")
     :action(function(ctx)
         print(color.cyan("Welcome to the Lumos CLI project generator!"))
         local project_name = prompt.input("Project name", "myapp")
+        
+        -- Check if project directory already exists
+        if lfs.attributes(project_name, "mode") == "directory" then
+            print(color.yellow("\nWarning: Directory '" .. project_name .. "' already exists!"))
+            io.write("Do you want to overwrite it? [y/N]: ")
+            local answer = io.read()
+            if not answer or answer:lower() ~= "y" then
+                print(color.yellow("Cancelled."))
+                return false
+            end
+        end
+        
         local description = prompt.input("Project description", "A CLI app built with Lumos")
         print(color.yellow("Creating project structure for " .. project_name .. " ..."))
         
@@ -245,46 +258,25 @@ app:command("new", "Create a new Lumos CLI project")
         write_file(project_name .. "/Makefile", [[install:
 	@echo "Installing dependencies"
 	@luarocks install busted --local || echo "Please install busted manually"
-	@luarocks install lumos --local || echo "Please install lumos manually"
+	@echo "Lumos is already installed globally or local to your user."
 
 test:
-	@echo "Running tests"
-	@busted tests/
+	@~/.luarocks/bin/busted tests/
 
 run:
-	@echo "Running the application"
-	@lua src/main.lua
+	@lua src/main.lua greet World
 
-docs:
-	@echo "Generating documentation"
-	@mkdir -p docs
-	@lua src/main.lua --help > docs/help.txt
+help:
+	@lua src/main.lua --help
 
 clean:
-	@echo "Cleaning build artifacts"
 	@rm -rf docs/*.txt
 
-.PHONY: install test run docs clean
-]])
-        
-        -- Create .busted config
-        write_file(project_name .. "/.busted", [[return {
-  default = {
-    verbose = true,
-    output = "utfTerminal",
-    pattern = "_spec",
-    recursive = true,
-    ROOT = {"tests"},
-    lpath = "src/?.lua;src/?/init.lua"
-  }
-}
+.PHONY: install test run help clean
 ]])
         
         -- Create .gitignore
-        write_file(project_name .. "/.gitignore", [[# Lua bytecode
-*.luac
-
-# IDE files
+        write_file(project_name .. "/.gitignore", [[# IDE files
 .vscode/
 .idea/
 *.swp
@@ -303,6 +295,17 @@ config.local.lua
 
 # LuaRocks
 .luarocks/
+]])
+        
+        -- Create .busted configuration
+        write_file(project_name .. "/.busted", [[return {
+  default = {
+    verbose = true,
+    coverage = false,
+    pattern = ".*_spec%.lua$",
+    ROOT = {"tests/"}
+  }
+}
 ]])
         
         print(color.green("\n✅ Lumos CLI project '" .. project_name .. "' created successfully!"))

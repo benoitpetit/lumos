@@ -152,7 +152,7 @@ function __%s_complete_flags
 end
 
 # Complete commands
-complete -c %s -f -n "not __fish_seen_subcommand_from (___%s_complete_commands)" -a "(__%s_complete_commands)"
+complete -c %s -f -n "not __fish_seen_subcommand_from (__%s_complete_commands)" -a "(__%s_complete_commands)"
 
 # Complete global flags
 complete -c %s -f -n "__fish_use_subcommand" -a "(__%s_complete_flags)"

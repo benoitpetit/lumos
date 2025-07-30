@@ -5,6 +5,11 @@ local color = require('lumos.color')
 
 local prompt = {}
 
+-- Detect if running on Windows
+local function is_windows()
+    return package.config:sub(1,1) == '\\'
+end
+
 -- Basic text input prompt
 function prompt.input(message, default)
     io.write(message)
@@ -65,9 +70,42 @@ function prompt.confirm(message, default)
     end
 end
 
+-- Simple selection prompt for Windows/environments without terminal controls
+function prompt.simple_select(message, options, default)
+    print(message)
+    for i, option in ipairs(options) do
+        print(string.format("  %d) %s", i, option))
+    end
+    
+    while true do
+        io.write("Select an option")
+        if default then
+            io.write(" [" .. default .. "]")
+        end
+        io.write(": ")
+        io.flush()
+        
+        local input = io.read("*l")
+        if input == "" and default then
+            return default, options[default]
+        end
+        
+        local choice = tonumber(input)
+        if choice and choice >= 1 and choice <= #options then
+            return choice, options[choice]
+        else
+            print("Please enter a valid number between 1 and " .. #options)
+        end
+    end
+end
+
 -- Selection prompt from a list of options
 -- Interactive select with arrow keys
 function prompt.select(message, options, default)
+    -- Use simple select on Windows or if terminal controls aren't available
+    if is_windows() then
+        return prompt.simple_select(message, options, default)
+    end
     print(message)
     local current = default or 1
     local function render_menu()
