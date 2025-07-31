@@ -10,60 +10,75 @@
 </p>
 
 <p align="center">
-    <a href="docs/qs.md">Quick Start</a> •
-    <a href="docs/">Documentation</a> •
-    <a href="docs/use.md">Examples</a> •
-    <a href="#installation">Installation</a>
+    <a href="docs/qs.md">🚀 Quick Start</a> •
+    <a href="docs/api.md">📚 API Docs</a> •
+    <a href="docs/use.md">💡 Examples</a> •
+    <a href="#installation">⚡ Install</a>
 </p>
 
 ---
 
 **Lumos** (Latin for "light") brings clarity to CLI development in Lua. Inspired by Cobra for Go, it provides everything you need to build professional command-line applications with minimal code and maximum functionality.
 
-## What Makes Lumos Special
+## ✨ What Makes Lumos Special
 
-- **Project Generator** - `lumos new` creates complete CLI projects in seconds
-- **Intuitive API** - Fluent, chainable methods for defining commands and flags
-- **Rich UI Components** - Colors, progress bars, prompts, and tables out of the box
-- **Shell Integration** - Auto-completion, man pages, and documentation generation
-- **Configuration Management** - JSON files, environment variables, and more
-- **Test-Ready** - Generated projects include complete test suites
+- **🚀 Project Generator** - `lumos new` creates complete CLI projects in seconds
+- **🎯 Intuitive API** - Fluent, chainable methods for defining commands and flags
+- **🎨 Rich UI Components** - Colors, progress bars, prompts, and tables out of the box
+- **🔧 Shell Integration** - Auto-completion, man pages, and documentation generation
+- **⚙️ Configuration Management** - JSON files, environment variables, and more
+- **🧪 Test-Ready** - Generated projects include complete test suites
+- **📦 Minimal Dependencies** - Only requires `luafilesystem`, modular architecture
+- **🌍 Cross-Platform** - Linux, macOS, Windows (WSL) supported
 
-## Quick Start
+## 🚀 5-Minute Quick Start
 
-### For End Users (when Lumos is published on LuaRocks)
+### 📎 TL;DR - Get Started Now
 
 ```bash
-# 1. Install Lumos from LuaRocks
+# Install Lumos from LuaRocks
 luarocks install --local lumos
 
-# 2. Create your first CLI project
-lumos new my-awesome-cli
-cd my-awesome-cli
+# Create your first CLI app
+lumos new hello-world && cd hello-world
 
-# 3. Test it out
-make install  # Install project dependencies
-lua src/main.lua greet World
+# Run it!
+lua src/main.lua greet "CLI Master"
+# Output: Hello, CLI Master!
 ```
 
-### For Developers (using Lumos from source)
+### 🔍 Step-by-Step Guide
 
+**Step 1: Install Lumos**
 ```bash
-# 1. Clone and install Lumos
-git clone https://github.com/benoitpetit/lumos.git
-cd lumos
-bash scripts/install.sh
+# Install from LuaRocks (recommended)
+luarocks install --local lumos
 
-# 2. Create a new CLI project
-lumos new my-awesome-cli
-cd my-awesome-cli
-
-# 3. Test it out
-make install  # Install project dependencies
-lua src/main.lua greet World
+# Add to PATH if needed
+echo 'export PATH="$HOME/.luarocks/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc
 ```
 
-**That's it!** You now have a fully functional CLI application.
+**Step 2: Create Your CLI Project**
+```bash
+lumos new my-awesome-cli
+# Follow the interactive prompts
+cd my-awesome-cli
+```
+
+**Step 3: Test Your CLI**
+```bash
+lua src/main.lua --help        # See generated help
+lua src/main.lua greet World   # Try the sample command
+```
+
+**Step 4: Develop & Test**
+```bash
+make install  # Install test dependencies
+make test     # Run the test suite
+```
+
+🎉 **Congratulations!** You now have a fully functional CLI application with tests, documentation, and shell integration ready to go.
 
 ## Example CLI Code
 
@@ -104,36 +119,43 @@ end)
 app:run(arg)
 ```
 
-## Installation
+## ⚡ Installation
 
 ### Prerequisites
 - Lua 5.1+ or LuaJIT
 - LuaRocks >= 3.9
-- Git (for installation from source)
 
-### Option 1: Quick Install (Recommended)
+### Option 1: From LuaRocks (Recommended)
 ```bash
-# Clone and install using the provided script
+# Install Lumos from LuaRocks
+luarocks install --local lumos
+
+# Add to PATH if needed
+echo 'export PATH="$HOME/.luarocks/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc
+```
+
+### Option 2: System-wide Installation
+```bash
+# Install globally (requires sudo)
+sudo luarocks install lumos
+```
+
+### Option 3: Development Installation
+```bash
+# For contributing to Lumos
 git clone https://github.com/benoitpetit/lumos.git
 cd lumos
-bash scripts/install.sh
-```
-
-### Option 2: Manual Installation with LuaRocks
-```bash
-# For development (if you're modifying Lumos)
 luarocks make --local lumos-dev-1.rockspec
-
-# For production use
-luarocks make --local lumos-0.1.0-1.rockspec
 ```
 
-### Option 3: From LuaRocks Repository (when published)
+### Verify Installation
 ```bash
-luarocks install --local lumos
+lumos version
+# Should output: Lumos CLI Framework v0.1.0
 ```
 
-**Note**: The `--local` flag installs Lumos in your user directory. For system-wide installation, run without `--local` using sudo.
+**Note**: The `--local` flag installs Lumos in your user directory (`~/.luarocks/`). For system-wide installation, omit `--local` and use `sudo`.
 
 ## Key Features
 

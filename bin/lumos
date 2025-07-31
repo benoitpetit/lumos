@@ -1,52 +1,82 @@
 #!/usr/bin/env lua
 
--- Lumos CLI global command
--- This script will be installed by LuaRocks and made available globally
+-- Lumos CLI Generator
+-- This script creates new CLI projects using the Lumos framework
 
--- Try to load lumos from system installation first, then fallback to local
-local function try_require(module)
-    local ok, result = pcall(require, module)
+-- Configure LuaRocks paths automatically
+local function setup_luarocks_paths()
+    local home = os.getenv("HOME")
+    if home then
+        local version = _VERSION:match("%d+%.%d+") or "5.1"
+        local lua_path = home .. "/.luarocks/share/lua/" .. version .. "/?.lua"
+        local lua_cpath = home .. "/.luarocks/share/lua/" .. version .. "/?/init.lua"
+        local lua_clib = home .. "/.luarocks/lib/lua/" .. version .. "/?.so"
+        
+        if not package.path:find(lua_path, 1, true) then
+            package.path = lua_path .. ";" .. lua_cpath .. ";" .. package.path
+        end
+        if not package.cpath:find(lua_clib, 1, true) then
+            package.cpath = lua_clib .. ";" .. package.cpath
+        end
+    end
+end
+setup_luarocks_paths()
+
+-- Module loading with fallback for development and production
+local function safe_require(module_name, fallback)
+    local ok, result = pcall(require, module_name)
     if ok then
         return result
     end
-    return nil
+    return fallback
 end
 
-
-
--- Debug pour le chemin
+-- Try to load from development path first (for local development)
 local script_dir = debug.getinfo(1, 'S').source:match('^@(.+/)') or './'
-local lumos_dir = script_dir .. '../'
-local local_path = lumos_dir .. '?.lua;' .. lumos_dir .. '?/init.lua;'
+local dev_path = script_dir .. '../?.lua;' .. script_dir .. '../?/init.lua;'
 
--- Ajoute le chemin local en priorité
-if not package.path:find(local_path, 1, true) then
-    package.path = local_path .. package.path
+-- Add development path temporarily for local development
+local original_path = package.path
+if not package.path:find(dev_path, 1, true) then
+    package.path = dev_path .. package.path
 end
 
-local lumos = try_require('lumos')
+-- Load Lumos modules
+local lumos = safe_require('lumos')
 if not lumos then
-    -- Fallback : tente le module global
-    package.path = package.path:gsub(local_path, '') -- retire le chemin local
-    lumos = try_require('lumos')
+    -- Reset path and try system installation
+    package.path = original_path
+    lumos = safe_require('lumos')
 end
 
-local color = try_require('lumos.color') or { cyan = function(s) return s end, yellow = function(s) return s end, green = function(s) return s end, white = function(s) return s end }
-local prompt = try_require('lumos.prompt') or { input = function(msg, default) io.write(msg .. ' [' .. default .. ']: '); return io.read() or default end }
-local lfs = try_require('lfs')
+local color = safe_require('lumos.color', {
+    cyan = function(s) return s end,
+    yellow = function(s) return s end,
+    green = function(s) return s end,
+    white = function(s) return s end,
+    red = function(s) return s end
+})
 
+local prompt = safe_require('lumos.prompt', {
+    input = function(msg, default)
+        io.write(msg .. (default and ' [' .. default .. ']' or '') .. ': ')
+        local input = io.read()
+        return (input and input ~= '') and input or default
+    end
+})
+
+local lfs = safe_require('lfs')
+
+-- Check dependencies
 if not lumos then
-    print("Erreur : le module Lumos n'est pas disponible.")
-    print("  1. Vérifie que le dossier ./lumos/ existe et contient init.lua et les modules nécessaires.")
-    print("  2. Ou installe-le globalement : luarocks install lumos")
-    print("  3. Exécute la commande depuis la racine du projet Lumos.")
-    print("  4. Chemin package.path utilisé : " .. package.path)
+    print("Error: Lumos framework not found.")
+    print("Please install with: luarocks install lumos")
     os.exit(1)
 end
 
 if not lfs then
-    print("Error: luafilesystem is required. Please install it with:")
-    print("  luarocks install luafilesystem")
+    print("Error: luafilesystem is required.")
+    print("Please install with: luarocks install luafilesystem")
     os.exit(1)
 end
 
@@ -81,71 +111,91 @@ end
 
 local function get_main_template(name, description)
     return [[#!/usr/bin/env lua
--- Add local path for app module
-local src_path = debug.getinfo(1, 'S').source:match("^@(.+/)main.lua$") or "./src/"
-package.path = src_path .. "?.lua;" .. src_path .. "?/init.lua;" .. package.path
+-- Main entry point for your CLI application
+
+-- Configure module path to find app.lua in src directory
+local script_dir = debug.getinfo(1, 'S').source:match("^@(.+/)")
+if script_dir then
+    package.path = script_dir .. "?.lua;" .. script_dir .. "?/init.lua;" .. package.path
+end
+
+-- Load the application module
 local ok, app = pcall(require, 'app')
 if not ok then
-    print("Error: module 'app' not found. Make sure Lumos is installed or present in ./src.")
+    print("Error: module 'app' not found. Ensure you're running from the correct directory.")
+    print("Current directory: " .. (os.getenv("PWD") or "unknown"))
     os.exit(1)
 end
 
--- Entrypoint for your CLI app
+-- Run the application with command-line arguments
 app.run(arg)
 ]]
 end
 
 local function get_module_template(name, description)
-    return string.format([[-- app module
--- Auto-configure Lua paths for LuaRocks installation
-local function setup_lua_paths()
-    local home = os.getenv("HOME")
-    if home then
-        local version = _VERSION:match("%%d+%%.%%d+") or "5.1"
-        local luarocks_path = home .. "/.luarocks/share/lua/" .. version .. "/?.lua"
-        local luarocks_cpath = home .. "/.luarocks/share/lua/" .. version .. "/?/init.lua"
-        if not package.path:find(luarocks_path, 1, true) then
-            package.path = luarocks_path .. ";" .. luarocks_cpath .. ";" .. package.path
-        end
-    end
-end
-setup_lua_paths()
+    return string.format([[-- %s - Main Application Module
+-- Generated by Lumos CLI Framework
 
-local ok, lumos = pcall(require, 'lumos')
-if not ok then
-    error("Module 'lumos' is not available. Make sure it's installed with: luarocks install lumos")
-end
-local okc, color = pcall(require, 'lumos.color')
-if not okc then
-    color = { green = function(s) return s end }
-end
+-- Load Lumos framework
+local lumos = require('lumos')
+local color = require('lumos.color')
 
 local M = {}
 
 function M.run(args)
+    -- Create the main application
     local app = lumos.new_app({
         name = "%s",
         version = "0.1.0",
         description = "%s"
     })
 
-    app:flag("-v --verbose", "Enable verbose mode")
+    -- Add global flags
+    app:flag("-v --verbose", "Enable verbose output")
+    app:flag("--version", "Show version information")
 
-    local greet = app:command("greet", "Greet someone")
-    greet:arg("name", "Name of the person")
+    -- Define the greet command (example)
+    local greet = app:command("greet", "Greet someone politely")
+    greet:arg("name", "Name of the person to greet")
+    greet:flag("-u --uppercase", "Display greeting in uppercase")
+    greet:flag("-c --colorful", "Use colored output")
+    
     greet:action(function(ctx)
         local name = ctx.args[1] or "World"
-        print(color.green("Hello, " .. name .. "!"))
+        local message = "Hello, " .. name .. "!"
+        
+        if ctx.flags.uppercase then
+            message = message:upper()
+        end
+        
+        if ctx.flags.colorful then
+            message = color.green(message)
+        else
+            message = color.white(message)
+        end
+        
+        if ctx.flags.verbose then
+            print(color.dim("Greeting generated for: " .. name))
+        end
+        
+        print(message)
         return true
     end)
+    
+    -- Add version handling
+    if args and #args > 0 and args[1] == "--version" then
+        print("%s v0.1.0")
+        print("Built with Lumos CLI Framework")
+        return
+    end
 
+    -- Run the application
     app:run(args)
 end
 
 return M
-]], name, description)
+]], name, name, description, name)
 end
-
 local function get_test_template(name)
     return [[-- Basic test for app
 local app = require('app')
@@ -200,16 +250,16 @@ busted tests/
 lua src/main.lua --help
 ```
 
-## Development
-
-This project uses the Lumos CLI framework. Check out the [Lumos documentation](https://github.com/your-org/lumos) for more advanced features like:
+## Key Features
 
 - Command aliases and subcommands
 - Advanced flag types and validation
-- Configuration file support
-- Shell completion
-- Man page generation
-- Progress bars and prompts
+- Configuration management
+- Shell completions and man pages
+
+## Development
+
+To contribute to this project, please refer to the [Lumos documentation](https://github.com/benoitpetit/lumos) for more advanced features and development practices.
 
 ## License
 
@@ -255,25 +305,39 @@ app:command("new", "Create a new Lumos CLI project")
         write_file(project_name .. "/README.md", get_readme_template(project_name))
         
         -- Create Makefile
-        write_file(project_name .. "/Makefile", [[install:
-	@echo "Installing dependencies"
-	@luarocks install busted --local --lua-version=5.4 --force || echo "Please install busted manually"
-	@echo "Lumos is already installed globally or local to your user."
+        write_file(project_name .. "/Makefile", string.format([[# %s CLI Project Makefile
+# Generated by Lumos CLI Framework
 
-test:
-	@~/.luarocks/bin/busted tests/
+# Check if Lumos is installed
+check-lumos:
+	@lua -e "require('lumos')" 2>/dev/null || { echo "Error: Lumos not found. Install with: luarocks install lumos"; exit 1; }
 
-run:
+install: check-lumos
+	@echo "Installing development dependencies..."
+	@luarocks install busted --local || echo "Warning: Could not install busted. Install manually if needed."
+	@echo "✓ Dependencies installed"
+
+test: check-lumos
+	@echo "Running tests..."
+	@busted tests/ || ~/.luarocks/bin/busted tests/ || echo "Error: busted not found in PATH"
+
+run: check-lumos
+	@echo "Running application..."
 	@lua src/main.lua greet World
 
-help:
+help: check-lumos
 	@lua src/main.lua --help
 
-clean:
-	@rm -rf docs/*.txt
+dev: check-lumos
+	@echo "Development mode - running with example args:"
+	@lua src/main.lua --verbose greet "Developer"
 
-.PHONY: install test run help clean
-]])
+clean:
+	@echo "Cleaning build artifacts..."
+	@rm -rf docs/*.txt *.log
+
+.PHONY: check-lumos install test run help dev clean
+]], project_name))
         
         -- Create .gitignore
         write_file(project_name .. "/.gitignore", [[# IDE files

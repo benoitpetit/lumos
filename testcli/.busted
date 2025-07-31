@@ -1,8 +1,0 @@
-return {
-  default = {
-    verbose = true,
-    coverage = false,
-    pattern = ".*_spec%.lua$",
-    ROOT = {"tests/"}
-  }
-}

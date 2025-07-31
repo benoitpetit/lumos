@@ -1,40 +1,66 @@
-# Lumos Quick Start
+# 🚀 Lumos Quick Start Guide
 
-Get started with Lumos CLI framework in 5 minutes.
+Get your first CLI application running with Lumos in under 5 minutes.
 
-## Installation
+## 📎 Prerequisites Check
 
-### Quick Install (Recommended)
+Before starting, make sure you have:
+
 ```bash
-git clone https://github.com/benoitpetit/lumos.git
-cd lumos
-bash scripts/install.sh
+lua -v      # Should show Lua 5.1 or higher
+luarocks    # Should show LuaRocks help
+git --version  # Should show Git version
 ```
 
-### Manual Install (if script fails)
+If any are missing:
+- **Ubuntu/Debian**: `sudo apt-get install lua5.1 luarocks git`
+- **CentOS/RHEL**: `sudo yum install lua luarocks git`
+- **macOS**: `brew install lua luarocks git`
+- **Windows**: Use WSL with one of the above
+
+## ⚡ Installation
+
+### Option 1: From LuaRocks (Recommended)
+
 ```bash
+# Install Lumos from LuaRocks
+luarocks install --local lumos
+
+# Add to PATH if needed
+echo 'export PATH="$HOME/.luarocks/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc
+
+# Verify installation
+lumos version
+```
+
+### Option 2: System-wide Installation
+
+```bash
+# Install globally (requires sudo)
+sudo luarocks install lumos
+```
+
+### Option 3: Development Installation
+
+<details>
+<summary>For contributing to Lumos development</summary>
+
+```bash
+# Clone and install for development
 git clone https://github.com/benoitpetit/lumos.git
 cd lumos
-
-# Create directories
-mkdir -p $HOME/.luarocks/share/lua/5.1
-mkdir -p $HOME/.luarocks/bin
-
-# Copy modules and binary
-cp -r lumos $HOME/.luarocks/share/lua/5.1/
-cp bin/lumos $HOME/.luarocks/bin/
-chmod +x $HOME/.luarocks/bin/lumos
+luarocks make --local lumos-dev-1.rockspec
 
 # Add to PATH
 echo 'export PATH="$HOME/.luarocks/bin:$PATH"' >> ~/.bashrc
 source ~/.bashrc
+
+# Verify installation
+lumos version
 ```
 
-### Dependencies
-
-Lumos requires:
-- Lua 5.1+ (install with: `sudo apt-get install lua5.1` on Ubuntu/Debian)
-- luafilesystem (install with: `luarocks install luafilesystem` if LuaRocks works)
+</details>
 
 ## Create Your First CLI
 

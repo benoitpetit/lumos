@@ -1,13 +1,28 @@
-# Lumos Local Development Guide
+# 🛠️ Lumos Development Guide
 
-This guide covers how to set up and work with Lumos for local development.
+Complete guide for contributing to and developing with Lumos locally.
 
-## Prerequisites
+## 📟 Table of Contents
 
-Before starting, ensure you have:
-- Lua 5.1 or later (or LuaJIT)
-- LuaRocks package manager
-- Git
+- [Quick Setup](#quick-setup)
+- [Development Workflow](#development-workflow)
+- [Testing](#testing)
+- [Architecture Overview](#architecture-overview)
+- [Contributing Guidelines](#contributing-guidelines)
+- [Troubleshooting](#troubleshooting)
+
+## 🚀 Quick Setup
+
+### Prerequisites
+
+Ensure you have the following installed:
+
+| Tool | Version | Check Command | Install Command |
+|------|---------|---------------|----------------|
+| Lua | 5.1+ | `lua -v` | `sudo apt-get install lua5.1` |
+| LuaRocks | 3.9+ | `luarocks --version` | `sudo apt-get install luarocks` |
+| Git | Any | `git --version` | `sudo apt-get install git` |
+| Busted | Latest | `busted --version` | `luarocks install --local busted` |
 
 ## Initial Setup
 
