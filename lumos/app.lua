@@ -1,5 +1,6 @@
 -- Lumos Application Module
 local core = require('lumos.core')
+local logger = require('lumos.logger')
 
 local lumos = {}
 

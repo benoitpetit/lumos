@@ -14,6 +14,8 @@ local completion = require('lumos.completion')
 local manpage = require('lumos.manpage')
 local markdown = require('lumos.markdown')
 local format = require('lumos.format')
+local security = require('lumos.security')
+local logger = require('lumos.logger')
 
 -- Export the main interface
 return {
@@ -31,6 +33,8 @@ return {
     manpage = manpage,
     markdown = markdown,
     format = format,
+        security = security,
+        logger = logger,
     version = "0.1.0",
     load_config = core.load_config
 }

@@ -1,5 +1,7 @@
 -- Lumos Markdown Documentation Generation Module
 local markdown = {}
+local security = require('lumos.security')
+local logger = require('lumos.logger')
 
 -- Escape special markdown characters
 local function escape_markdown(text)
@@ -270,35 +272,56 @@ end
 -- Generate all documentation
 function markdown.generate_all(app, output_dir, verbose)
     output_dir = output_dir or "docs"
-        if verbose == nil then verbose = true end  -- Default to true for backwards compatibility
-        
-        -- Create output directory if it doesn't exist
-        os.execute("mkdir -p " .. output_dir)
-        
-        -- Generate main documentation
-        local main_content = markdown.generate_main(app)
-        local main_file = io.open(output_dir .. "/README.md", "w")
-        if main_file then
-            main_file:write(main_content)
-            main_file:close()
-            -- Removed verbose print for cleaner test output
+    if verbose == nil then verbose = true end
+    
+    -- Create output directory securely
+    local success, err = security.safe_mkdir(output_dir)
+    if not success then
+        logger.error("Failed to create docs directory", {dir = output_dir, error = err})
+        if verbose then
+            print("Error: " .. (err or "Failed to create directory"))
         end
-        
-        -- Generate command-specific documentation
-        if #app.commands > 0 then
-            local commands_dir = output_dir .. "/commands"
-            os.execute("mkdir -p " .. commands_dir)
-            
+        return false
+    end
+    
+    -- Generate main documentation
+    local main_content = markdown.generate_main(app)
+    local main_file, main_err = security.safe_open(output_dir .. "/README.md", "w")
+    if main_file then
+        main_file:write(main_content)
+        main_file:close()
+        if verbose then
+            print("Generated: " .. output_dir .. "/README.md")
+        end
+    else
+        logger.error("Failed to create main docs file", {error = main_err})
+        return false
+    end
+    
+    -- Generate command-specific documentation
+    if #app.commands > 0 then
+        local commands_dir = output_dir .. "/commands"
+        local cmd_success, cmd_err = security.safe_mkdir(commands_dir)
+        if not cmd_success then
+            logger.warn("Failed to create commands directory", {error = cmd_err})
+        else
             for _, cmd in ipairs(app.commands) do
                 local cmd_content = markdown.generate_command(app, cmd)
-                local cmd_file = io.open(commands_dir .. "/" .. cmd.name .. ".md", "w")
+                local cmd_file, cmd_file_err = security.safe_open(commands_dir .. "/" .. cmd.name .. ".md", "w")
                 if cmd_file then
                     cmd_file:write(cmd_content)
                     cmd_file:close()
-                    -- Removed verbose print for cleaner test output
+                    if verbose then
+                        print("Generated: " .. commands_dir .. "/" .. cmd.name .. ".md")
+                    end
+                else
+                    logger.error("Failed to create command doc", {command = cmd.name, error = cmd_file_err})
                 end
             end
         end
+    end
+    
+    return true
 end
 
 return markdown

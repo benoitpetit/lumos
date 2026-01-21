@@ -1,5 +1,7 @@
 -- Lumos Man Page Generation Module
 local manpage = {}
+local security = require('lumos.security')
+local logger = require('lumos.logger')
 
 -- Escape special characters for man page format
 local function escape_man(text)
@@ -217,28 +219,39 @@ end
 function manpage.generate_all(app, output_dir)
     output_dir = output_dir or "man"
     
-    -- Create output directory if it doesn't exist
-    os.execute("mkdir -p " .. output_dir)
+    -- Create output directory securely
+    local success, err = security.safe_mkdir(output_dir)
+    if not success then
+        logger.error("Failed to create man page directory", {dir = output_dir, error = err})
+        return false
+    end
     
     -- Generate main man page
     local main_content = manpage.generate_main(app)
-    local main_file = io.open(output_dir .. "/" .. app.name .. ".1", "w")
+    local main_file, main_err = security.safe_open(output_dir .. "/" .. app.name .. ".1", "w")
     if main_file then
         main_file:write(main_content)
         main_file:close()
         print("Generated main man page: " .. output_dir .. "/" .. app.name .. ".1")
+    else
+        logger.error("Failed to create main man page", {error = main_err})
+        return false
     end
     
     -- Generate command-specific man pages
     for _, cmd in ipairs(app.commands) do
         local cmd_content = manpage.generate_command(app, cmd)
-        local cmd_file = io.open(output_dir .. "/" .. app.name .. "-" .. cmd.name .. ".1", "w")
+        local cmd_file, cmd_err = security.safe_open(output_dir .. "/" .. app.name .. "-" .. cmd.name .. ".1", "w")
         if cmd_file then
             cmd_file:write(cmd_content)
             cmd_file:close()
             print("Generated command man page: " .. output_dir .. "/" .. app.name .. "-" .. cmd.name .. ".1")
+        else
+            logger.error("Failed to create command man page", {command = cmd.name, error = cmd_err})
         end
     end
+    
+    return true
 end
 
 return manpage

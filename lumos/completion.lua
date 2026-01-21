@@ -1,5 +1,7 @@
 -- Lumos Shell Completion Module
 local completion = {}
+local security = require('lumos.security')
+local logger = require('lumos.logger')
 
 -- Generate Bash completion script
 function completion.generate_bash(app)
@@ -167,38 +169,59 @@ end
 
 -- Generate all completion scripts
 function completion.generate_all(app, output_dir, verbose)
-    output_dir = output_dir or "completion"
-        if verbose == nil then verbose = true end  -- Default to true for backwards compatibility
-        
-        -- Create output directory if it doesn't exist
-        os.execute("mkdir -p " .. output_dir)
-        
-        -- Generate Bash completion
-        local bash_script = completion.generate_bash(app)
-        local bash_file = io.open(output_dir .. "/" .. app.name .. "_bash.sh", "w")
-        if bash_file then
-            bash_file:write(bash_script)
-            bash_file:close()
-            -- Removed verbose print for cleaner test output
+    output_dir = output_dir or "./completion"
+    if verbose == nil then verbose = true end
+    
+    -- Create output directory securely
+    local success, err = security.safe_mkdir(output_dir)
+    if not success then
+        logger.error("Failed to create completion directory", {dir = output_dir, error = err})
+        if verbose then
+            print("Error: " .. (err or "Failed to create directory"))
         end
-        
-        -- Generate Zsh completion
-        local zsh_script = completion.generate_zsh(app)
-        local zsh_file = io.open(output_dir .. "/" .. app.name .. "_zsh.sh", "w")
-        if zsh_file then
-            zsh_file:write(zsh_script)
-            zsh_file:close()
-            -- Removed verbose print for cleaner test output
+        return false
+    end
+    
+    -- Generate Bash completion
+    local bash_script = completion.generate_bash(app)
+    local bash_file, bash_err = security.safe_open(output_dir .. "/" .. app.name .. "_bash.sh", "w")
+    if bash_file then
+        bash_file:write(bash_script)
+        bash_file:close()
+        if verbose then
+            print("Generated Bash completion: " .. output_dir .. "/" .. app.name .. "_bash.sh")
         end
-        
-        -- Generate Fish completion
-        local fish_script = completion.generate_fish(app)
-        local fish_file = io.open(output_dir .. "/" .. app.name .. ".fish", "w")
-        if fish_file then
-            fish_file:write(fish_script)
-            fish_file:close()
-            -- Removed verbose print for cleaner test output
+    else
+        logger.error("Failed to create Bash completion file", {error = bash_err})
+    end
+    
+    -- Generate Zsh completion
+    local zsh_script = completion.generate_zsh(app)
+    local zsh_file, zsh_err = security.safe_open(output_dir .. "/" .. app.name .. "_zsh.sh", "w")
+    if zsh_file then
+        zsh_file:write(zsh_script)
+        zsh_file:close()
+        if verbose then
+            print("Generated Zsh completion: " .. output_dir .. "/" .. app.name .. "_zsh.sh")
         end
+    else
+        logger.error("Failed to create Zsh completion file", {error = zsh_err})
+    end
+    
+    -- Generate Fish completion
+    local fish_script = completion.generate_fish(app)
+    local fish_file, fish_err = security.safe_open(output_dir .. "/" .. app.name .. ".fish", "w")
+    if fish_file then
+        fish_file:write(fish_script)
+        fish_file:close()
+        if verbose then
+            print("Generated Fish completion: " .. output_dir .. "/" .. app.name .. ".fish")
+        end
+    else
+        logger.error("Failed to create Fish completion file", {error = fish_err})
+    end
+    
+    return true
 end
 
 return completion

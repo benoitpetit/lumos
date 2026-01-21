@@ -2,14 +2,19 @@
 -- Simple configuration file loader supporting JSON and basic key-value pairs
 
 local json = require('lumos.json')
+local security = require('lumos.security')
+local logger = require('lumos.logger')
 
 local config = {}
 
 -- Load configuration from a file
 function config.load_file(file_path)
-    local file = io.open(file_path, "r")
+    logger.debug("Loading configuration file", {path = file_path})
+    
+    local file, err = security.safe_open(file_path, "r")
     if not file then
-        return nil, "Could not open configuration file: " .. file_path
+        logger.error("Could not open configuration file", {path = file_path, error = err})
+        return nil, "Could not open configuration file: " .. (err or file_path)
     end
     
     local content = file:read("*all")
@@ -21,8 +26,10 @@ function config.load_file(file_path)
             return json.decode(content)
         end)
         if success then
+            logger.info("Loaded JSON configuration", {path = file_path})
             return result
         else
+            logger.error("Invalid JSON in config file", {path = file_path, error = tostring(result)})
             return nil, "Invalid JSON in config file: " .. file_path
         end
     end

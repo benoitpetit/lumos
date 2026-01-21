@@ -1,5 +1,6 @@
 -- Lumos Core Module
 local flags = require('lumos.flags')
+local logger = require('lumos.logger')
 
 local core = {}
 
@@ -173,6 +174,7 @@ function core.execute_command(app, parsed_args)
     
     if not cmd then
         if parsed_args.command then
+            logger.warn("Unknown command", {command = parsed_args.command})
             print("Error: Unknown command '" .. parsed_args.command .. "'")
             core.show_help(app)
             return false
@@ -181,6 +183,8 @@ function core.execute_command(app, parsed_args)
             return true
         end
     end
+    
+    logger.debug("Executing command", {command = cmd.name, args = parsed_args.args})
     
     -- Handle subcommands if present
     if parsed_args.subcommand and cmd.subcommands then
@@ -220,6 +224,7 @@ function core.execute_command(app, parsed_args)
     -- Validate and merge flags
     local validated_flags, validation_errors = core.validate_and_merge_flags(app, cmd, parsed_args.flags)
     if #validation_errors > 0 then
+        logger.error("Flag validation failed", {errors = validation_errors})
         for _, error in ipairs(validation_errors) do
             print("Error: " .. error)
         end
@@ -233,13 +238,25 @@ function core.execute_command(app, parsed_args)
             flags = validated_flags,
             command = cmd
         }
-        return cmd.action(context)
+        
+        -- Execute with error handling
+        local success, result = pcall(cmd.action, context)
+        if not success then
+            logger.error("Command action failed", {command = cmd.name, error = tostring(result)})
+            print("Error executing command: " .. tostring(result))
+            if os.getenv("LUMOS_DEBUG") then
+                print(debug.traceback())
+            end
+            return false
+        end
+        return result
     else
         -- If no action but has subcommands, show help
         if cmd.subcommands and #cmd.subcommands > 0 then
             core.show_command_help(app, cmd)
             return true
         else
+            logger.warn("No action defined for command", {command = cmd.name})
             print("Error: No action defined for command '" .. cmd.name .. "'")
             return false
         end
