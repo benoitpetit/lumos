@@ -390,4 +390,93 @@ app:command("version", "Show Lumos version")
         return true
     end)
 
+-- Bundle command for creating portable CLI executables
+local bundle_cmd = app:command("bundle", "Bundle a Lumos CLI project into a portable single-file executable")
+bundle_cmd:arg("entry", "Entry point file (e.g., src/main.lua)")
+bundle_cmd:flag("-o --output", "Output file path (default: dist/<name>)")
+bundle_cmd:flag("-d --dir", "Project directory (default: current directory)")
+bundle_cmd:flag("--no-lumos", "Do not bundle Lumos framework (requires Lumos installed on target)")
+bundle_cmd:flag("--strip-comments", "Remove comments to reduce file size")
+bundle_cmd:flag("--analyze", "Analyze dependencies without creating bundle")
+
+bundle_cmd:action(function(ctx)
+    local bundle = safe_require('lumos.bundle')
+    if not bundle then
+        print(color.red("Error: Bundle module not found."))
+        return false
+    end
+    
+    local entry_file = ctx.args[1]
+    if not entry_file then
+        print(color.red("Error: Entry file is required."))
+        print(color.yellow("Usage: lumos bundle <entry_file> [options]"))
+        print(color.yellow("Example: lumos bundle src/main.lua -o dist/myapp"))
+        return false
+    end
+    
+    -- Check if entry file exists
+    if not lfs.attributes(entry_file) then
+        print(color.red("Error: Entry file not found: " .. entry_file))
+        return false
+    end
+    
+    local project_dir = ctx.flags.dir or "."
+    
+    -- Analyze mode
+    if ctx.flags.analyze then
+        print(color.cyan("Analyzing dependencies for: " .. entry_file))
+        local modules = bundle.analyze(entry_file, {project_dir, project_dir .. "/src", project_dir .. "/lib", "."})
+        
+        if #modules == 0 then
+            print(color.yellow("No local dependencies found."))
+        else
+            print(color.green("\nFound " .. #modules .. " dependencies:"))
+            for i, mod in ipairs(modules) do
+                print(string.format("  %d. %s", i, mod.name))
+                print(color.white("     -> " .. mod.path))
+            end
+        end
+        
+        if not ctx.flags["no-lumos"] then
+            print(color.cyan("\nLumos modules will also be bundled:"))
+            local lumos_mods = bundle.get_lumos_modules()
+            for _, mod_name in ipairs(lumos_mods) do
+                print("  - " .. mod_name)
+            end
+        end
+        
+        return true
+    end
+    
+    -- Bundle mode
+    print(color.cyan("Bundling CLI application..."))
+    print(color.white("  Entry: " .. entry_file))
+    
+    local options = {
+        entry = entry_file,
+        output = ctx.flags.output,
+        project_dir = project_dir,
+        include_lumos = not ctx.flags["no-lumos"],
+        strip_comments = ctx.flags["strip-comments"]
+    }
+    
+    local success, err, info = bundle.create(options)
+    
+    if not success then
+        print(color.red("Error: " .. (err or "Unknown error")))
+        return false
+    end
+    
+    if info then
+        print(color.green("\n✅ Bundle created successfully!"))
+        print(color.white("  Output: " .. info.output))
+        print(color.white("  Modules bundled: " .. info.modules_count))
+        print(color.white("  Size: " .. string.format("%.2f KB", info.size / 1024)))
+        print(color.yellow("\nYour portable CLI is ready!"))
+        print(color.yellow("Run it with: ./" .. info.output:match("([^/]+)$") .. " --help"))
+    end
+    
+    return true
+end)
+
 app:run(arg)

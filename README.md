@@ -30,6 +30,7 @@
 - **🧪 Test-Ready** - Generated projects include complete test suites
 - **📦 Minimal Dependencies** - Only requires `luafilesystem`, modular architecture
 - **🌍 Cross-Platform** - Linux, macOS, Windows (WSL) supported
+- **🚀 Portable Bundles** - Create single-file executables with `lumos bundle`
 
 ## 🚀 5-Minute Quick Start
 
@@ -76,6 +77,12 @@ lua src/main.lua greet World   # Try the sample command
 ```bash
 make install  # Install test dependencies
 make test     # Run the test suite
+```
+
+**Step 5: Create a Portable Bundle (Optional)**
+```bash
+lumos bundle src/main.lua -o dist/myapp  # Create single-file executable
+./dist/myapp --help                       # Works without Lumos installed!
 ```
 
 🎉 **Congratulations!** You now have a fully functional CLI application with tests, documentation, and shell integration ready to go.

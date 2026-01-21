@@ -1,60 +1,60 @@
 # 🔒 Lumos Security Guide
 
-Guide de sécurité et best practices pour l'utilisation de Lumos en production.
+Security guide and best practices for using Lumos in production.
 
-## 📋 Table des Matières
+## 📋 Table of Contents
 
-- [Vue d'ensemble](#vue-densemble)
-- [Nouvelles Fonctionnalités de Sécurité](#nouvelles-fonctionnalités-de-sécurité)
+- [Overview](#overview)
+- [Security Features](#security-features)
 - [Best Practices](#best-practices)
-- [Protection contre les Vulnérabilités](#protection-contre-les-vulnérabilités)
-- [Configuration Sécurisée](#configuration-sécurisée)
-- [Audit et Monitoring](#audit-et-monitoring)
-- [Checklist de Déploiement](#checklist-de-déploiement)
+- [Protection Against Vulnerabilities](#protection-against-vulnerabilities)
+- [Secure Configuration](#secure-configuration)
+- [Audit and Monitoring](#audit-and-monitoring)
+- [Deployment Checklist](#deployment-checklist)
 
-## 🎯 Vue d'ensemble
+## 🎯 Overview
 
-Lumos inclut désormais des fonctionnalités de sécurité robustes pour protéger vos applications CLI contre les vulnérabilités courantes.
+Lumos now includes robust security features to protect your CLI applications against common vulnerabilities.
 
-### Modules de Sécurité
+### Security Modules
 
-- **`lumos.security`** - Sanitisation et validation des entrées
-- **`lumos.logger`** - Logging structuré pour l'audit
+- **`lumos.security`** - Input sanitization and validation
+- **`lumos.logger`** - Structured logging for audit
 
-## 🆕 Nouvelles Fonctionnalités de Sécurité
+## 🆕 Security Features
 
-### Module security.lua
+### security.lua Module
 
-Le module `security` fournit des fonctions pour sécuriser vos applications :
+The `security` module provides functions to secure your applications:
 
 ```lua
 local security = require('lumos.security')
 
--- Échapper des arguments shell
+-- Escape shell arguments
 local safe_arg = security.shell_escape(user_input)
 os.execute("ls " .. safe_arg)
 
--- Valider des chemins
+-- Validate paths
 local path, err = security.sanitize_path(user_path)
 if not path then
     print("Invalid path: " .. err)
     return
 end
 
--- Ouvrir des fichiers de manière sécurisée
+-- Open files safely
 local file, err = security.safe_open(path, "r")
 if not file then
     print("Cannot open file: " .. err)
     return
 end
 
--- Valider des emails
+-- Validate emails
 local valid, err = security.validate_email(email)
 if not valid then
     print("Invalid email: " .. err)
 end
 
--- Valider des URLs
+-- Validate URLs
 local valid, err = security.validate_url(url)
 if not valid then
     print("Invalid URL: " .. err)
@@ -67,48 +67,48 @@ if not allowed then
 end
 ```
 
-### Module logger.lua
+### logger.lua Module
 
-Le module `logger` offre un logging structuré avec niveaux :
+The `logger` module offers structured logging with levels:
 
 ```lua
 local logger = require('lumos.logger')
 
--- Différents niveaux de log
+-- Different log levels
 logger.error("Critical error occurred", {user = "admin", code = 500})
 logger.warn("Deprecated feature used", {feature = "old_api"})
 logger.info("User logged in", {user = "john", ip = "192.168.1.1"})
 logger.debug("Cache miss", {key = "user:123"})
-logger.trace("Function entry", {function = "process_data"})
+logger.trace("Function entry", {func = "process_data"})
 
 -- Configuration
-logger.set_level("INFO")  -- ou logger.LEVELS.INFO
+logger.set_level("INFO")  -- or logger.LEVELS.INFO
 logger.set_output("/var/log/myapp.log")
 logger.set_timestamp(true)
 logger.set_colors(true)
 
--- Configuration depuis l'environnement
-logger.configure_from_env("MYAPP")  -- Lit MYAPP_LOG_LEVEL, etc.
+-- Configure from environment
+logger.configure_from_env("MYAPP")  -- Reads MYAPP_LOG_LEVEL, etc.
 
--- Logger avec contexte fixe
+-- Logger with fixed context
 local user_logger = logger.child({user = "john", session = "abc123"})
-user_logger.info("Action performed")  -- Inclut automatiquement le contexte
+user_logger.info("Action performed")  -- Automatically includes context
 ```
 
 ## 🛡️ Best Practices
 
-### 1. Validation des Entrées Utilisateur
+### 1. User Input Validation
 
-**❌ MAUVAIS :**
+**❌ BAD:**
 ```lua
 local cmd = app:command("delete", "Delete file")
 cmd:arg("file", "File to delete")
 cmd:action(function(ctx)
-    os.execute("rm " .. ctx.args[1])  -- DANGEREUX!
+    os.execute("rm " .. ctx.args[1])  -- DANGEROUS!
 end)
 ```
 
-**✅ BON :**
+**✅ GOOD:**
 ```lua
 local security = require('lumos.security')
 local logger = require('lumos.logger')
@@ -136,16 +136,16 @@ cmd:action(function(ctx)
 end)
 ```
 
-### 2. Gestion Sécurisée des Fichiers
+### 2. Secure File Handling
 
-**❌ MAUVAIS :**
+**❌ BAD:**
 ```lua
 local file = io.open(user_provided_path, "w")
 file:write(data)
 file:close()
 ```
 
-**✅ BON :**
+**✅ GOOD:**
 ```lua
 local security = require('lumos.security')
 local logger = require('lumos.logger')
@@ -162,12 +162,12 @@ file:close()
 logger.info("File written successfully", {path = user_provided_path})
 ```
 
-### 3. Logging Approprié
+### 3. Appropriate Logging
 
 ```lua
 local logger = require('lumos.logger')
 
--- Log des actions importantes
+-- Log important actions
 cmd:action(function(ctx)
     logger.info("Command executed", {
         command = ctx.command.name,
@@ -176,7 +176,7 @@ cmd:action(function(ctx)
         flags = ctx.flags
     })
     
-    -- Votre logique métier...
+    -- Your business logic...
     
     if error_occurred then
         logger.error("Operation failed", {
@@ -188,13 +188,13 @@ cmd:action(function(ctx)
 end)
 ```
 
-### 4. Protection contre l'Escalade de Privilèges
+### 4. Protection Against Privilege Escalation
 
 ```lua
 local security = require('lumos.security')
 local logger = require('lumos.logger')
 
--- Vérifier si on tourne avec des privilèges élevés
+-- Check if running with elevated privileges
 if security.is_elevated() then
     logger.warn("Running with elevated privileges", {
         user = os.getenv("USER"),
@@ -204,7 +204,7 @@ if security.is_elevated() then
     print("⚠️  Warning: Running as root/administrator")
     print("This is not recommended for this command.")
     
-    -- Demander confirmation
+    -- Ask for confirmation
     local prompt = require('lumos.prompt')
     if not prompt.confirm("Continue anyway?", false) then
         return false
@@ -212,21 +212,21 @@ if security.is_elevated() then
 end
 ```
 
-## 🔐 Protection contre les Vulnérabilités
+## 🔐 Protection Against Vulnerabilities
 
-### Injection de Commandes Shell
+### Shell Command Injection
 
-**Problème :** Exécution de commandes arbitraires via des entrées malveillantes.
+**Problem:** Execution of arbitrary commands via malicious input.
 
-**Solution :**
+**Solution:**
 ```lua
 local security = require('lumos.security')
 
--- Toujours échapper les arguments
+-- Always escape arguments
 local safe_filename = security.shell_escape(filename)
 os.execute("cat " .. safe_filename)
 
--- Ou utiliser des chemins validés
+-- Or use validated paths
 local path, err = security.sanitize_path(filename)
 if path then
     os.execute("cat " .. security.shell_escape(path))
@@ -235,20 +235,20 @@ end
 
 ### Path Traversal
 
-**Problème :** Accès à des fichiers en dehors du répertoire autorisé.
+**Problem:** Access to files outside the allowed directory.
 
-**Solution :**
+**Solution:**
 ```lua
 local security = require('lumos.security')
 
--- Valider le chemin
+-- Validate the path
 local path, err = security.sanitize_path(user_path)
 if not path then
     print("Invalid path: " .. err)
     return false
 end
 
--- Vérifier que le chemin est dans le répertoire autorisé
+-- Verify path is within allowed directory
 local allowed_dir = "/var/app/data/"
 if not path:match("^" .. allowed_dir) then
     logger.warn("Path traversal attempt", {path = path})
@@ -257,11 +257,11 @@ if not path:match("^" .. allowed_dir) then
 end
 ```
 
-### Injection de Code dans les Prompts
+### Prompt Code Injection
 
-**Problème :** Séquences d'échappement malveillantes dans les entrées.
+**Problem:** Malicious escape sequences in inputs.
 
-**Solution :**
+**Solution:**
 ```lua
 local security = require('lumos.security')
 local prompt = require('lumos.prompt')
@@ -269,15 +269,15 @@ local prompt = require('lumos.prompt')
 local input = prompt.input("Enter name")
 local safe_input = security.sanitize_output(input)
 
--- Utiliser safe_input au lieu de input
+-- Use safe_input instead of input
 print("Hello, " .. safe_input)
 ```
 
 ### Rate Limiting
 
-**Problème :** Abus de ressources par des appels répétés.
+**Problem:** Resource abuse through repeated calls.
 
-**Solution :**
+**Solution:**
 ```lua
 local security = require('lumos.security')
 
@@ -290,13 +290,13 @@ cmd:action(function(ctx)
         return false
     end
     
-    -- Appel API...
+    -- API call...
 end)
 ```
 
-## ⚙️ Configuration Sécurisée
+## ⚙️ Secure Configuration
 
-### Variables d'Environnement
+### Environment Variables
 
 ```bash
 # Logging
@@ -304,20 +304,20 @@ export LUMOS_LOG_LEVEL=INFO
 export LUMOS_LOG_FILE=/var/log/myapp.log
 export LUMOS_LOG_TIMESTAMP=true
 
-# Désactiver les couleurs en production
+# Disable colors in production
 export LUMOS_NO_COLOR=1
 
-# Mode debug (inclut stacktraces)
+# Debug mode (includes stacktraces)
 export LUMOS_DEBUG=1
 ```
 
-### Permissions des Fichiers
+### File Permissions
 
 ```bash
-# Fichiers de configuration
+# Configuration files
 chmod 600 config.json
 
-# Répertoires de données
+# Data directories
 chmod 700 /var/app/data
 
 # Logs
@@ -325,14 +325,14 @@ chmod 640 /var/log/myapp.log
 chown app:log /var/log/myapp.log
 ```
 
-### Chargement Sécurisé de la Configuration
+### Secure Configuration Loading
 
 ```lua
 local config = require('lumos.config')
 local security = require('lumos.security')
 local logger = require('lumos.logger')
 
--- Valider le chemin du fichier config
+-- Validate config file path
 local config_path = os.getenv("APP_CONFIG") or "./config.json"
 local validated_path, err = security.sanitize_path(config_path)
 
@@ -341,7 +341,7 @@ if not validated_path then
     os.exit(1)
 end
 
--- Charger la config
+-- Load config
 local cfg, load_err = config.load_file(validated_path)
 if not cfg then
     logger.error("Failed to load config", {error = load_err})
@@ -351,35 +351,35 @@ end
 logger.info("Configuration loaded", {path = validated_path})
 ```
 
-## 📊 Audit et Monitoring
+## 📊 Audit and Monitoring
 
-### Logging des Événements de Sécurité
+### Logging Security Events
 
 ```lua
 local logger = require('lumos.logger')
 
--- Connexions/Authentifications
+-- Connections/Authentication
 logger.info("User authenticated", {
     user = username,
     method = "password",
     ip = remote_ip
 })
 
--- Tentatives d'accès refusées
+-- Denied access attempts
 logger.warn("Access denied", {
     user = username,
     resource = resource_path,
     reason = "insufficient_permissions"
 })
 
--- Modifications sensibles
+-- Sensitive modifications
 logger.info("Configuration changed", {
     user = username,
     file = config_file,
     changes = changed_keys
 })
 
--- Erreurs de sécurité
+-- Security errors
 logger.error("Security violation detected", {
     type = "path_traversal",
     user = username,
@@ -387,76 +387,76 @@ logger.error("Security violation detected", {
 })
 ```
 
-### Format de Log Structuré
+### Structured Log Format
 
-Les logs sont au format :
+Logs are formatted as:
 ```
 2026-01-21 14:30:45 [ERROR] Security violation detected [type=path_traversal user=john input=../../etc/passwd]
 ```
 
-Facilement parsables avec des outils comme `jq`, `grep`, ou des systèmes de log centralisés (ELK, Splunk, etc.).
+Easily parseable with tools like `jq`, `grep`, or centralized logging systems (ELK, Splunk, etc.).
 
-## ✅ Checklist de Déploiement
+## ✅ Deployment Checklist
 
-### Avant de Déployer en Production
+### Before Deploying to Production
 
-- [ ] Toutes les entrées utilisateur sont validées avec `security.sanitize_*`
-- [ ] Les commandes shell utilisent `security.shell_escape()`
-- [ ] Les fichiers sont ouverts avec `security.safe_open()`
-- [ ] Le logging est configuré avec des niveaux appropriés
-- [ ] Les événements de sécurité sont loggés
-- [ ] Les permissions des fichiers sont correctes (600/700)
-- [ ] Le mode debug est désactivé (`LUMOS_DEBUG` non défini)
-- [ ] Les stacktraces ne sont pas exposées aux utilisateurs
-- [ ] Rate limiting est implémenté pour les opérations coûteuses
-- [ ] Les dépendances sont à jour (`luarocks list`)
-- [ ] Les tests de sécurité passent (`busted spec/security_spec.lua`)
+- [ ] All user inputs are validated with `security.sanitize_*`
+- [ ] Shell commands use `security.shell_escape()`
+- [ ] Files are opened with `security.safe_open()`
+- [ ] Logging is configured with appropriate levels
+- [ ] Security events are logged
+- [ ] File permissions are correct (600/700)
+- [ ] Debug mode is disabled (`LUMOS_DEBUG` not set)
+- [ ] Stacktraces are not exposed to users
+- [ ] Rate limiting is implemented for expensive operations
+- [ ] Dependencies are up to date (`luarocks list`)
+- [ ] Security tests pass (`busted spec/security_spec.lua`)
 
-### Monitoring Continu
+### Continuous Monitoring
 
-- [ ] Les logs sont collectés et analysés régulièrement
-- [ ] Les alertes sont configurées pour les événements critiques
-- [ ] Les métriques de performance sont suivies
-- [ ] Les tentatives d'intrusion sont détectées
-- [ ] Les mises à jour de sécurité sont appliquées rapidement
+- [ ] Logs are collected and analyzed regularly
+- [ ] Alerts are configured for critical events
+- [ ] Performance metrics are tracked
+- [ ] Intrusion attempts are detected
+- [ ] Security updates are applied promptly
 
-## 🚨 En Cas d'Incident de Sécurité
+## 🚨 In Case of Security Incident
 
-1. **Isoler** : Arrêter l'application si nécessaire
-2. **Analyser** : Examiner les logs avec `logger`
-3. **Contenir** : Identifier et bloquer la source
-4. **Corriger** : Patcher la vulnérabilité
-5. **Vérifier** : Tester la correction
-6. **Documenter** : Créer un post-mortem
+1. **Isolate**: Stop the application if necessary
+2. **Analyze**: Examine logs with `logger`
+3. **Contain**: Identify and block the source
+4. **Fix**: Patch the vulnerability
+5. **Verify**: Test the fix
+6. **Document**: Create a post-mortem
 
-### Analyse des Logs
+### Log Analysis
 
 ```bash
-# Chercher des tentatives de path traversal
+# Search for path traversal attempts
 grep "path_traversal" /var/log/myapp.log
 
-# Chercher des erreurs de sécurité
+# Search for security errors
 grep "\[ERROR\]" /var/log/myapp.log | grep -i security
 
-# Analyse des rate limits dépassés
+# Analyze exceeded rate limits
 grep "Rate limit exceeded" /var/log/myapp.log
 
-# Tentatives d'accès refusées
+# Denied access attempts
 grep "Access denied" /var/log/myapp.log
 ```
 
-## 📚 Ressources Complémentaires
+## 📚 Additional Resources
 
 - [OWASP Top 10](https://owasp.org/www-project-top-ten/)
 - [CWE - Common Weakness Enumeration](https://cwe.mitre.org/)
 - [Lua Security Considerations](https://www.lua.org/pil/8.1.html)
 
-## 🔄 Mises à Jour
+## 🔄 Updates
 
-Ce guide de sécurité est mis à jour régulièrement. Consultez-le avant chaque déploiement majeur.
+This security guide is updated regularly. Review it before each major deployment.
 
 ---
 
-**Version du Guide :** 1.0  
-**Dernière mise à jour :** 21 janvier 2026  
-**Framework Lumos :** v0.1.0+
+**Guide Version:** 1.0  
+**Last Updated:** January 21, 2026  
+**Lumos Framework:** v0.1.0+

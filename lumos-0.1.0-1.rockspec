@@ -51,7 +51,8 @@ build = {
       ["lumos.completion"] = "lumos/completion.lua",
       ["lumos.manpage"] = "lumos/manpage.lua",
       ["lumos.markdown"] = "lumos/markdown.lua",
-      ["lumos.format"] = "lumos/format.lua"
+      ["lumos.format"] = "lumos/format.lua",
+      ["lumos.bundle"] = "lumos/bundle.lua"
    },
    install = {
       bin = {
