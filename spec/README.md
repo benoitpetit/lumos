@@ -4,18 +4,29 @@ This directory contains the comprehensive test suite for the Lumos CLI framework
 
 ## Overview
 
-The test suite covers all modules of the Lumos framework with unit tests designed to ensure 100% code coverage and robust functionality.
+The test suite covers all modules of the Lumos framework with unit tests designed to ensure broad code coverage and robust functionality.
 
 ## Test Files
 
 - **`init_spec.lua`** - Tests for the main Lumos module and exports
 - **`app_spec.lua`** - Tests for application creation and command logic
 - **`flags_spec.lua`** - Tests for POSIX flag parsing functionality
+- **`flags_advanced_spec.lua`** - Tests for typed flags, validation, and persistent flags
 - **`color_spec.lua`** - Tests for color and styling support
+- **`format_spec.lua`** - Tests for text formatting utilities
 - **`progress_spec.lua`** - Tests for progress bar functionality
 - **`prompt_spec.lua`** - Tests for interactive prompts and input validation
 - **`table_spec.lua`** - Tests for boxed table formatting
 - **`loader_spec.lua`** - Tests for loading animations and spinners
+- **`json_spec.lua`** - Tests for JSON encode/decode
+- **`config_spec.lua`** - Tests for configuration file loading (JSON and key=value)
+- **`logger_spec.lua`** - Tests for structured logging with levels, context, and output redirection
+- **`security_spec.lua`** - Tests for shell escaping, path validation, and input sanitization
+- **`bundle_spec.lua`** - Tests for application bundling into standalone scripts
+- **`core_advanced_spec.lua`** - Tests for argument parsing, command execution, and help generation
+- **`completion_spec.lua`** - Tests for shell completion script generation (bash/zsh/fish)
+- **`manpage_spec.lua`** - Tests for man page generation
+- **`documentation_spec.lua`** - Tests for Markdown documentation generation
 
 ## Running Tests
 
@@ -25,7 +36,7 @@ Install the test dependencies:
 
 ```bash
 luarocks install busted
-luarocks install luacov
+luarocks install luacov  # optional, for coverage reports
 ```
 
 ### Running All Tests
@@ -33,32 +44,27 @@ luarocks install luacov
 From the project root directory:
 
 ```bash
-# Run all tests
-busted spec/
+# Run all tests (recommended)
+make test
 
-# Run tests with verbose output
-busted --verbose spec/
-
-# Run tests with coverage analysis
-busted --coverage spec/
+# Run with coverage analysis
+make test-coverage
 ```
 
 ### Running Individual Test Files
 
 ```bash
-# Test a specific module
 busted spec/color_spec.lua
-busted spec/progress_spec.lua
+busted spec/logger_spec.lua
 ```
 
 ### Test Configuration
 
-The test suite uses the `.busted` configuration file in the project root, which includes:
+The test suite uses the `.busted` configuration file in the project root, which sets:
 
 - Verbose output
-- Coverage analysis
+- Correct Lua path configuration (local modules take priority over installed ones)
 - Pattern matching for `_spec.lua` files
-- Correct Lua path configuration
 
 ## Test Structure
 
@@ -88,18 +94,11 @@ end)
 
 The tests use various mocking techniques:
 
-- **IO Mocking** - Capturing `io.write` and `io.read` for testing output and input
+- **IO Mocking** - Capturing `io.write` / `io.read` for testing output and input
+- **Global Print Mocking** - Intercepting `_G.print` to capture CLI output
 - **Time Mocking** - Controlling `os.time` for consistent progress bar testing
-- **Function Restoration** - Properly restoring original functions after each test
-
-## Coverage Goals
-
-The test suite aims for:
-
-- **100% line coverage** across all modules
-- **100% branch coverage** for conditional logic
-- **Comprehensive edge case testing**
-- **Error condition validation**
+- **Logger Output Redirection** - Using an in-memory table mock for `logger.set_output`
+- **Function Restoration** - Properly restoring original functions in `after_each`
 
 ## Test Categories
 
@@ -132,11 +131,10 @@ When adding new functionality:
 
 ## Test Results
 
-A successful test run should show:
+A successful test run shows:
 
 ```
-●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●
-69 successes / 0 failures / 0 errors / 0 pending : X.XXXXX seconds
+269 successes / 0 failures / 0 errors / 0 pending : X.XXXXX seconds
 ```
 
 Any failures or errors indicate issues that need to be addressed before merging changes.

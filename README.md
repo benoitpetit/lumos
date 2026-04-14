@@ -26,11 +26,13 @@
 - **🎯 Intuitive API** - Fluent, chainable methods for defining commands and flags
 - **🎨 Rich UI Components** - Colors, progress bars, prompts, and tables out of the box
 - **🔧 Shell Integration** - Auto-completion, man pages, and documentation generation
-- **⚙️ Configuration Management** - JSON files, environment variables, and more
+- **⚙️ Configuration Management** - JSON and key=value files, environment variables, and more
 - **🧪 Test-Ready** - Generated projects include complete test suites
 - **📦 Minimal Dependencies** - Only requires `luafilesystem`, modular architecture
-- **🌍 Cross-Platform** - Linux, macOS, Windows (WSL) supported
-- **🚀 Portable Bundles** - Create single-file executables with `lumos bundle`
+- **🌍 Cross-Platform** - Linux, macOS, Windows (WSL) supported with cross-platform TTY detection
+- **🚀 Portable Bundles** - Create self-contained single-file Lua scripts with `lumos bundle` (requires Lua runtime)
+- **🔒 Security Built-in** - Input sanitization, safe file operations, rate limiting
+- **📝 Structured Logging** - 5-level logger with child loggers and environment configuration
 
 ## 🚀 5-Minute Quick Start
 
@@ -81,8 +83,8 @@ make test     # Run the test suite
 
 **Step 5: Create a Portable Bundle (Optional)**
 ```bash
-lumos bundle src/main.lua -o dist/myapp  # Create single-file executable
-./dist/myapp --help                       # Works without Lumos installed!
+lumos bundle src/main.lua -o dist/myapp  # Create self-contained Lua script
+./dist/myapp --help                       # Works without Lumos installed (requires Lua)
 ```
 
 🎉 **Congratulations!** You now have a fully functional CLI application with tests, documentation, and shell integration ready to go.
@@ -188,10 +190,11 @@ local name = prompt.input("Your name:", "Anonymous")
 ### Configuration Management
 ```lua
 local config = require('lumos.config')
+local core = require('lumos.core')
 
 local settings = config.merge_configs(
     {timeout = 30},              -- defaults
-    config.load_file("config.json"),  -- file
+    core.load_config("config.json"),  -- file (JSON or key=value)
     config.load_env("MYAPP"),         -- environment
     ctx.flags                         -- command line
 )
@@ -209,6 +212,21 @@ lumos-app --generate-manpage > lumos-app.1
 lumos-app --generate-docs markdown
 ```
 
+### Security & Logging
+```lua
+local security = require('lumos.security')
+local logger = require('lumos.logger')
+
+-- Sanitize user input
+local safe = security.sanitize_output(user_input)
+
+-- Validate paths
+local path, err = security.sanitize_path(user_path)
+
+-- Structured logging
+logger.info("Action performed", {user = "john", id = 42})
+```
+
 ## Documentation
 
 Complete documentation is available in the `docs/` directory:
@@ -217,7 +235,8 @@ Complete documentation is available in the `docs/` directory:
 - **[CLI Tool Usage](docs/cli.md)** - How to use `lumos new` to create projects
 - **[API Reference](docs/api.md)** - Complete framework API documentation
 - **[Usage Examples](docs/use.md)** - Real-world CLI examples and patterns
-- **[Development Guide](docs/dev.md)** - Local development setup and workflow
+- **[Security Guide](docs/security.md)** - Security features and best practices
+- **[Bundling Guide](docs/bundle.md)** - Creating portable single-file executables
 
 ## Examples
 
@@ -255,7 +274,7 @@ make install && make test
 - **License:** MIT
 - **Lua Versions:** 5.1, 5.2, 5.3, 5.4, LuaJIT
 - **Platforms:** Linux, macOS, Windows (WSL)
-- **Tests:** 147 passing tests
+- **Tests:** 188 passing tests
 - **Dependencies:** luafilesystem
 
 ## Acknowledgments

@@ -16,6 +16,7 @@ local markdown = require('lumos.markdown')
 local format = require('lumos.format')
 local security = require('lumos.security')
 local logger = require('lumos.logger')
+local bundle = require('lumos.bundle')
 
 -- Export the main interface
 return {
@@ -33,8 +34,9 @@ return {
     manpage = manpage,
     markdown = markdown,
     format = format,
-        security = security,
-        logger = logger,
+    security = security,
+    logger = logger,
+    bundle = bundle,
     version = "0.1.0",
     load_config = core.load_config
 }

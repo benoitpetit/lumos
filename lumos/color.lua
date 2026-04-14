@@ -50,15 +50,8 @@ local function supports_color()
         return true
     end
     
-    -- Check if output is a TTY (basic check)
-    local handle = io.popen("test -t 1 && echo true || echo false")
-    if handle then
-        local result = handle:read("*a"):gsub("%s+", "")
-        handle:close()
-        return result == "true"
-    end
-    
-    return false
+    -- Reuse format module's TTY detection to avoid spawning a second subprocess
+    return format.is_tty()
 end
 
 local color_enabled = supports_color()
@@ -116,13 +109,16 @@ function color.white(text)
     return color.colorize(text, "white")
 end
 
--- Convenience functions for text formatting (delegated to format module)
+-- Convenience functions for text formatting — respect color_enabled so that
+-- color.disable() also disables bold/dim (unlike a raw format.bold delegation).
 function color.bold(text)
-    return format.bold(text)
+    if not color_enabled then return text end
+    return "\27[1m" .. text .. "\27[0m"
 end
 
 function color.dim(text)
-    return format.dim(text)
+    if not color_enabled then return text end
+    return "\27[2m" .. text .. "\27[0m"
 end
 
 -- Enable/disable colors

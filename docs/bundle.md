@@ -6,13 +6,19 @@ Guide for creating portable CLI applications with Lumos.
 
 The `lumos bundle` command creates a single, portable Lua file containing your CLI application and all its dependencies. This file can be distributed and executed on any machine with Lua installed, without requiring Lumos to be installed.
 
+## Requirements
+
+- **Lua runtime** must be installed on the target machine (Lua 5.1+)
+- **Native C modules** (e.g. `luafilesystem`) are *not* bundled and must be installed separately on the target if your app uses them
+- On **Windows**, run the bundle with `lua myapp` instead of `./myapp`
+
 ## Quick Start
 
 ```bash
 # Create a bundle of your application
 lumos bundle src/main.lua -o dist/myapp
 
-# The generated file is executable
+# The generated file can be run directly on Unix
 ./dist/myapp --help
 ```
 
@@ -48,7 +54,7 @@ lumos bundle <entry_file> [options]
 # Create a bundle with default values
 lumos bundle src/main.lua
 
-# Result: dist/main (executable)
+# Result: dist/main (self-contained Lua script)
 ```
 
 ### Custom Bundle
@@ -81,6 +87,7 @@ lumos bundle src/main.lua --analyze
 #   - lumos.init
 #   - lumos.app
 #   - lumos.core
+#   - lumos.bundle
 #   ...
 ```
 
@@ -114,11 +121,10 @@ The generated bundle contains:
 -- ============================================
 
 -- Bundled modules preloader
+local _loadcode = loadstring or load
 local _BUNDLED_MODULES = {}
 
-_BUNDLED_MODULES["lumos"] = function()
-    -- Lumos module content
-end
+_BUNDLED_MODULES["lumos"] = assert(_loadcode(...))
 
 -- ... other modules ...
 

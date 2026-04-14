@@ -30,5 +30,12 @@ Thumbs.db
 
 # tmp folder
 tmp/
+
+# Generated documentation artifacts
+docs/*.txt
+
+# Distribution / bundle outputs
+dist/
+
 # Added by Prompt My Project (PMP) - https://github.com/benoitpetit/prompt-my-project
 pmp_output

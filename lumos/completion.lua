@@ -125,46 +125,54 @@ end
 
 -- Generate Fish completion script
 function completion.generate_fish(app)
-    local commands = {}
-    
-    -- Extract commands with descriptions
+    local lines = {}
+    local fn_name = "__" .. app.name .. "_complete_commands"
+
+    -- Header
+    table.insert(lines, "# Fish completion for " .. app.name)
+    table.insert(lines, "")
+
+    -- Helper function listing all commands with descriptions (tab-separated)
+    table.insert(lines, "function " .. fn_name)
     for _, cmd in ipairs(app.commands) do
-        local desc = cmd.description or "No description"
-        table.insert(commands, string.format("echo '%s\\t%s'", cmd.name, desc))
-        
-        -- Add aliases
+        local desc = cmd.description or ""
+        table.insert(lines, string.format("    echo '%s\\t%s'", cmd.name, desc))
+        -- Aliases
         if cmd.aliases then
             for _, alias in ipairs(cmd.aliases) do
-                table.insert(commands, string.format("echo '%s\\t%s'", alias, desc))
+                table.insert(lines, string.format("    echo '%s\\t%s'", alias, desc))
             end
         end
     end
-    
-    local fish_script = string.format([[
-# Fish completion for %s
-function __%s_complete_commands
-    %s
-end
+    table.insert(lines, "end")
+    table.insert(lines, "")
 
-function __%s_complete_flags
-    echo '--help\\tShow help information'
-    echo '-h\\tShow help information'
-    echo '--version\\tShow version information'
-    echo '-v\\tShow version information'
-end
+    -- Top-level command completion
+    table.insert(lines, string.format(
+        "complete -c %s -f -a '(%s)'", app.name, fn_name))
+    table.insert(lines, "")
 
-# Complete commands
-complete -c %s -f -n "not __fish_seen_subcommand_from (__%s_complete_commands)" -a "(__%s_complete_commands)"
+    -- Global flags
+    table.insert(lines, "# Global flags")
+    table.insert(lines, string.format(
+        "complete -c %s -l help -s h -d 'Show help information'", app.name))
+    table.insert(lines, string.format(
+        "complete -c %s -l version -s v -d 'Show version information'", app.name))
 
-# Complete global flags
-complete -c %s -f -n "__fish_use_subcommand" -a "(__%s_complete_flags)"
+    -- Persistent flags
+    if app.persistent_flags and next(app.persistent_flags) then
+        for flag_name, flag_def in pairs(app.persistent_flags) do
+            local desc = (flag_def.description or ""):gsub("'", "\\'")
+            local line = string.format("complete -c %s -l %s", app.name, flag_name)
+            if flag_def.short then
+                line = line .. string.format(" -s %s", flag_def.short)
+            end
+            line = line .. string.format(" -d '%s'", desc)
+            table.insert(lines, line)
+        end
+    end
 
-# Complete help flag for any subcommand
-complete -c %s -l help -s h -d "Show help information"
-complete -c %s -l version -s v -d "Show version information"
-]], app.name, app.name, table.concat(commands, "\n    "), app.name, app.name, app.name, app.name, app.name, app.name, app.name, app.name)
-    
-    return fish_script
+    return table.concat(lines, "\n") .. "\n"
 end
 
 -- Generate all completion scripts
@@ -197,12 +205,12 @@ function completion.generate_all(app, output_dir, verbose)
     
     -- Generate Zsh completion
     local zsh_script = completion.generate_zsh(app)
-    local zsh_file, zsh_err = security.safe_open(output_dir .. "/" .. app.name .. "_zsh.sh", "w")
+    local zsh_file, zsh_err = security.safe_open(output_dir .. "/" .. app.name .. "_zsh.zsh", "w")
     if zsh_file then
         zsh_file:write(zsh_script)
         zsh_file:close()
         if verbose then
-            print("Generated Zsh completion: " .. output_dir .. "/" .. app.name .. "_zsh.sh")
+            print("Generated Zsh completion: " .. output_dir .. "/" .. app.name .. "_zsh.zsh")
         end
     else
         logger.error("Failed to create Zsh completion file", {error = zsh_err})

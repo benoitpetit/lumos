@@ -1,15 +1,15 @@
 -- Lumos Core Module
 local flags = require('lumos.flags')
 local logger = require('lumos.logger')
+local json = require('lumos.json')
+local security = require('lumos.security')
+local config_module = require('lumos.config')
 
 local core = {}
 
--- Configuration file loader
+-- Configuration file loader — delegates to config module to avoid duplication
 function core.load_config(file_path)
-    -- Placeholder logic for loading a config file (YAML, JSON, etc.)
-    -- This function would parse the file and add config variables
-    -- to the application's settings or flags.
-    print("Loading configuration from " .. file_path)
+    return config_module.load_file(file_path)
 end
 
 -- Parse command line arguments into structured data with subcommand support
@@ -17,7 +17,6 @@ function core.parse_arguments(args, app)
     local parsed = {
         command = nil,
         subcommand = nil,
-        subcommands = {},
         flags = {},
         args = {},
         raw_args = args or {}
@@ -128,7 +127,17 @@ function core.validate_and_merge_flags(app, cmd, parsed_flags)
         return true
     end
     
-    -- Start with app-level persistent flags
+    -- Start with app-level global flags (non-persistent, app-scoped)
+    if app.global_flags then
+        for flag_name, flag_def in pairs(app.global_flags) do
+            local value = parsed_flags[flag_name] or parsed_flags[flag_def.short]
+            if value ~= nil then
+                validate_single_flag(flag_name, value, flag_def)
+            end
+        end
+    end
+
+    -- Add app-level persistent flags
     if app.persistent_flags then
         for flag_name, flag_def in pairs(app.persistent_flags) do
             local value = parsed_flags[flag_name] or parsed_flags[flag_def.short]
@@ -196,13 +205,25 @@ function core.execute_command(app, parsed_args)
                 return true
             end
             
-            -- Execute subcommand action
-            if subcmd.action then
+            -- Validate and merge flags for subcommand
+            if rawget(subcmd, 'action') then
+                local validated_flags, validation_errors = core.validate_and_merge_flags(app, subcmd, parsed_args.flags)
+                if #validation_errors > 0 then
+                    logger.error("Subcommand flag validation failed", {errors = validation_errors})
+                    for _, error in ipairs(validation_errors) do
+                        print("Error: " .. error)
+                    end
+                    return false
+                end
+
+                -- Execute subcommand action
                 local context = {
                     args = parsed_args.args,
-                    flags = parsed_args.flags,
+                    flags = validated_flags,
                     command = subcmd,
-                    parent = cmd
+                    parent = cmd,
+                    config = app.loaded_config,
+                    env = app.loaded_env
                 }
                 return subcmd.action(context)
             else
@@ -232,11 +253,13 @@ function core.execute_command(app, parsed_args)
     end
     
     -- Execute the command action if it exists
-    if cmd.action then
+    if rawget(cmd, 'action') then
         local context = {
             args = parsed_args.args,
             flags = validated_flags,
-            command = cmd
+            command = cmd,
+            config = app.loaded_config,
+            env = app.loaded_env
         }
         
         -- Execute with error handling
@@ -282,6 +305,38 @@ function core.show_help(app)
     print("Global flags:")
     print("  -h, --help    Show help information")
     print("  -v, --version Show version information")
+
+    -- Display app-level flags defined via app:flag()
+    if app.global_flags and next(app.global_flags) then
+        for flag_name, flag_def in pairs(app.global_flags) do
+            local flag_text = "  "
+            if flag_def.short then
+                flag_text = flag_text .. "-" .. flag_def.short .. ", "
+            end
+            flag_text = flag_text .. "--" .. flag_name
+            if flag_def.description then
+                flag_text = flag_text .. "\t" .. flag_def.description
+            end
+            print(flag_text)
+        end
+    end
+
+    -- Display app-level persistent flags defined via app:persistent_flag()
+    if app.persistent_flags and next(app.persistent_flags) then
+        print()
+        print("Persistent flags (inherited by all commands):")
+        for flag_name, flag_def in pairs(app.persistent_flags) do
+            local flag_text = "  "
+            if flag_def.short then
+                flag_text = flag_text .. "-" .. flag_def.short .. ", "
+            end
+            flag_text = flag_text .. "--" .. flag_name
+            if flag_def.description then
+                flag_text = flag_text .. "\t" .. flag_def.description
+            end
+            print(flag_text)
+        end
+    end
 end
 
 -- Display help for a specific command

@@ -35,17 +35,32 @@ users_cmd:action(function(ctx)
     return true
 end)
 
+-- Command demonstrating input validation
+local validate_cmd = app:command("validate", "Validate an email address")
+validate_cmd:flag("-e --email", "Email to validate (interactive prompt if omitted)")
+
+validate_cmd:action(function(ctx)
+    local email = ctx.flags.email
+    if not email or email == "" then
+        email = prompt.input("Enter your email")
+    end
+
+    -- Guard against nil/empty input (e.g. EOF in non-interactive mode)
+    if not email or email == "" then
+        print("No email provided.")
+        return false
+    end
+
+    local valid, result = prompt.validate(email, prompt.validators.email)
+    if valid then
+        print("Valid email: " .. result)
+    else
+        print("Invalid email format!")
+    end
+    return valid
+end)
+
 -- Add global flags
 app:flag("-j --json", "Output in JSON format")
 
--- Utilize input validators
-local email = prompt.input("Enter your email")
-local valid, result = prompt.validate(email, prompt.validators.email)
-if valid then
-    print("Valid email: " .. result)
-else
-    print("Invalid email format!")
-end
-
 app:run(arg)
-

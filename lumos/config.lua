@@ -7,6 +7,34 @@ local logger = require('lumos.logger')
 
 local config = {}
 
+-- Parse a key=value text block into a Lua table.
+-- Lines starting with # are treated as comments.
+-- Values are auto-converted to boolean or number when possible.
+function config.parse_key_value(content)
+    local result = {}
+    for line in content:gmatch("[^\r\n]+") do
+        line = line:match("^%s*(.-)%s*$") -- trim whitespace
+        if line ~= "" and not line:match("^#") then -- ignore empty lines and comments
+            local key, value = line:match("^([^=]+)=(.*)$")
+            if key and value then
+                key   = key:match("^%s*(.-)%s*$")
+                value = value:match("^%s*(.-)%s*$")
+
+                if value == "true" then
+                    result[key] = true
+                elseif value == "false" then
+                    result[key] = false
+                elseif tonumber(value) then
+                    result[key] = tonumber(value)
+                else
+                    result[key] = value
+                end
+            end
+        end
+    end
+    return result
+end
+
 -- Load configuration from a file
 function config.load_file(file_path)
     logger.debug("Loading configuration file", {path = file_path})
@@ -35,65 +63,43 @@ function config.load_file(file_path)
     end
     
     -- Simple key=value parser for other files
-    local config = {}
-    for line in content:gmatch("[^\r\n]+") do
-        line = line:match("^%s*(.-)%s*$") -- trim whitespace
-        if line ~= "" and not line:match("^#") then -- ignore empty lines and comments
-            local key, value = line:match("^([^=]+)=(.*)$")
-            if key and value then
-                key = key:match("^%s*(.-)%s*$")
-                value = value:match("^%s*(.-)%s*$")
-                
-                -- Try to convert value to appropriate type
-                if value == "true" then
-                    config[key] = true
-                elseif value == "false" then
-                    config[key] = false
-                elseif tonumber(value) then
-                    config[key] = tonumber(value)
-                else
-                    config[key] = value
+    local result = config.parse_key_value(content)
+    logger.info("Loaded key-value configuration", {path = file_path})
+    return result
+end
+
+-- Load configuration from environment variables with a prefix.
+-- Enumerates all env vars via the `env` command and filters by prefix.
+function config.load_env(prefix)
+    local result = {}
+    local filter = prefix and (prefix .. "_") or ""
+
+    local handle = io.popen("env 2>/dev/null")
+    if not handle then return result end
+
+    for line in handle:lines() do
+        local key, value = line:match("^([^=]+)=(.*)")
+        if key then
+            local match = filter == "" or key:sub(1, #filter) == filter
+            if match then
+                local short_key = (filter ~= "" and key:sub(#filter + 1) or key):lower()
+                if short_key ~= "" then
+                    if value == "true" then
+                        result[short_key] = true
+                    elseif value == "false" then
+                        result[short_key] = false
+                    elseif tonumber(value) then
+                        result[short_key] = tonumber(value)
+                    else
+                        result[short_key] = value
+                    end
                 end
             end
         end
     end
-    
-    return config
-end
+    handle:close()
 
--- Load configuration from environment variables with a prefix
-function config.load_env(prefix)
-    local config = {}
-    prefix = prefix and (prefix .. "_") or ""
-    
-    -- Simple environment variable reader
-    -- In a real implementation, you might use os.getenv in a loop
-    -- For now, we'll provide a basic structure
-    local common_vars = {
-        "DEBUG", "VERBOSE", "CONFIG_FILE", "LOG_LEVEL", 
-        "OUTPUT_FORMAT", "COLOR", "TIMEOUT"
-    }
-    
-    for _, var in ipairs(common_vars) do
-        local env_var = prefix .. var
-        local value = os.getenv(env_var)
-        if value then
-            local key = var:lower()
-            
-            -- Convert to appropriate type
-            if value == "true" then
-                config[key] = true
-            elseif value == "false" then
-                config[key] = false
-            elseif tonumber(value) then
-                config[key] = tonumber(value)
-            else
-                config[key] = value
-            end
-        end
-    end
-    
-    return config
+    return result
 end
 
 -- Merge configurations with priority: flags > env > config_file > defaults

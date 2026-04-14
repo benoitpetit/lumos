@@ -152,11 +152,11 @@ function security.sanitize_output(text)
     text = table.concat(clean)
     
     -- Remove ANSI escape sequences that aren't from our color module
-    -- This is a basic filter, real ANSI codes from lumos.color will be allowed
+    -- Covers all CSI sequences: ESC [ <params> <final-byte>
     local has_escape = text:match("\27%[")
     if has_escape then
         -- Only allow known safe ANSI codes (colors, formatting)
-        text = text:gsub("\27%[[^mK]", "")
+        text = text:gsub("\27%[[\32-\126]*[@-~]", "")
     end
     
     return text
@@ -199,24 +199,16 @@ end
 
 -- Check if running with elevated privileges (security warning)
 function security.is_elevated()
-    local uid = os.getenv("UID") or ""
-    local euid = os.getenv("EUID") or ""
-    
-    -- Check if root
-    if uid == "0" or euid == "0" then
-        return true
-    end
-    
-    -- Try to detect via id command
+    -- Use `id -u` as the authoritative source — works on all POSIX systems.
+    -- os.getenv("UID") is a bash shell variable and is unreliable here.
     local handle = io.popen("id -u 2>/dev/null")
     if handle then
         local result = handle:read("*a")
         handle:close()
-        if result:match("^0") then
+        if result and result:match("^0") then
             return true
         end
     end
-    
     return false
 end
 

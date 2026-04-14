@@ -82,8 +82,8 @@ function flags.parse_single_flag(arg, args, start_index)
         else
             value = true  -- Boolean flag
         end
-        -- Keep original dashes 
-        -- name = name:gsub("-", "_")
+        -- Normalize hyphens to underscores so --dry-run → ctx.flags.dry_run
+        name = name:gsub("-", "_")
     elseif arg:sub(1, 1) == "-" then
         -- Short flag
         name = arg:sub(2, 2)

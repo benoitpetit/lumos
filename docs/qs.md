@@ -13,7 +13,7 @@ git --version  # Should show Git version
 ```
 
 If any are missing:
-- **Ubuntu/Debian**: `sudo apt-get install lua5.1 luarocks git`
+- **Ubuntu/Debian**: `sudo apt-get install lua5.3 luarocks git`
 - **CentOS/RHEL**: `sudo yum install lua luarocks git`
 - **macOS**: `brew install lua luarocks git`
 - **Windows**: Use WSL with one of the above
@@ -205,14 +205,31 @@ end)
 ### Configuration
 ```lua
 local config = require('lumos.config')
+local core = require('lumos.core')
 
 -- Load from file and environment
 local settings = config.merge_configs(
     {timeout = 30, debug = false},  -- defaults
-    config.load_file("config.json"),
+    core.load_config("config.json"), -- JSON or key=value file
     config.load_env("MYAPP"),
     ctx.flags
 )
+```
+
+### Security Features
+```lua
+local security = require('lumos.security')
+local logger = require('lumos.logger')
+
+-- Sanitize user input before using it
+local safe_input = security.sanitize_output(user_input)
+
+-- Validate file paths
+local path, err = security.sanitize_path(user_path)
+if not path then
+    logger.error("Invalid path", {error = err})
+    return false
+end
 ```
 
 ## Common Patterns
@@ -264,11 +281,22 @@ deploy:examples({
 })
 ```
 
+### Bundling for Distribution
+```bash
+# Create a standalone executable
+lumos bundle src/main.lua -o dist/myapp
+
+# Test it
+./dist/myapp --help
+```
+
 ## Next Steps
 
 - Read the [API Reference](api.md) for complete method documentation
 - See [Usage Examples](use.md) for real-world scenarios
 - Learn about the [CLI Tool](cli.md) for project management
+- Review the [Security Guide](security.md) for production best practices
+- Check out the [Bundling Guide](bundle.md) for distribution
 - Check out the examples in the `examples/` directory
 
 ## Tips
@@ -278,3 +306,5 @@ deploy:examples({
 3. **Add Help Text**: Provide clear descriptions for commands and flags
 4. **Handle Errors**: Return false from actions to indicate failure
 5. **Test Your CLI**: Write tests for your commands using the generated test suite
+6. **Secure Inputs**: Always sanitize user input with `lumos.security`
+7. **Log Actions**: Use `lumos.logger` for audit trails in production

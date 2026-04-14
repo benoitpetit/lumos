@@ -4,11 +4,18 @@
 
 local bundle = {}
 
-local lfs = require("lfs")
+local security = require("lumos.security")
+
+local lfs
+local function get_lfs()
+    if not lfs then
+        lfs = require("lfs")
+    end
+    return lfs
+end
 
 -- Default configuration
 local default_config = {
-    minify = false,
     include_lumos = true,
     shebang = "#!/usr/bin/env lua",
     strip_comments = false,
@@ -33,14 +40,15 @@ local LUMOS_MODULES = {
     "lumos.completion",
     "lumos.manpage",
     "lumos.markdown",
-    "lumos.format"
+    "lumos.format",
+    "lumos.bundle"
 }
 
 --- Read file contents
 ---@param path string
 ---@return string|nil, string|nil
 local function read_file(path)
-    local f, err = io.open(path, "r")
+    local f, err = security.safe_open(path, "r")
     if not f then
         return nil, "Cannot read file: " .. path .. " - " .. (err or "unknown error")
     end
@@ -54,7 +62,7 @@ end
 ---@param content string
 ---@return boolean, string|nil
 local function write_file(path, content)
-    local f, err = io.open(path, "w")
+    local f, err = security.safe_open(path, "w")
     if not f then
         return false, "Cannot write file: " .. path .. " - " .. (err or "unknown error")
     end
@@ -67,8 +75,21 @@ end
 ---@param path string
 ---@return boolean
 local function path_exists(path)
-    local attr = lfs.attributes(path)
+    local attr = get_lfs().attributes(path)
     return attr ~= nil
+end
+
+--- Check if path is a regular file
+---@param path string
+---@return boolean
+local function is_file(path)
+    return get_lfs().attributes(path, "mode") == "file"
+end
+
+--- Detect Windows
+---@return boolean
+local function is_windows()
+    return package.config:sub(1, 1) == "\\"
 end
 
 --- Create directory recursively
@@ -88,7 +109,7 @@ local function mkdir_p(path)
     for _, part in ipairs(parts) do
         current = current .. part .. "/"
         if not path_exists(current) then
-            local ok, err = lfs.mkdir(current)
+            local ok, err = get_lfs().mkdir(current)
             if not ok and not path_exists(current) then
                 return false
             end
@@ -176,7 +197,7 @@ local function collect_dependencies(entry_file, search_paths, collected, visited
     local requires = extract_requires(content)
     
     for module_name, _ in pairs(requires) do
-        -- Skip standard library modules
+        -- Skip standard library modules and native C modules
         if not module_name:match("^string$") and
            not module_name:match("^table$") and
            not module_name:match("^math$") and
@@ -184,7 +205,9 @@ local function collect_dependencies(entry_file, search_paths, collected, visited
            not module_name:match("^os$") and
            not module_name:match("^debug$") and
            not module_name:match("^coroutine$") and
-           not module_name:match("^package$") then
+           not module_name:match("^package$") and
+           not module_name:match("^lfs$") and
+           not module_name:match("^utf8$") then
             
             local module_path = find_module(module_name, search_paths)
             if module_path and not visited[module_path] then
@@ -286,6 +309,10 @@ function bundle.create(options)
     
     if not path_exists(entry_file) then
         return false, "Entry file not found: " .. entry_file
+    end
+    
+    if not is_file(entry_file) then
+        return false, "Entry path is not a file: " .. entry_file
     end
     
     -- Determine search paths
@@ -395,8 +422,10 @@ function bundle.create(options)
         return false, write_err
     end
     
-    -- Make executable
-    os.execute("chmod +x " .. output_file)
+    -- Make executable on Unix-like systems
+    if not is_windows() then
+        os.execute("chmod +x " .. security.shell_escape(output_file))
+    end
     
     return true, nil, {
         output = output_file,

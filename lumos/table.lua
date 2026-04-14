@@ -4,6 +4,48 @@
 
 local tbl = {}
 
+-- Detect Windows
+local function is_windows()
+    return package.config:sub(1, 1) == "\\"
+end
+
+-- Cross-platform terminal width detection
+local function get_terminal_width()
+    -- First, try environment variable
+    local cols = tonumber(os.getenv("COLUMNS"))
+    if cols and cols > 0 then
+        return cols
+    end
+    
+    if is_windows() then
+        -- Try mode con on Windows
+        local handle = io.popen("mode con /status 2>nul")
+        if handle then
+            for line in handle:lines() do
+                local num = line:match("Columns:%s*(%d+)")
+                if num then
+                    handle:close()
+                    return tonumber(num)
+                end
+            end
+            handle:close()
+        end
+    else
+        -- Try tput on Unix
+        local fh = io.popen("tput cols 2>/dev/null")
+        if fh then
+            local w = fh:read("*l")
+            fh:close()
+            local num = tonumber(w)
+            if num and num > 0 then
+                return num
+            end
+        end
+    end
+    
+    return 80 -- default fallback
+end
+
 -- Creates a boxed table from a list of strings
 -- options: {header=..., footer=..., align="left"|"center"|"right"}
 local function to_string(val)
@@ -44,13 +86,7 @@ function tbl.boxed(items, options)
 
     -- If 'large' option, adapt width to terminal
     if options.large then
-        local term_width = 0
-        local fh = io.popen('tput cols 2>/dev/null')
-        if fh then
-            local w = fh:read('*l')
-            fh:close()
-            term_width = tonumber(w) or 0
-        end
+        local term_width = get_terminal_width()
         if term_width > 10 then
             max_len = term_width - 4 -- 2 for each border
             if max_len < 1 then max_len = 1 end
@@ -107,6 +143,7 @@ function tbl.create(data, options)
         for key, _ in pairs(data[1]) do
             table.insert(headers, key)
         end
+        table.sort(headers)  -- deterministic column order
     end
     
     -- Convert data to string matrix
@@ -187,6 +224,10 @@ function tbl.create(data, options)
         local line = border_chars.vertical
         for i, cell in ipairs(row) do
             local width = col_widths[i]
+            -- Truncate cell if it exceeds the column width (e.g. due to max_width)
+            if #cell > width then
+                cell = cell:sub(1, width)
+            end
             local padded_cell
             
             -- Alignment
@@ -248,6 +289,7 @@ function tbl.simple(data, options)
         for key, _ in pairs(data[1]) do
             table.insert(headers, key)
         end
+        table.sort(headers)  -- deterministic column order
     end
     
     -- Convert to matrix
@@ -293,6 +335,10 @@ function tbl.simple(data, options)
         local line_parts = {}
         for i, cell in ipairs(row) do
             local width = col_widths[i]
+            -- Truncate cell if it exceeds the column width
+            if #cell > width then
+                cell = cell:sub(1, width)
+            end
             local align = options.align and options.align[i] or "left"
             local padded_cell
             
@@ -331,6 +377,7 @@ function tbl.key_value(data, options)
     for key, value in pairs(data) do
         table.insert(items, {Key = to_string(key), Value = to_string(value)})
     end
+    table.sort(items, function(a, b) return a.Key < b.Key end)
     
     local table_options = {
         headers = {"Key", "Value"},

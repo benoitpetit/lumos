@@ -107,9 +107,13 @@ describe('Prompt Module', function()
     end)
 
     it('handles invalid input by reprompting', function()
-      -- Test removed to avoid output pollution during test runs
-      -- This functionality works but causes console output during tests
-      assert.is_true(true) -- Placeholder assertion
+      -- confirm() loops until it gets a valid y/n response.
+      -- Provide: invalid input, then a valid "y".
+      read_responses = {"maybe", "y"}
+      
+      local result = prompt.confirm("Continue?")
+      
+      assert.is_true(result)
     end)
   end)
 

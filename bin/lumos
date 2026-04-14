@@ -393,8 +393,8 @@ app:command("version", "Show Lumos version")
 -- Bundle command for creating portable CLI executables
 local bundle_cmd = app:command("bundle", "Bundle a Lumos CLI project into a portable single-file executable")
 bundle_cmd:arg("entry", "Entry point file (e.g., src/main.lua)")
-bundle_cmd:flag("-o --output", "Output file path (default: dist/<name>)")
-bundle_cmd:flag("-d --dir", "Project directory (default: current directory)")
+bundle_cmd:flag_string("-o --output", "Output file path (default: dist/<name>)")
+bundle_cmd:flag_string("-d --dir", "Project directory (default: current directory)")
 bundle_cmd:flag("--no-lumos", "Do not bundle Lumos framework (requires Lumos installed on target)")
 bundle_cmd:flag("--strip-comments", "Remove comments to reduce file size")
 bundle_cmd:flag("--analyze", "Analyze dependencies without creating bundle")
@@ -414,9 +414,13 @@ bundle_cmd:action(function(ctx)
         return false
     end
     
-    -- Check if entry file exists
+    -- Check if entry file exists and is a regular file
     if not lfs.attributes(entry_file) then
         print(color.red("Error: Entry file not found: " .. entry_file))
+        return false
+    end
+    if lfs.attributes(entry_file, "mode") ~= "file" then
+        print(color.red("Error: Entry path is not a file: " .. entry_file))
         return false
     end
     
@@ -437,7 +441,7 @@ bundle_cmd:action(function(ctx)
             end
         end
         
-        if not ctx.flags["no-lumos"] then
+        if not ctx.flags["no_lumos"] then
             print(color.cyan("\nLumos modules will also be bundled:"))
             local lumos_mods = bundle.get_lumos_modules()
             for _, mod_name in ipairs(lumos_mods) do
@@ -456,8 +460,8 @@ bundle_cmd:action(function(ctx)
         entry = entry_file,
         output = ctx.flags.output,
         project_dir = project_dir,
-        include_lumos = not ctx.flags["no-lumos"],
-        strip_comments = ctx.flags["strip-comments"]
+        include_lumos = not ctx.flags["no_lumos"],
+        strip_comments = ctx.flags["strip_comments"]
     }
     
     local success, err, info = bundle.create(options)

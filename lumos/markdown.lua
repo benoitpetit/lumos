@@ -31,13 +31,14 @@ end
 
 -- Generate installation section
 local function generate_installation(app)
+    local repo_url = app.github_url or ("https://github.com/your-org/" .. app.name)
     return string.format([[## Installation
 
 To install %s, download the binary from the releases page or build from source:
 
 ```bash
-# Download binary (replace with actual URL)
-wget https://github.com/your-org/%s/releases/latest/download/%s
+# Download binary
+wget %s/releases/latest/download/%s
 chmod +x %s
 sudo mv %s /usr/local/bin/
 ```
@@ -45,12 +46,12 @@ sudo mv %s /usr/local/bin/
 Or build from source:
 
 ```bash
-git clone https://github.com/your-org/%s.git
+git clone %s.git
 cd %s
 # Build instructions here
 ```
 
-]], app.name, app.name, app.name, app.name, app.name, app.name, app.name)
+]], app.name, repo_url, app.name, app.name, app.name, repo_url, app.name)
 end
 
 -- Generate usage section

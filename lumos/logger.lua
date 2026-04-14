@@ -1,6 +1,8 @@
 -- Lumos Logger Module
 -- Provides structured logging with levels and context
 
+local json = require('lumos.json')
+
 local logger = {}
 
 -- Log levels
@@ -74,10 +76,14 @@ local function format_context(context)
         return ""
     end
     
+    local keys = {}
+    for key in pairs(context) do table.insert(keys, key) end
+    table.sort(keys)
     local parts = {}
-    for key, value in pairs(context) do
+    for _, key in ipairs(keys) do
+        local value = context[key]
         if type(value) == "table" then
-            value = require('lumos.json').encode(value)
+            value = json.encode(value)
         else
             value = tostring(value)
         end
@@ -108,7 +114,7 @@ local function do_log(level, level_name, message, context)
     end
     
     local log_line = string.format("%s%s [%s] %s%s%s\n",
-        timestamp and (timestamp .. " ") or "",
+        (timestamp ~= "" and (timestamp .. " ") or ""),
         color_start,
         level_name,
         message,
@@ -170,8 +176,8 @@ function logger.set_output(output)
             return false
         end
         log_output = file
-    elseif type(output) == "userdata" then
-        -- File handle
+    elseif type(output) == "userdata" or type(output) == "table" then
+        -- File handle or mock table (e.g. in tests)
         log_output = output
     else
         logger.warn("Invalid log output type")

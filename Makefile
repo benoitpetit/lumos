@@ -1,6 +1,6 @@
 # Lumos CLI Framework Makefile
 
-.PHONY: test install build clean doc examples help
+.PHONY: test test-coverage install build clean doc examples help
 
 # Default target
 all: test
@@ -8,7 +8,7 @@ all: test
 # Run all tests
 test:
 	@echo "Running tests..."
-	@~/.luarocks/bin/busted
+	@$(shell which busted 2>/dev/null || echo ~/.luarocks/bin/busted)
 
 # Install lumos locally for development
 install:
@@ -52,16 +52,22 @@ clean:
 	@rm -rf docs/*.txt
 	@rm -rf .luarocks/
 
+# Run tests with coverage (requires luacov: luarocks install luacov --local)
+test-coverage:
+	@echo "Running tests with coverage..."
+	@$(shell which busted 2>/dev/null || echo ~/.luarocks/bin/busted) --coverage
+
 # Show available targets
 help:
 	@echo "Available targets:"
-	@echo "  test         - Run all tests"
-	@echo "  install      - Install locally for development"
-	@echo "  install-prod - Install from rockspec"
-	@echo "  doc          - Generate documentation"
-	@echo "  examples     - Run example applications"
-	@echo "  clean        - Clean build artifacts"
-	@echo "  help         - Show this help message"
+	@echo "  test          - Run all tests"
+	@echo "  test-coverage - Run tests with coverage (requires luacov)"
+	@echo "  install       - Install locally for development"
+	@echo "  install-prod  - Install from rockspec"
+	@echo "  doc           - Generate documentation"
+	@echo "  examples      - Run example applications"
+	@echo "  clean         - Clean build artifacts"
+	@echo "  help          - Show this help message"
 
 # Test the lumos command locally (before installation)
 test-cli:

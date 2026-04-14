@@ -10,6 +10,13 @@ local function is_windows()
     return package.config:sub(1,1) == '\\'
 end
 
+-- Check if stty is available (Unix-like only)
+local function has_stty()
+    if is_windows() then return false end
+    local ok = os.execute("stty size >/dev/null 2>&1")
+    return ok == 0 or ok == true
+end
+
 -- Basic text input prompt
 function prompt.input(message, default)
     io.write(message)
@@ -31,12 +38,15 @@ function prompt.password(message)
     io.write(message .. ": ")
     io.flush()
     
-    -- Try to disable echo (Unix-like systems)
-    local success = os.execute("stty -echo 2>/dev/null")
-    local input = io.read("*l")
-    
-    if success then
+    local input
+    if not is_windows() and has_stty() then
+        -- Unix-like systems: disable echo
+        os.execute("stty -echo 2>/dev/null")
+        input = io.read("*l")
         os.execute("stty echo 2>/dev/null")
+    else
+        -- Fallback: read normally (Windows or no stty)
+        input = io.read("*l")
     end
     
     io.write("\n")
@@ -56,7 +66,12 @@ function prompt.confirm(message, default)
         io.write(message .. default_text .. ": ")
         io.flush()
         
-        local input = io.read("*l"):lower()
+        local input = io.read("*l")
+        -- Handle EOF gracefully
+        if input == nil then
+            return default ~= nil and default or false
+        end
+        input = input:lower()
         
         if input == "" and default ~= nil then
             return default
@@ -103,10 +118,9 @@ end
 -- Interactive select with arrow keys
 function prompt.select(message, options, default)
     -- Use simple select on Windows or if terminal controls aren't available
-    if is_windows() then
+    if is_windows() or not has_stty() then
         return prompt.simple_select(message, options, default)
     end
-    print(message)
     local current = default or 1
     local function render_menu()
         io.write(message .. "\n")
@@ -114,50 +128,59 @@ function prompt.select(message, options, default)
             local marker = (i == current) and ">" or " "
             io.write(string.format("%s %d) %s\n", marker, i, option))
         end
-        io.write("Use ↑/↓ to navigate, Enter to confirm.\n")
+        io.write("Use up/down to navigate, Enter to confirm.\n")
         io.flush()
     end
     local function update_selection()
-        -- Remonte le curseur de n+1 lignes (n options + instructions)
+        -- Move cursor up by n+1 lines (n options + instructions)
         io.write(string.format("\27[%dA", #options + 1))
         for i, option in ipairs(options) do
             local marker = (i == current) and ">" or " "
             io.write(string.format("\r%s %d) %s\27[K\n", marker, i, option))
         end
-        io.write("\rUse ↑/↓ to navigate, Enter to confirm.\27[K\n")
+        io.write("\rUse up/down to navigate, Enter to confirm.\27[K\n")
         io.flush()
     end
     os.execute("stty -icanon -echo")
     io.write("\27[?25l") -- hide cursor
     render_menu()
     local result = nil
-    while not result do
-        local c = io.read(1)
-        if c == "\27" then -- escape
-            local c2 = io.read(1)
-            if c2 == "[" then
-                local c3 = io.read(1)
-                if c3 == "A" then -- up
-                    current = current > 1 and current - 1 or #options
-                    update_selection()
-                elseif c3 == "B" then -- down
-                    current = current < #options and current + 1 or 1
-                    update_selection()
+    local ok, err = pcall(function()
+        while not result do
+            local c = io.read(1)
+            if c == "\27" then -- escape
+                local c2 = io.read(1)
+                if c2 == "[" then
+                    local c3 = io.read(1)
+                    if c3 == "A" then -- up
+                        current = current > 1 and current - 1 or #options
+                        update_selection()
+                    elseif c3 == "B" then -- down
+                        current = current < #options and current + 1 or 1
+                        update_selection()
+                    end
                 end
+            elseif c == "\r" or c == "\n" then -- enter
+                result = {current, options[current]}
             end
-        elseif c == "\r" or c == "\n" then -- enter
-            result = {current, options[current]}
         end
-    end
+    end)
     io.write("\27[?25h") -- show cursor
     os.execute("stty sane")
     io.write("\n")
+    if not ok then error(err, 2) end
     return result[1], result[2]
 end
 
 -- Multi-selection prompt
 -- Interactive multiselect with arrow keys and space
 function prompt.multiselect(message, options)
+    if is_windows() or not has_stty() then
+        -- Fallback on Windows or no stty: return empty (interactive not possible)
+        print(message)
+        print("(Interactive multi-selection not available on this platform)")
+        return {}
+    end
     print(message)
     local selected = {}
     for i = 1, #options do selected[i] = false end
@@ -169,7 +192,7 @@ function prompt.multiselect(message, options)
             local pointer = (i == current) and ">" or " "
             io.write(string.format("%s %s %s\n", pointer, marker, option))
         end
-        io.write("Use ↑/↓ to navigate, Space to select, Enter to confirm, q to quit.\n")
+        io.write("Use up/down to navigate, Space to select, Enter to confirm, q to quit.\n")
         io.flush()
     end
     local function update_selection()
@@ -179,7 +202,7 @@ function prompt.multiselect(message, options)
             local pointer = (i == current) and ">" or " "
             io.write(string.format("\r%s %s %s\27[K\n", pointer, marker, option))
         end
-        io.write("\rUse ↑/↓ to navigate, Space to select, Enter to confirm, q to quit.\27[K\n")
+        io.write("\rUse up/down to navigate, Space to select, Enter to confirm, q to quit.\27[K\n")
         io.flush()
     end
     os.execute("stty -icanon -echo")
@@ -187,32 +210,35 @@ function prompt.multiselect(message, options)
     render_menu()
     local done = false
     local quit = false
-    while not done and not quit do
-        local c = io.read(1)
-        if c == "\27" then -- escape
-            local c2 = io.read(1)
-            if c2 == "[" then
-                local c3 = io.read(1)
-                if c3 == "A" then -- up
-                    current = current > 1 and current - 1 or #options
-                    update_selection()
-                elseif c3 == "B" then -- down
-                    current = current < #options and current + 1 or 1
-                    update_selection()
+    local ok, err = pcall(function()
+        while not done and not quit do
+            local c = io.read(1)
+            if c == "\27" then -- escape
+                local c2 = io.read(1)
+                if c2 == "[" then
+                    local c3 = io.read(1)
+                    if c3 == "A" then -- up
+                        current = current > 1 and current - 1 or #options
+                        update_selection()
+                    elseif c3 == "B" then -- down
+                        current = current < #options and current + 1 or 1
+                        update_selection()
+                    end
                 end
+            elseif c == " " then -- space
+                selected[current] = not selected[current]
+                update_selection()
+            elseif c == "q" then
+                quit = true
+            elseif c == "\r" or c == "\n" then -- enter
+                done = true
             end
-        elseif c == " " then -- space
-            selected[current] = not selected[current]
-            update_selection()
-        elseif c == "q" then
-            quit = true
-        elseif c == "\r" or c == "\n" then -- enter
-            done = true
         end
-    end
-    io.write("\27[?25h") -- affiche le curseur
+    end)
+    io.write("\27[?25h") -- show cursor
     os.execute("stty sane")
     io.write("\n")
+    if not ok then error(err, 2) end
     if quit then return {} end
     local result = {}
     for i, sel in ipairs(selected) do

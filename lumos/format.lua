@@ -15,6 +15,29 @@ local formats = {
     hidden = "\27[8m"
 }
 
+-- Detect Windows
+local function is_windows()
+    return package.config:sub(1, 1) == "\\"
+end
+
+-- Check if stdout is a TTY (cross-platform). Exposed so other modules can reuse
+-- this result without spawning a second subprocess.
+local function is_tty()
+    if is_windows() then
+        return io.type(io.stdout) == "file"
+    end
+    local handle = io.popen("test -t 1 && echo true || echo false")
+    if handle then
+        local result = handle:read("*a"):gsub("%s+", "")
+        handle:close()
+        return result == "true"
+    end
+    return false
+end
+
+-- Expose is_tty so other modules (e.g. color) can reuse it without a second spawn
+format.is_tty = is_tty
+
 -- Check if terminal supports formatting
 local function supports_formatting()
     -- Check for NO_COLOR environment variables
@@ -28,15 +51,8 @@ local function supports_formatting()
         return true
     end
     
-    -- Check if output is a TTY (basic check)
-    local handle = io.popen("test -t 1 && echo true || echo false")
-    if handle then
-        local result = handle:read("*a"):gsub("%s+", "")
-        handle:close()
-        return result == "true"
-    end
-    
-    return false
+    -- Check if output is a TTY (cross-platform)
+    return is_tty()
 end
 
 local formatting_enabled = supports_formatting()

@@ -6,8 +6,11 @@ local logger = require('lumos.logger')
 -- Escape special characters for man page format
 local function escape_man(text)
     if not text then return "" end
-    -- Only escape backslashes and hyphens at the start of lines
-    return text:gsub("\\", "\\\\"):gsub("^%-", "\\-")
+    text = text:gsub("\\", "\\\\")
+    -- Escape hyphens at the start of the whole string and after each newline
+    text = text:gsub("^%-", "\\-")
+    text = text:gsub("\n%-", "\n\\-")
+    return text
 end
 
 -- Format date for man page

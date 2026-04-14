@@ -219,7 +219,7 @@ end
 -- Add task command
 local add_cmd = app:command("add", "Add a new task")
 add_cmd:arg("title", "Task title")
-add_cmd:flag("--priority", "Task priority")
+add_cmd:option("--priority", "Task priority")
 
 add_cmd:action(function(ctx)
     local title = ctx.args[1]
@@ -284,23 +284,24 @@ list_cmd:action(function(ctx)
     if ctx.flags.json then
         print(json.encode(filtered))
     else
-        local data = {{"ID", "Title", "Priority", "Status", "Created"}}
-        
+        local data = {}
         for _, task in ipairs(filtered) do
             local status = task.completed and color.green("Done") or color.yellow("Pending")
             local priority_color = task.priority == "High" and color.red or 
                                  task.priority == "Medium" and color.yellow or color.white
             
             table.insert(data, {
-                tostring(task.id),
-                task.title,
-                priority_color(task.priority),
-                status,
-                task.created
+                id = tostring(task.id),
+                title = task.title,
+                priority = priority_color(task.priority),
+                status = status,
+                created = task.created
             })
         end
         
-        print(tbl.table(data, {headers = true}))
+        print(tbl.create(data, {
+            headers = {"ID", "Title", "Priority", "Status", "Created"}
+        }))
     end
     
     return true
@@ -418,6 +419,7 @@ A deployment tool that uses configuration files:
 local lumos = require('lumos')
 local color = require('lumos.color')
 local config = require('lumos.config')
+local core = require('lumos.core')
 local json = require('lumos.json')
 
 local app = lumos.new_app({
@@ -432,7 +434,7 @@ app:persistent_flag("-c --config", "Configuration file")
 -- Deploy command with configuration
 local deploy_cmd = app:command("deploy", "Deploy with configuration")
 deploy_cmd:arg("environment", "Target environment")
-deploy_cmd:flag("--timeout", "Override timeout setting")
+deploy_cmd:option("--timeout", "Override timeout setting")
 deploy_cmd:flag("--dry-run", "Show what would be done")
 
 deploy_cmd:action(function(ctx)
@@ -451,7 +453,8 @@ deploy_cmd:action(function(ctx)
     
     local file_config = {}
     if ctx.flags.config then
-        file_config = config.load_file(ctx.flags.config) or {}
+        -- core.load_config supports both JSON and key=value files
+        file_config = core.load_config(ctx.flags.config) or {}
     end
     
     local env_config = config.load_env("DEPLOY") -- DEPLOY_* variables
@@ -468,15 +471,15 @@ deploy_cmd:action(function(ctx)
     print(json.encode(final_config))
     print()
     
-    local env_config = final_config.environments[env]
-    if not env_config then
+    local env_settings = final_config.environments[env]
+    if not env_settings then
         print(color.red("Error: Unknown environment: " .. env))
         return false
     end
     
     print(color.blue("Deploying to " .. env .. "..."))
-    print("Host: " .. env_config.host)
-    print("Port: " .. env_config.port)
+    print("Host: " .. env_settings.host)
+    print("Port: " .. env_settings.port)
     print("Timeout: " .. final_config.timeout .. "s")
     
     if ctx.flags.dry_run then
@@ -491,7 +494,86 @@ end)
 app:run(arg)
 ```
 
-## Usage Examples
+## Secure CLI with Logging
+
+A secure file management CLI using `lumos.security` and `lumos.logger`:
+
+```lua
+local lumos = require('lumos')
+local color = require('lumos.color')
+local security = require('lumos.security')
+local logger = require('lumos.logger')
+
+local app = lumos.new_app({
+    name = "securefile",
+    version = "0.1.0",
+    description = "Secure file management CLI"
+})
+
+-- Configure logging
+logger.set_level("INFO")
+logger.configure_from_env("SECUREFILE")
+
+local read_cmd = app:command("read", "Read a file safely")
+read_cmd:arg("path", "File path")
+
+read_cmd:action(function(ctx)
+    local path = ctx.args[1]
+    if not path then
+        print(color.red("Error: path is required"))
+        return false
+    end
+    
+    local safe_path, err = security.sanitize_path(path)
+    if not safe_path then
+        logger.error("Invalid path", {input = path, error = err})
+        print(color.red("Error: " .. err))
+        return false
+    end
+    
+    local file, ferr = security.safe_open(safe_path, "r")
+    if not file then
+        logger.error("Cannot open file", {path = safe_path, error = ferr})
+        print(color.red("Error: " .. ferr))
+        return false
+    end
+    
+    local content = file:read("*all")
+    file:close()
+    
+    -- Sanitize output to prevent terminal escape injection
+    print(security.sanitize_output(content))
+    logger.info("File read", {path = safe_path, size = #content})
+    return true
+end)
+
+local exec_cmd = app:command("exec", "Execute a safe command")
+exec_cmd:arg("program", "Program to run")
+exec_cmd:arg("args", "Arguments")
+
+exec_cmd:action(function(ctx)
+    local program = ctx.args[1]
+    local args = ctx.args[2] or ""
+    
+    local safe_program, err = security.sanitize_command_name(program)
+    if not safe_program then
+        logger.error("Invalid command", {input = program, error = err})
+        print(color.red("Error: " .. err))
+        return false
+    end
+    
+    local safe_args = security.shell_escape(args)
+    local cmd = safe_program .. " " .. safe_args
+    
+    logger.info("Executing command", {command = cmd})
+    local success = os.execute(cmd)
+    return success == 0 or success == true
+end)
+
+app:run(arg)
+```
+
+## Usage Examples Summary
 
 These examples show different patterns:
 
@@ -499,6 +581,7 @@ These examples show different patterns:
 2. **Advanced CLI**: Nested subcommands with interactive prompts
 3. **Interactive CLI**: Menu-driven interface with persistent data
 4. **Configuration CLI**: External configuration with environment variables
+5. **Secure CLI**: Input sanitization, safe file operations, and structured logging
 
 Each example demonstrates key Lumos features:
 - Command and subcommand definition
@@ -508,3 +591,4 @@ Each example demonstrates key Lumos features:
 - Error handling and colored output
 - JSON data handling
 - Table formatting
+- Security features and logging

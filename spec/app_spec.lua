@@ -104,6 +104,85 @@ describe('App Module', function()
       assert.are.equal('v', test_app.global_flags.verbose.short)
       assert.are.equal('verbose', test_app.global_flags.verbose.long)
     end)
-    -- Test removed as it was blocking on interactive example
+  end)
+
+  describe('app:run()', function()
+    it('executes the matching command and returns true', function()
+      local test_app = app.new_app({name = 'testapp', version = '1.0.0'})
+      local executed = false
+
+      test_app:command('greet', 'Say hello'):action(function(ctx)
+        executed = true
+        return true
+      end)
+
+      local result = test_app:run({'greet'})
+      assert.is_true(executed)
+      assert.is_true(result)
+    end)
+
+    it('returns false for an unknown command', function()
+      local test_app = app.new_app({name = 'testapp'})
+      -- Suppress the help output during this test
+      local original_print = _G.print
+      _G.print = function() end
+      local result = test_app:run({'nonexistent'})
+      _G.print = original_print
+      assert.is_false(result)
+    end)
+
+    it('passes parsed flags to the command action', function()
+      local test_app = app.new_app({name = 'testapp'})
+      local received_flags = {}
+
+      local cmd = test_app:command('build', 'Build something')
+      cmd:flag('-v --verbose', 'Verbose mode')
+      cmd:action(function(ctx)
+        received_flags = ctx.flags
+        return true
+      end)
+
+      test_app:run({'build', '--verbose'})
+      assert.is_true(received_flags.verbose)
+    end)
+
+    it('passes positional args to the command action', function()
+      local test_app = app.new_app({name = 'testapp'})
+      local received_args = {}
+
+      test_app:command('process', 'Process files')
+        :arg('file', 'File to process')
+        :action(function(ctx)
+          received_args = ctx.args
+          return true
+        end)
+
+      test_app:run({'process', 'myfile.txt'})
+      assert.are.equal('myfile.txt', received_args[1])
+    end)
+
+    it('returns true and prints version when --version flag is set', function()
+      local test_app = app.new_app({name = 'myapp', version = '2.0.0'})
+      local printed = ""
+      local original_print = _G.print
+      _G.print = function(s) printed = printed .. (s or "") end
+
+      local result = test_app:run({'--version'})
+
+      _G.print = original_print
+      assert.is_true(result)
+      assert.is_not_nil(printed:match("2%.0%.0"))
+    end)
+
+    it('handles empty args and shows help', function()
+      local test_app = app.new_app({name = 'testapp'})
+      local original_print = _G.print
+      _G.print = function() end
+      local result = test_app:run({})
+      _G.print = original_print
+      -- show_help returns true
+      assert.is_true(result)
+    end)
   end)
 end)
+

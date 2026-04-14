@@ -30,7 +30,7 @@ local app = lumos.new_app({
 Lumos exports the following modules:
 
 - `lumos.app` - Application builder
-- `lumos.core` - Core utilities
+- `lumos.core` - Core utilities (argument parsing, config loading)
 - `lumos.flags` - Flag parsing
 - `lumos.color` - Color output
 - `lumos.format` - Text formatting
@@ -38,10 +38,14 @@ Lumos exports the following modules:
 - `lumos.progress` - Progress bars
 - `lumos.prompt` - User prompts
 - `lumos.table` - Table formatting
-- `lumos.json` - JSON utilities
+- `lumos.json` - JSON utilities (full spec support, nested objects, unicode)
+- `lumos.config` - Configuration file management
 - `lumos.completion` - Shell completion
 - `lumos.manpage` - Man page generation
 - `lumos.markdown` - Markdown documentation
+- `lumos.security` - Input sanitization and validation
+- `lumos.logger` - Structured logging
+- `lumos.bundle` - Programmatic bundling API
 
 ## Application Methods
 
@@ -110,7 +114,7 @@ cmd:flag("-f --force", "Force operation")
 
 ### `cmd:option(spec, description)`
 
-Adds a flag that accepts a value.
+Adds a flag that accepts a string value. This is an alias for `cmd:flag_string()`.
 
 ```lua
 cmd:option("-c --config", "Configuration file")
@@ -141,6 +145,7 @@ cmd:action(function(ctx)
     -- ctx.args - positional arguments
     -- ctx.flags - flag values
     -- ctx.command - command reference
+    -- ctx.parent - parent command (for subcommands)
     return true  -- success
 end)
 ```
@@ -206,9 +211,9 @@ color.dim("Dimmed text") -- Uses format.dim internally
 ### Background Colors
 
 ```lua
-color.bg_red("Red background")
-color.bg_green("Green background")
-color.bg_blue("Blue background")
+color.colorize("Red background", "bg_red")
+color.colorize("Green background", "bg_green")
+color.colorize("Blue background", "bg_blue")
 ```
 
 ### Template Formatting
@@ -224,6 +229,18 @@ color.format("{green}{bold}Success!{reset}")
 color.enable()     -- Force enable colors
 color.disable()    -- Force disable colors
 color.is_enabled() -- Check if colors are enabled
+```
+
+### Contextual Helpers
+
+```lua
+color.status.success("Done!")
+color.status.error("Failed!")
+color.status.warning("Caution!")
+color.status.info("Note:")
+
+color.log.info("Application started")
+color.log.error("Connection failed")
 ```
 
 ## Format Module (`lumos.format`)
@@ -336,7 +353,17 @@ end
 bar:update(value)     -- Set progress
 bar:increment(amount) -- Increment progress
 bar:finish()          -- Complete
-bar:reset()           -- Reset to start
+```
+
+### Colored Progress Bars
+
+```lua
+local bar = progress.new({
+    total = 100,
+    color_fn = function(bar, current, total)
+        return progress.color_bar(bar, current, total)
+    end
+})
 ```
 
 ## Prompt Module (`lumos.prompt`)
@@ -356,6 +383,8 @@ local email = prompt.input("Email:")
 local password = prompt.password("Password:")
 ```
 
+On Windows or systems without `stty`, this falls back to normal text input.
+
 ### Confirmation
 
 ```lua
@@ -366,8 +395,10 @@ local confirmed = prompt.confirm("Continue?", true)
 
 ```lua
 local options = {"Option 1", "Option 2", "Option 3"}
-local choice = prompt.select("Choose:", options, 1)
+local choice, value = prompt.select("Choose:", options, 1)
 ```
+
+On Windows or without `stty`, falls back to `prompt.simple_select()`.
 
 ### Multi-Selection
 
@@ -375,15 +406,22 @@ local choice = prompt.select("Choose:", options, 1)
 local options = {"Option 1", "Option 2", "Option 3"}
 local selected = prompt.multiselect("Choose multiple:", options)
 -- Returns table of selected items with value and index
+-- On Windows/fallback, returns empty table
 ```
 
 ### Input Validation
 
 ```lua
-local valid_input = prompt.input("Port:", nil, function(value)
-    local num = tonumber(value)
-    return num and num > 0 and num < 65536
-end, "Please enter a valid port number")
+local valid, value = prompt.validate(user_input, function(input)
+    return tonumber(input) ~= nil
+end, "Please enter a valid number")
+```
+
+### Predefined Validators
+
+```lua
+prompt.validators.email("test@example.com")   -- true
+prompt.validators.number("42")                -- true
 ```
 
 ## Loader Module (`lumos.loader`)
@@ -497,12 +535,24 @@ print(tbl.create(data, {
 ```lua
 local json = require('lumos.json')
 
--- Encode
-local json_string = json.encode({name = "John", age = 30})
+-- Encode any Lua table to JSON
+local json_string = json.encode({name = "John", age = 30, tags = {"dev", "ops"}})
+-- {"name":"John","age":30,"tags":["dev","ops"]}
 
--- Decode
+-- Decode JSON string to Lua table
 local data = json.decode('{"name":"John","age":30}')
+
+-- Supports nested objects, arrays, unicode escapes, and all standard JSON escapes
+local complex = json.decode('{"nested":{"a":[1,2,3]},"unicode":"café"}')
 ```
+
+**Supported features:**
+- Nested objects and arrays of arbitrary depth
+- Unicode escapes (`\uXXXX`, surrogate pairs)
+- All standard escapes (`\n`, `\t`, `\r`, `\"`, `\\`, `\b`, `\f`, `\/`)
+- Numbers (including negative and scientific notation)
+- `null`, `true`, `false`
+- Strict validation with trailing data detection
 
 ## Configuration Module (`lumos.config`)
 
@@ -511,7 +561,7 @@ local data = json.decode('{"name":"John","age":30}')
 ```lua
 local config = require('lumos.config')
 
--- From file
+-- From JSON or key=value file
 local file_config = config.load_file("config.json")
 
 -- From environment variables
@@ -524,6 +574,145 @@ local final_config = config.merge_configs(
     env_config,           -- environment
     ctx.flags             -- command line
 )
+```
+
+### Core Configuration Loading
+
+```lua
+local core = require('lumos.core')
+
+-- load_config supports both JSON and simple key=value files
+local cfg = core.load_config("app.json")
+local cfg2 = core.load_config("app.conf")
+```
+
+## Security Module (`lumos.security`)
+
+### Input Sanitization
+
+```lua
+local security = require('lumos.security')
+
+-- Escape shell arguments
+local safe = security.shell_escape(user_input)
+
+-- Sanitize file paths
+local path, err = security.sanitize_path(user_path)
+
+-- Sanitize terminal output
+local clean = security.sanitize_output(user_input)
+
+-- Validate emails
+local valid, err = security.validate_email(email)
+
+-- Validate URLs
+local valid, err = security.validate_url(url)
+
+-- Validate integers
+local valid, num = security.validate_integer(value, 1, 100)
+
+-- Validate command names
+local name, err = security.sanitize_command_name(cmd_name)
+
+-- Check for elevated privileges
+if security.is_elevated() then
+    print("Warning: running as root")
+end
+
+-- Rate limiting
+local allowed, err = security.rate_limit("api", 10, 60)
+```
+
+### Safe File Operations
+
+```lua
+-- Open files safely (prevents writing to /etc, /sys, /proc)
+local file, err = security.safe_open(path, "r")
+
+-- Create directories safely
+local ok, err = security.safe_mkdir(path)
+```
+
+## Logger Module (`lumos.logger`)
+
+### Basic Logging
+
+```lua
+local logger = require('lumos.logger')
+
+logger.error("Critical error", {code = 500})
+logger.warn("Deprecated feature", {feature = "old_api"})
+logger.info("User action", {user = "john"})
+logger.debug("Cache miss", {key = "user:123"})
+logger.trace("Entry point", {func = "main"})
+```
+
+### Configuration
+
+```lua
+-- Set level by name or constant
+logger.set_level("INFO")
+logger.set_level(logger.LEVELS.DEBUG)
+
+-- Redirect to file
+logger.set_output("/var/log/myapp.log")
+
+-- Toggle features
+logger.set_timestamp(true)
+logger.set_context(true)
+logger.set_colors(false)
+
+-- Configure from environment (reads LUMOS_LOG_LEVEL, LUMOS_LOG_FILE, etc.)
+logger.configure_from_env("LUMOS")
+```
+
+### Child Loggers
+
+```lua
+local user_logger = logger.child({user = "john", session = "abc123"})
+user_logger.info("Action performed")  -- Includes fixed context
+```
+
+### Auto-Level Detection
+
+```lua
+logger.auto("Error: connection failed")  -- Logs as ERROR
+logger.auto("Warning: disk space low")   -- Logs as WARN
+logger.auto("Debug info here")           -- Logs as DEBUG
+logger.auto("User logged in")            -- Logs as INFO
+```
+
+## Bundle Module (`lumos.bundle`)
+
+### Programmatic API
+
+```lua
+local bundle = require('lumos.bundle')
+
+-- Create a bundle
+local success, err, info = bundle.create({
+    entry = "src/main.lua",
+    output = "dist/myapp",
+    include_lumos = true,
+    strip_comments = true
+})
+
+if success then
+    print("Bundle created: " .. info.output)
+    print("Modules: " .. info.modules_count)
+    print("Size: " .. info.size .. " bytes")
+else
+    print("Error: " .. err)
+end
+
+-- Analyze dependencies
+local modules = bundle.analyze("src/main.lua", {".", "./src"})
+for _, mod in ipairs(modules) do
+    print(mod.name .. " -> " .. mod.path)
+end
+
+-- List Lumos modules
+local lumos_mods = bundle.get_lumos_modules()
 ```
 
 ## Documentation Generation
@@ -574,7 +763,7 @@ The action function receives a context object:
     args = {...},      -- Positional arguments array
     flags = {...},     -- Flag values table
     command = cmd,     -- Command reference
-    app = app         -- Application reference
+    parent = cmd       -- Parent command reference (for subcommands)
 }
 ```
 

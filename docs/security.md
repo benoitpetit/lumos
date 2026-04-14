@@ -14,12 +14,12 @@ Security guide and best practices for using Lumos in production.
 
 ## 🎯 Overview
 
-Lumos now includes robust security features to protect your CLI applications against common vulnerabilities.
+Lumos includes robust security features to protect your CLI applications against common vulnerabilities.
 
 ### Security Modules
 
-- **`lumos.security`** - Input sanitization and validation
-- **`lumos.logger`** - Structured logging for audit
+- **`lumos.security`** - Input sanitization, validation, and safe operations
+- **`lumos.logger`** - Structured logging for audit trails
 
 ## 🆕 Security Features
 
@@ -60,6 +60,26 @@ if not valid then
     print("Invalid URL: " .. err)
 end
 
+-- Validate integers with ranges
+local valid, num = security.validate_integer(value, 1, 100)
+if not valid then
+    print("Invalid integer")
+end
+
+-- Validate command names
+local name, err = security.sanitize_command_name(cmd_name)
+if not name then
+    print("Invalid command name: " .. err)
+end
+
+-- Sanitize terminal output
+local clean = security.sanitize_output(user_input)
+
+-- Check for elevated privileges
+if security.is_elevated() then
+    print("Warning: running as root")
+end
+
 -- Rate limiting
 local allowed, err = security.rate_limit("api_call", 10, 60)
 if not allowed then
@@ -93,6 +113,12 @@ logger.configure_from_env("MYAPP")  -- Reads MYAPP_LOG_LEVEL, etc.
 -- Logger with fixed context
 local user_logger = logger.child({user = "john", session = "abc123"})
 user_logger.info("Action performed")  -- Automatically includes context
+
+-- Auto-level detection based on keywords
+logger.auto("Error: connection failed")  -- Logs as ERROR
+logger.auto("Warning: disk space low")   -- Logs as WARN
+logger.auto("Debug trace here")          -- Logs as DEBUG
+logger.auto("Server started")            -- Logs as INFO
 ```
 
 ## 🛡️ Best Practices
@@ -458,5 +484,5 @@ This security guide is updated regularly. Review it before each major deployment
 ---
 
 **Guide Version:** 1.0  
-**Last Updated:** January 21, 2026  
+**Last Updated:** April 2026  
 **Lumos Framework:** v0.1.0+

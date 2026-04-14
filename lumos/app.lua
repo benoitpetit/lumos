@@ -62,7 +62,6 @@ function Command:flag(spec, description)
     self.flags = self.flags or {}
     local short, long = parse_flag_spec(spec)
 
-    -- Handle the case where we couldn't parse anything
     if not long and not short then
         error("Invalid flag specification: " .. spec)
     end
@@ -78,25 +77,9 @@ function Command:flag(spec, description)
     return self
 end
 
+-- option() is an alias for flag_string()
 function Command:option(spec, description)
-    self.flags = self.flags or {}
-    local short, long = spec:match("^%-([a-zA-Z])%s+%-%-([a-zA-Z%-]+)$")
-    if not short then
-        long = spec:match("^%-%-([a-zA-Z%-]+)$")
-    end
-    if not long then
-        short = spec:match("^%-([a-zA-Z])$")
-    end
-    
-    local flag = {
-        short = short,
-        long = long or short,
-        description = description,
-        type = "string"
-    }
-    
-    self.flags[long or short] = flag
-    return self
+    return self:flag_string(spec, description)
 end
 
 function Command:examples(example_list)
@@ -179,12 +162,10 @@ end
 -- Add persistent flag support (inherited by subcommands)
 function Command:persistent_flag(spec, description)
     self.persistent_flags = self.persistent_flags or {}
-    local short, long = spec:match("^%-([a-zA-Z])%s+%-%-([a-zA-Z%-]+)$")
-    if not short then
-        long = spec:match("^%-%-([a-zA-Z%-]+)$")
-    end
-    if not long then
-        short = spec:match("^%-([a-zA-Z])$")
+    local short, long = parse_flag_spec(spec)
+    
+    if not long and not short then
+        error("Invalid flag specification: " .. spec)
     end
     
     local flag = {
@@ -196,6 +177,72 @@ function Command:persistent_flag(spec, description)
     }
     
     self.persistent_flags[long or short] = flag
+    return self
+end
+
+function Command:persistent_flag_string(spec, description)
+    self.persistent_flags = self.persistent_flags or {}
+    local short, long = parse_flag_spec(spec)
+    if not long and not short then
+        error("Invalid flag specification: " .. spec)
+    end
+    self.persistent_flags[long or short] = {
+        short = short, long = long or short,
+        description = description, type = "string", persistent = true
+    }
+    return self
+end
+
+function Command:persistent_flag_int(spec, description, min, max)
+    self.persistent_flags = self.persistent_flags or {}
+    local short, long = parse_flag_spec(spec)
+    if not long and not short then
+        error("Invalid flag specification: " .. spec)
+    end
+    self.persistent_flags[long or short] = {
+        short = short, long = long or short,
+        description = description, type = "int",
+        min = min, max = max, persistent = true
+    }
+    return self
+end
+
+function Command:persistent_flag_email(spec, description)
+    self.persistent_flags = self.persistent_flags or {}
+    local short, long = parse_flag_spec(spec)
+    if not long and not short then
+        error("Invalid flag specification: " .. spec)
+    end
+    self.persistent_flags[long or short] = {
+        short = short, long = long or short,
+        description = description, type = "email", persistent = true
+    }
+    return self
+end
+
+function Command:flag_url(spec, description)
+    self.flags = self.flags or {}
+    local short, long = parse_flag_spec(spec)
+    if not long and not short then
+        error("Invalid flag specification: " .. spec)
+    end
+    self.flags[long or short] = {
+        short = short, long = long or short,
+        description = description, type = "url"
+    }
+    return self
+end
+
+function Command:flag_path(spec, description)
+    self.flags = self.flags or {}
+    local short, long = parse_flag_spec(spec)
+    if not long and not short then
+        error("Invalid flag specification: " .. spec)
+    end
+    self.flags[long or short] = {
+        short = short, long = long or short,
+        description = description, type = "path"
+    }
     return self
 end
 
@@ -231,6 +278,10 @@ function lumos.new_app(config)
         self.persistent_flags = self.persistent_flags or {}
         local short, long = parse_flag_spec(spec)
         
+        if not long and not short then
+            error("Invalid flag specification: " .. spec)
+        end
+        
         local flag = {
             short = short,
             long = long or short,
@@ -239,77 +290,123 @@ function lumos.new_app(config)
             persistent = true
         }
         
-        if not long and not short then
-            error("Invalid flag specification: " .. spec)
-        end
         self.persistent_flags[long or short] = flag
         return self
     end
 
-function app:flag(spec, description)
-    local short, long = spec:match("^%-([a-zA-Z])%s+%-%-([a-zA-Z%-]+)$")
-    if not short then
-        long = spec:match("^%-%-([a-zA-Z%-]+)$")
-    end
-    if not long then
-        short = spec:match("^%-([a-zA-Z])$")
-    end
-
-    local flag = {
-        short = short,
-        long = long or short,
-        description = description,
-        type = "boolean"
-    }
-
-    self.global_flags[long or short] = flag
-    return self
-end
-
-local json = require('lumos.json')
-local config = require('lumos.config')
-local completion = require('lumos.completion')
-local manpage = require('lumos.manpage')
-local markdown = require('lumos.markdown')
-
-function app:run(args)
-    args = args or {}
-    
-    -- Handle global flags first
-    local parsed = core.parse_arguments(args, self)
-    
-    -- Check for global JSON output flag
-    if parsed.flags.json then
-        parsed.output_json = true
+    function app:persistent_flag_string(spec, description)
+        self.persistent_flags = self.persistent_flags or {}
+        local short, long = parse_flag_spec(spec)
+        if not long and not short then error("Invalid flag specification: " .. spec) end
+        self.persistent_flags[long or short] = {
+            short = short, long = long or short,
+            description = description, type = "string", persistent = true
+        }
+        return self
     end
 
-    -- Check for version flag
-    if parsed.flags.version or parsed.flags.v then
-        if parsed.output_json then
-            print(json.encode({version = self.version, name = self.name}))
-        else
-            print(self.name .. " v" .. self.version)
+    function app:persistent_flag_int(spec, description, min, max)
+        self.persistent_flags = self.persistent_flags or {}
+        local short, long = parse_flag_spec(spec)
+        if not long and not short then error("Invalid flag specification: " .. spec) end
+        self.persistent_flags[long or short] = {
+            short = short, long = long or short,
+            description = description, type = "int",
+            min = min, max = max, persistent = true
+        }
+        return self
+    end
+
+    function app:persistent_flag_email(spec, description)
+        self.persistent_flags = self.persistent_flags or {}
+        local short, long = parse_flag_spec(spec)
+        if not long and not short then error("Invalid flag specification: " .. spec) end
+        self.persistent_flags[long or short] = {
+            short = short, long = long or short,
+            description = description, type = "email", persistent = true
+        }
+        return self
+    end
+
+    function app:flag(spec, description)
+        local short, long = parse_flag_spec(spec)
+        
+        if not long and not short then
+            error("Invalid flag specification: " .. spec)
         end
-        return true
+
+        local flag = {
+            short = short,
+            long = long or short,
+            description = description,
+            type = "boolean"
+        }
+
+        self.global_flags[long or short] = flag
+        return self
     end
-    
-    -- Check for global help
-    if parsed.flags.help or parsed.flags.h then
-        if parsed.output_json then
-            print(json.encode({commands = self.commands, flags = parsed.flags}))
-        else
-            if not parsed.command then 
-                core.show_help(self)
-                return true
+
+    local json = require('lumos.json')
+    local config_module = require('lumos.config')
+    local completion = require('lumos.completion')
+    local manpage = require('lumos.manpage')
+    local markdown = require('lumos.markdown')
+
+    function app:run(args)
+        args = args or {}
+        
+        -- Auto-load configuration file if configured
+        if self.config_file then
+            local file_cfg, _ = config_module.load_file(self.config_file)
+            if file_cfg then
+                self.loaded_config = file_cfg
             end
         end
-    end
-    
-    -- Execute command
-    return core.execute_command(self, parsed)
-end
 
-    -- Phase 3: Shell Integration methods
+        -- Auto-load environment variables if a prefix is configured
+        if self.env_prefix then
+            self.loaded_env = config_module.load_env(self.env_prefix)
+        end
+
+        -- Handle global flags first
+        local parsed = core.parse_arguments(args, self)
+        
+        -- Check for global JSON output flag
+        if parsed.flags.json then
+            parsed.output_json = true
+        end
+
+        -- Check for version flag
+        if parsed.flags.version or parsed.flags.v then
+            if parsed.output_json then
+                print(json.encode({version = self.version, name = self.name}))
+            else
+                print(self.name .. " v" .. self.version)
+            end
+            return true
+        end
+        
+        -- Check for global help
+        if parsed.flags.help or parsed.flags.h then
+            if parsed.output_json then
+                -- Serialize only command names to avoid circular reference crashes
+                local cmd_names = {}
+                for _, cmd in ipairs(self.commands) do
+                    table.insert(cmd_names, cmd.name)
+                end
+                print(json.encode({commands = cmd_names, flags = parsed.flags}))
+            else
+                if not parsed.command then 
+                    core.show_help(self)
+                    return true
+                end
+            end
+        end
+        
+        -- Execute command
+        return core.execute_command(self, parsed)
+    end
+
     function app:generate_completion(shell, output_dir, verbose)
         if shell == "bash" then
             return completion.generate_bash(self)
