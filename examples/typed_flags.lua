@@ -9,6 +9,7 @@ package.path = package.path .. ";../?.lua;../?/init.lua;"
 local lumos = require('lumos')
 local color = require('lumos.color')
 
+local logger = require('lumos.logger')
 -- Create the application
 local app = lumos.new_app({
     name = "typed_flags_demo",
@@ -34,32 +35,32 @@ create:examples({
 create:action(function(ctx)
     local name = ctx.args[1]
     if not name then
-        print(color.status.error("Error: Resource name is required"))
+        logger.error("Error: Resource name is required")
         return false
     end
     
     -- Display validated inputs
-    print(color.bold("Creating resource: " .. color.cyan(name)))
+    logger.info(color.bold("Creating resource: " .. color.cyan(name)))
     
     if ctx.flags.port then
-        print("Port: " .. color.yellow(ctx.flags.port))
+        logger.warn("Port: " .. color.yellow(ctx.flags.port))
     end
     
     if ctx.flags.timeout then
-        print("Timeout: " .. color.yellow(ctx.flags.timeout .. "s"))
+        logger.warn("Timeout: " .. color.yellow(ctx.flags.timeout .. "s"))
     end
     
     if ctx.flags.email then
-        print("Email: " .. color.green(ctx.flags.email))
+        logger.info("Email: " .. color.green(ctx.flags.email))
     end
     
     if ctx.flags.force then
-        print(color.status.warning("Force mode enabled"))
+        logger.warn("Force mode enabled")
     end
     
-    print(color.status.success("✓ Resource created successfully!"))
+    logger.info("✓ Resource created successfully!")
     return true
 end)
 
 -- Run the app
-app:run(arg)
+os.exit(app:run(arg))

@@ -55,4 +55,30 @@ describe('Flags Module', function()
     assert.equal("v", app.persistent_flags.v.short)
     assert.equal("v", app.persistent_flags.v.long)
   end)
+
+  -- validate_flag: boolean (no type) should pass through without error
+  it('validate_flag returns true for a boolean flag value', function()
+    local ok, val = flags.validate_flag({long = "verbose"}, true)
+    assert.is_true(ok)
+    assert.is_true(val)
+  end)
+
+  -- validate_flag: int type with a boolean value must return false (not nil)
+  it('validate_flag returns false (not nil) for boolean value on int flag', function()
+    local ok, msg = flags.validate_flag({type = "int", long = "count"}, true)
+    assert.is_false(ok)
+    assert.is_string(msg)
+  end)
+
+  -- parse_single_flag: a negative number after a long flag is treated as its value
+  it('treats negative number as value of preceding long flag', function()
+    local result = flags.parse_single_flag('--offset', {'--offset', '-5'}, 1)
+    assert.are.same({name = 'offset', value = '-5', next_index = 3}, result)
+  end)
+
+  -- parse_single_flag: a negative number after a short flag is treated as its value
+  it('treats negative number as value of preceding short flag', function()
+    local result = flags.parse_single_flag('-n', {'-n', '-42'}, 1)
+    assert.are.same({name = 'n', value = '-42', next_index = 3}, result)
+  end)
 end)

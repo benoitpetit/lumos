@@ -5,7 +5,8 @@ local flags = {}
 local validators = {
     int = function(value)
         local num = tonumber(value)
-        return num and math.floor(num) == num, "must be an integer"
+        -- Explicit boolean return: nil is not false
+        return num ~= nil and math.floor(num) == num, "must be an integer"
     end,
     
     number = function(value)
@@ -47,13 +48,14 @@ function flags.validate_flag(flag_def, value)
         end
     end
     
-    -- Range validation for numbers
-    if flag_def.min and value < flag_def.min then
-        return false, "must be >= " .. flag_def.min
-    end
-    
-    if flag_def.max and value > flag_def.max then
-        return false, "must be <= " .. flag_def.max
+    -- Range validation (numeric types only — avoids string/number comparison crash)
+    if flag_def.type == "int" or flag_def.type == "number" then
+        if flag_def.min and value < flag_def.min then
+            return false, "must be >= " .. flag_def.min
+        end
+        if flag_def.max and value > flag_def.max then
+            return false, "must be <= " .. flag_def.max
+        end
     end
     
     -- Required validation
@@ -76,7 +78,8 @@ function flags.parse_single_flag(arg, args, start_index)
         if eq_pos then
             value = name:sub(eq_pos + 1)
             name = name:sub(1, eq_pos - 1)
-        elseif next_index <= #args and not args[next_index]:match("^%-%-?") then
+        elseif next_index <= #args and not args[next_index]:match("^%-%-?[%a_]") then
+            -- Next token is a value; negative numbers (e.g. -5) are values, not flags
             value = args[next_index]
             next_index = next_index + 1
         else
@@ -89,7 +92,8 @@ function flags.parse_single_flag(arg, args, start_index)
         name = arg:sub(2, 2)
         if #arg > 2 then
             value = arg:sub(3)
-        elseif next_index <= #args and not args[next_index]:match("^%-%-?") then
+        elseif next_index <= #args and not args[next_index]:match("^%-%-?[%a_]") then
+            -- Next token is a value; negative numbers (e.g. -5) are values, not flags
             value = args[next_index]
             next_index = next_index + 1
         else

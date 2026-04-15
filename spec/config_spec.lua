@@ -147,4 +147,73 @@ describe('Config Module', function()
             assert.is_table(merged)
         end)
     end)
+
+    -- -------------------------------------------------------------------------
+    describe('validate_schema', function()
+        it('passes when data matches schema', function()
+            local data = {name = "lumos", port = 8080}
+            local schema = {
+                name = {required = true, type = "string"},
+                port = {type = "number"}
+            }
+            local ok, errors = config.validate_schema(data, schema)
+            assert.is_true(ok)
+            assert.are.equal(0, #errors)
+        end)
+
+        it('fails when required field is missing', function()
+            local data = {port = 8080}
+            local schema = {name = {required = true}}
+            local ok, errors = config.validate_schema(data, schema)
+            assert.is_false(ok)
+            assert.are.equal(1, #errors)
+            assert.is_not_nil(errors[1]:match("name is required"))
+        end)
+
+        it('fails when type does not match', function()
+            local data = {port = "8080"}
+            local schema = {port = {type = "number"}}
+            local ok, errors = config.validate_schema(data, schema)
+            assert.is_false(ok)
+            assert.is_not_nil(errors[1]:match("must be number"))
+        end)
+
+        it('fails when custom validator returns false', function()
+            local data = {env = "prod"}
+            local schema = {
+                env = {validate = function(v) return v == "dev" or v == "staging" end}
+            }
+            local ok, errors = config.validate_schema(data, schema)
+            assert.is_false(ok)
+            assert.is_not_nil(errors[1]:match("validation failed"))
+        end)
+    end)
+
+    -- -------------------------------------------------------------------------
+    describe('load_validated', function()
+        it('returns data when file is valid against schema', function()
+            local tmp = os.tmpname() .. ".json"
+            local f = io.open(tmp, "w")
+            f:write('{"name":"lumos","debug":true}')
+            f:close()
+
+            local data, err = config.load_validated(tmp, {name = {required = true}})
+            os.remove(tmp)
+            assert.is_nil(err)
+            assert.are.equal("lumos", data.name)
+        end)
+
+        it('returns nil and error when schema validation fails', function()
+            local tmp = os.tmpname() .. ".json"
+            local f = io.open(tmp, "w")
+            f:write('{"debug":true}')
+            f:close()
+
+            local data, err = config.load_validated(tmp, {name = {required = true}})
+            os.remove(tmp)
+            assert.is_nil(data)
+            assert.is_not_nil(err)
+            assert.is_not_nil(err:match("Validation failed"))
+        end)
+    end)
 end)

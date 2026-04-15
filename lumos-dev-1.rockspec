@@ -56,7 +56,10 @@ build = {
       ["lumos.manpage"] = "lumos/manpage.lua",
       ["lumos.markdown"] = "lumos/markdown.lua",
       ["lumos.format"] = "lumos/format.lua",
-      ["lumos.bundle"] = "lumos/bundle.lua"
+      ["lumos.bundle"] = "lumos/bundle.lua",
+      ["lumos.native_build"] = "lumos/native_build.lua",
+      ["lumos.package"] = "lumos/package.lua",
+      ["lumos.plugin"] = "lumos/plugin.lua"
    },
    install = {
       bin = {

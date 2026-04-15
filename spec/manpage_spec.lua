@@ -55,7 +55,7 @@ describe("Man Page Generation", function()
             local manpage = app:generate_manpage()
             
             assert.matches(".SH EXAMPLES", manpage)
-            assert.matches("myapp deploy %-%-env prod", manpage)
+            assert.matches("myapp deploy \\%-\\%-env prod", manpage)
             assert.matches("myapp deploy staging", manpage)
         end)
     end)

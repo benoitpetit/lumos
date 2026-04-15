@@ -106,6 +106,59 @@ describe('App Module', function()
     end)
   end)
 
+  describe('Fluent flag modifiers', function()
+    it('supports :default() chaining', function()
+      local test_app = app.new_app()
+      local cmd = test_app:command('test', 'Test')
+      cmd:flag_string('--format', 'Format'):default('json')
+      
+      assert.are.equal('json', cmd.flags.format.default)
+    end)
+
+    it('supports :required() chaining', function()
+      local test_app = app.new_app()
+      local cmd = test_app:command('test', 'Test')
+      cmd:flag_string('--token', 'Token'):required(true)
+      
+      assert.is_true(cmd.flags.token.required)
+    end)
+
+    it('supports :env() chaining', function()
+      local test_app = app.new_app()
+      local cmd = test_app:command('test', 'Test')
+      cmd:flag_string('--api-key', 'API Key'):env('MYAPP_API_KEY')
+      
+      assert.are.equal('MYAPP_API_KEY', cmd.flags['api-key'].env)
+    end)
+
+    it('supports :validate() chaining', function()
+      local test_app = app.new_app()
+      local cmd = test_app:command('test', 'Test')
+      local validator = function(v) return v ~= "" end
+      cmd:flag_string('--name', 'Name'):validate(validator)
+      
+      assert.is_function(cmd.flags.name.custom_validator)
+    end)
+  end)
+
+  describe('Command categories and hooks', function()
+    it('supports :category()', function()
+      local test_app = app.new_app()
+      local cmd = test_app:command('deploy', 'Deploy'):category('Ops')
+      
+      assert.are.equal('Ops', cmd._category)
+    end)
+
+    it('supports :pre_run() and :post_run()', function()
+      local test_app = app.new_app()
+      local cmd = test_app:command('test', 'Test')
+      cmd:pre_run(function() end):post_run(function() end)
+      
+      assert.are.equal(1, #cmd.pre_runs)
+      assert.are.equal(1, #cmd.post_runs)
+    end)
+  end)
+
   describe('app:run()', function()
     it('executes the matching command and returns true', function()
       local test_app = app.new_app({name = 'testapp', version = '1.0.0'})
@@ -118,7 +171,7 @@ describe('App Module', function()
 
       local result = test_app:run({'greet'})
       assert.is_true(executed)
-      assert.is_true(result)
+      assert.are.equal(0, result)
     end)
 
     it('returns false for an unknown command', function()
@@ -128,7 +181,7 @@ describe('App Module', function()
       _G.print = function() end
       local result = test_app:run({'nonexistent'})
       _G.print = original_print
-      assert.is_false(result)
+      assert.are.equal(2, result)
     end)
 
     it('passes parsed flags to the command action', function()
@@ -170,7 +223,7 @@ describe('App Module', function()
       local result = test_app:run({'--version'})
 
       _G.print = original_print
-      assert.is_true(result)
+      assert.are.equal(0, result)
       assert.is_not_nil(printed:match("2%.0%.0"))
     end)
 
@@ -180,8 +233,8 @@ describe('App Module', function()
       _G.print = function() end
       local result = test_app:run({})
       _G.print = original_print
-      -- show_help returns true
-      assert.is_true(result)
+      -- show_help returns EXIT_OK
+      assert.are.equal(0, result)
     end)
   end)
 end)

@@ -143,6 +143,19 @@ function format.wrap(text, width)
 end
 
 -- Case transformations
+function format.uppercase(text)
+    return text:upper()
+end
+
+function format.lowercase(text)
+    return text:lower()
+end
+
+function format.capitalize(text)
+    if #text == 0 then return text end
+    return text:sub(1, 1):upper() .. text:sub(2):lower()
+end
+
 function format.title_case(text)
     return text:gsub("(%a)([%w_']*)", function(first, rest)
         return first:upper() .. rest:lower()
@@ -159,6 +172,23 @@ end
 
 function format.kebab_case(text)
     return text:gsub("([a-z])([A-Z])", "%1-%2"):lower():gsub("_", "-")
+end
+
+-- Padding
+function format.pad_left(text, width)
+    return string.format("%" .. tostring(width) .. "s", text)
+end
+
+function format.pad_right(text, width)
+    return string.format("%-" .. tostring(width) .. "s", text)
+end
+
+function format.pad_center(text, width)
+    local pad = width - #text
+    if pad <= 0 then return text end
+    local left = math.floor(pad / 2)
+    local right = pad - left
+    return string.rep(" ", left) .. text .. string.rep(" ", right)
 end
 
 -- Enable/disable formatting

@@ -35,8 +35,11 @@ function completion.generate_bash(app)
     table.insert(flags, "--version")
     table.insert(flags, "-v")
     
+    -- Derive a safe function name from the app name (replace non-alphanumeric chars with _)
+    local safe_name = (app.name or "app"):gsub("[^%w]", "_")
+
     local bash_script = string.format([==[
-_lumos_completions() {
+_%s_completions() {
     local cur prev opts
     COMPREPLY=()
     cur="${COMP_WORDS[COMP_CWORD]}"
@@ -64,8 +67,8 @@ _lumos_completions() {
     return 0
 }
 
-complete -F _lumos_completions %s
-]==], table.concat(commands, " "), table.concat(flags, " "), app.name)
+complete -F _%s_completions %s
+]==], safe_name, table.concat(commands, " "), table.concat(flags, " "), safe_name, app.name)
     
     return bash_script
 end

@@ -9,6 +9,7 @@ package.path = package.path .. ";../?.lua;../?/init.lua;"
 local lumos = require('lumos')
 local color = require('lumos.color')
 
+local logger = require('lumos.logger')
 -- Create the application
 local app = lumos.new_app({
     name = "advanced_app",
@@ -27,7 +28,7 @@ add:flag_int("--count", "Number of items to add", 1, 100)
 add:action(function(ctx)
     local item = ctx.args[1] or "item"
     local count = ctx.flags.count or 1
-    print(color.green("Adding " .. count .. " " .. item .. "(s)"))
+    logger.info("Adding " .. count .. " " .. item .. "(s)")
     
     return true
 end)
@@ -38,9 +39,9 @@ remove:arg("item", "Item to remove")
 remove:flag("-q --quiet", "Suppress output")
 remove:action(function(ctx)
     local item = ctx.args[1] or "item"
-    print(color.red("Removing " .. item))
+    logger.info("Removing " .. item)
     return true
 end)
 
 -- Run the app
-app:run(arg)
+os.exit(app:run(arg))

@@ -10,6 +10,7 @@ local lumos = require('lumos')
 local color = require('lumos.color')
 local config = require('lumos.config')
 
+local logger = require('lumos.logger')
 -- Create the application with config support
 local app = lumos.new_app({
     name = "config_app",
@@ -39,9 +40,9 @@ deploy:action(function(ctx)
         local file_config, err = config.load_file(ctx.flags.config)
         if file_config then
             configs.file = file_config
-            print(color.status.info("Loaded config from: " .. ctx.flags.config))
+            logger.info("Loaded config from: " .. ctx.flags.config)
         else
-            print(color.status.warning("Could not load config: " .. err))
+            logger.warn("Could not load config: " .. err)
         end
     end
     
@@ -49,7 +50,7 @@ deploy:action(function(ctx)
     local env_config = config.load_env("CONFIG_APP")
     if next(env_config) then
         configs.env = env_config
-        print(color.status.info("Loaded environment config"))
+        logger.info("Loaded environment config")
     end
     
     -- Merge all configurations
@@ -60,19 +61,19 @@ deploy:action(function(ctx)
         ctx.flags -- command line flags have highest priority
     )
     
-    print(color.bold("Deployment Configuration:"))
-    print("Target: " .. color.cyan(target))
-    print("Timeout: " .. color.yellow(merged.timeout .. "s"))
-    print("Dry run: " .. (merged.dry_run and color.green("Yes") or color.dim("No")))
+    logger.info("Deployment Configuration:")
+    logger.info("Target: " .. color.cyan(target))
+    logger.warn("Timeout: " .. color.yellow(merged.timeout .. "s"))
+    logger.info("Dry run: " .. (merged.dry_run and color.green("Yes") or color.dim("No")))
     
     if merged.dry_run then
-        print(color.status.info("This is a dry run - no actual deployment"))
+        logger.info("This is a dry run - no actual deployment")
     else
-        print(color.status.success("Deploying to " .. target .. "..."))
+        logger.info("Deploying to " .. target .. "...")
     end
     
     return true
 end)
 
 -- Run the app
-app:run(arg)
+os.exit(app:run(arg))

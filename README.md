@@ -31,6 +31,8 @@
 - **📦 Minimal Dependencies** - Only requires `luafilesystem`, modular architecture
 - **🌍 Cross-Platform** - Linux, macOS, Windows (WSL) supported with cross-platform TTY detection
 - **🚀 Portable Bundles** - Create self-contained single-file Lua scripts with `lumos bundle` (requires Lua runtime)
+- **📦 Standalone Packages** - Create true zero-dependency executables with `lumos package` (no C compiler required)
+- **🔨 Native Builds** - Compile to native binaries with `lumos build` (embeds Lua VM + static linking)
 - **🔒 Security Built-in** - Input sanitization, safe file operations, rate limiting
 - **📝 Structured Logging** - 5-level logger with child loggers and environment configuration
 
@@ -81,10 +83,19 @@ make install  # Install test dependencies
 make test     # Run the test suite
 ```
 
-**Step 5: Create a Portable Bundle (Optional)**
+**Step 5: Distribute Your CLI (Optional)**
+
 ```bash
-lumos bundle src/main.lua -o dist/myapp  # Create self-contained Lua script
-./dist/myapp --help                       # Works without Lumos installed (requires Lua)
+# Fast: bundled Lua script (requires Lua on target)
+lumos bundle src/main.lua -o dist/myapp
+
+# Zero dependencies: standalone package using a precompiled stub
+lumos package src/main.lua -o dist/myapp
+
+# Maximum control: native binary with embedded Lua VM
+lumos build src/main.lua -o dist/myapp
+
+./dist/myapp --help
 ```
 
 🎉 **Congratulations!** You now have a fully functional CLI application with tests, documentation, and shell integration ready to go.
@@ -99,7 +110,7 @@ local color = require('lumos.color')
 
 local app = lumos.new_app({
     name = "my-awesome-cli",
-    version = "0.1.0",
+    version = "0.2.0",
     description = "My awesome CLI application"
 })
 
@@ -161,7 +172,7 @@ luarocks make --local lumos-dev-1.rockspec
 ### Verify Installation
 ```bash
 lumos version
-# Should output: Lumos CLI Framework v0.1.0
+# Should output: Lumos CLI Framework v0.2.0
 ```
 
 **Note**: The `--local` flag installs Lumos in your user directory (`~/.luarocks/`). For system-wide installation, omit `--local` and use `sudo`.
@@ -270,11 +281,11 @@ make install && make test
 
 ## Project Status
 
-- **Version:** 0.1.0
+- **Version:** 0.2.0
 - **License:** MIT
 - **Lua Versions:** 5.1, 5.2, 5.3, 5.4, LuaJIT
 - **Platforms:** Linux, macOS, Windows (WSL)
-- **Tests:** 188 passing tests
+- **Tests:** 295 passing tests
 - **Dependencies:** luafilesystem
 
 ## Acknowledgments

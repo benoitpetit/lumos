@@ -22,7 +22,7 @@ describe("Shell Completion Generation", function()
             
             assert.is_string(completion)
             assert.matches("testapp", completion)
-            assert.matches("_lumos_completions", completion)
+            assert.matches("_testapp_completions", completion)
             assert.matches("test t", completion) -- Commands with aliases
             assert.matches("%-%-verbose %-v", completion) -- Flags
         end)

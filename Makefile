@@ -2,13 +2,18 @@
 
 .PHONY: test test-coverage install build clean doc examples help
 
+# Resolve the busted binary at recipe execution time (not parse time) so it
+# always reflects what is on PATH when make runs.
+# Fallback to the user-local LuaRocks path when busted is not in PATH.
+BUSTED = $(shell which busted 2>/dev/null || echo $(HOME)/.luarocks/bin/busted)
+
 # Default target
 all: test
 
 # Run all tests
 test:
 	@echo "Running tests..."
-	@$(shell which busted 2>/dev/null || echo ~/.luarocks/bin/busted)
+	@$(BUSTED)
 
 # Install lumos locally for development
 install:
@@ -26,12 +31,12 @@ install-system:
 setup:
 	@echo "Setting up Lumos for global usage..."
 	@bash scripts/install.sh
-	@echo "✅ Setup complete! Restart your terminal or run: source ~/.bashrc"
+	@echo "Setup complete! Restart your terminal or run: source ~/.bashrc"
 
 # Install from rockspec for production
 install-prod:
 	@echo "Installing Lumos from production rockspec..."
-	@luarocks make --local lumos-0.1.0-1.rockspec
+	@luarocks make --local lumos-0.2.0-1.rockspec
 
 # Build documentation
 doc:
@@ -55,7 +60,7 @@ clean:
 # Run tests with coverage (requires luacov: luarocks install luacov --local)
 test-coverage:
 	@echo "Running tests with coverage..."
-	@$(shell which busted 2>/dev/null || echo ~/.luarocks/bin/busted) --coverage
+	@$(BUSTED) --coverage
 
 # Show available targets
 help:
@@ -78,4 +83,4 @@ test-cli:
 check-rockspec:
 	@echo "Checking rockspec syntax..."
 	@luarocks lint lumos-dev-1.rockspec
-	@luarocks lint lumos-0.1.0-1.rockspec
+	@luarocks lint lumos-0.2.0-1.rockspec

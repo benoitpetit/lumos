@@ -26,8 +26,12 @@ function security.sanitize_path(path)
         return nil, "Empty path"
     end
     
+    -- Normalise Windows-style backslashes to forward slashes before any checks
+    -- so that traversal attempts like "foo\..\bar" are correctly detected.
+    local sanitized = path:gsub("\\", "/")
+    
     -- Remove dangerous characters
-    local sanitized = path:gsub("[;&|$`<>]", "")
+    sanitized = sanitized:gsub("[;&|$`<>]", "")
     
     -- Check for path traversal attempts
     if sanitized:match("%.%.") then

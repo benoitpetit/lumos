@@ -69,16 +69,27 @@ function config.load_file(file_path)
 end
 
 -- Load configuration from environment variables with a prefix.
--- Enumerates all env vars via the `env` command and filters by prefix.
+-- On POSIX systems the `env` command is used to enumerate all variables;
+-- on Windows (or when `env` is unavailable) the function returns an empty
+-- table to avoid a crash with an unresolvable shell command.
 function config.load_env(prefix)
     local result = {}
     local filter = prefix and (prefix .. "_") or ""
+
+    -- Portability guard: io.popen("env") does not work on Windows.
+    local is_windows = package.config:sub(1,1) == "\\"
+    if is_windows then
+        logger.debug("config.load_env: skipping env enumeration on Windows")
+        return result
+    end
 
     local handle = io.popen("env 2>/dev/null")
     if not handle then return result end
 
     for line in handle:lines() do
-        local key, value = line:match("^([^=]+)=(.*)")
+        -- Guard against multi-line values embedded in a single popen line:
+        -- only process lines that contain an '=' sign.
+        local key, value = line:match("^([^=\n]+)=(.*)")
         if key then
             local match = filter == "" or key:sub(1, #filter) == filter
             if match then
@@ -100,6 +111,36 @@ function config.load_env(prefix)
     handle:close()
 
     return result
+end
+
+-- Validate a configuration table against a schema.
+-- Schema format: { field_name = { type = "string", required = true, validate = function(v) return true end } }
+function config.validate_schema(data, schema)
+    local errors = {}
+    for field, rules in pairs(schema) do
+        local value = data[field]
+        if rules.required and (value == nil or value == "") then
+            table.insert(errors, field .. " is required")
+        end
+        if value ~= nil and rules.type and type(value) ~= rules.type then
+            table.insert(errors, field .. " must be " .. rules.type .. " (got " .. type(value) .. ")")
+        end
+        if value ~= nil and rules.validate and not rules.validate(value) then
+            table.insert(errors, field .. " validation failed")
+        end
+    end
+    return #errors == 0, errors
+end
+
+-- Load and validate a configuration file.
+function config.load_validated(path, schema)
+    local data, err = config.load_file(path)
+    if not data then return nil, err end
+    local ok, errors = config.validate_schema(data, schema)
+    if not ok then
+        return nil, "Validation failed: " .. table.concat(errors, "; ")
+    end
+    return data
 end
 
 -- Merge configurations with priority: flags > env > config_file > defaults

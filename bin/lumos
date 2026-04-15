@@ -128,7 +128,7 @@ if not ok then
 end
 
 -- Run the application with command-line arguments
-app.run(arg)
+os.exit(app.run(arg))
 ]]
 end
 
@@ -146,7 +146,7 @@ function M.run(args)
     -- Create the main application
     local app = lumos.new_app({
         name = "%s",
-        version = "0.1.0",
+        version = "0.2.0",
         description = "%s"
     })
 
@@ -184,13 +184,13 @@ function M.run(args)
     
     -- Add version handling
     if args and #args > 0 and args[1] == "--version" then
-        print("%s v0.1.0")
+        print("%s v0.2.0")
         print("Built with Lumos CLI Framework")
         return
     end
 
     -- Run the application
-    app:run(args)
+    return app:run(args)
 end
 
 return M
@@ -270,7 +270,7 @@ end
 -- Main CLI application
 local app = lumos.new_app({
     name = "lumos",
-    version = "0.1.0",
+    version = "0.2.0",
     description = "Lumos CLI framework and project generator"
 })
 
@@ -390,8 +390,73 @@ app:command("version", "Show Lumos version")
         return true
     end)
 
+app:command("doctor", "Check the Lumos environment for common issues")
+    :action(function(ctx)
+        print(color.cyan("Lumos Environment Check"))
+        print(string.rep("-", 40))
+        
+        local checks = {}
+        local issues = 0
+        
+        -- Lua version
+        table.insert(checks, {"Lua version", _VERSION or "unknown"})
+        
+        -- luafilesystem
+        local lfs_ok, lfs_ver = pcall(function()
+            local info = lfs._VERSION or "installed"
+            return info
+        end)
+        if lfs_ok then
+            table.insert(checks, {"luafilesystem", lfs_ver})
+        else
+            table.insert(checks, {"luafilesystem", color.red("NOT FOUND")})
+            issues = issues + 1
+        end
+        
+        -- Lumos version
+        table.insert(checks, {"Lumos", lumos and lumos.version or color.red("NOT FOUND")})
+        if not lumos then issues = issues + 1 end
+        
+        -- LuaRocks
+        local lr_handle = io.popen("luarocks --version 2>/dev/null")
+        local lr_out = lr_handle and lr_handle:read("*l") or nil
+        if lr_handle then lr_handle:close() end
+        if lr_out and lr_out ~= "" then
+            table.insert(checks, {"LuaRocks", lr_out})
+        else
+            table.insert(checks, {"LuaRocks", color.red("NOT FOUND")})
+            issues = issues + 1
+        end
+        
+        -- Busted (optional)
+        local b_handle = io.popen("busted --version 2>/dev/null")
+        local b_out = b_handle and b_handle:read("*l") or nil
+        if b_handle then b_handle:close() end
+        if b_out and b_out ~= "" then
+            table.insert(checks, {"busted", b_out})
+        else
+            table.insert(checks, {"busted", color.yellow("not installed (optional)")})
+        end
+        
+        -- Current directory
+        table.insert(checks, {"Working directory", os.getenv("PWD") or "."})
+        
+        for _, check in ipairs(checks) do
+            print(string.format("  %-18s %s", check[1] .. ":", check[2]))
+        end
+        
+        print(string.rep("-", 40))
+        if issues == 0 then
+            print(color.green("✅ Environment looks good."))
+            return true
+        else
+            print(color.red("⚠️  Found " .. issues .. " issue(s)."))
+            return false
+        end
+    end)
+
 -- Bundle command for creating portable CLI executables
-local bundle_cmd = app:command("bundle", "Bundle a Lumos CLI project into a portable single-file executable")
+local bundle_cmd = app:command("bundle", "Bundle a Lumos CLI project into a single portable Lua script (requires Lua interpreter on target)")
 bundle_cmd:arg("entry", "Entry point file (e.g., src/main.lua)")
 bundle_cmd:flag_string("-o --output", "Output file path (default: dist/<name>)")
 bundle_cmd:flag_string("-d --dir", "Project directory (default: current directory)")
@@ -476,11 +541,210 @@ bundle_cmd:action(function(ctx)
         print(color.white("  Output: " .. info.output))
         print(color.white("  Modules bundled: " .. info.modules_count))
         print(color.white("  Size: " .. string.format("%.2f KB", info.size / 1024)))
-        print(color.yellow("\nYour portable CLI is ready!"))
+        print(color.yellow("\nYour bundled Lua script is ready!"))
+        print(color.yellow("Note: the target machine needs a Lua interpreter installed."))
         print(color.yellow("Run it with: ./" .. info.output:match("([^/]+)$") .. " --help"))
     end
     
     return true
 end)
 
-app:run(arg)
+-- Build command for creating native static binaries
+local build_cmd = app:command("build", "Build a standalone native binary from a Lumos CLI project (no Lua runtime required on target)")
+build_cmd:arg("entry", "Entry point file (e.g., src/main.lua)")
+build_cmd:flag_string("-o --output", "Output binary path (default: dist/<name>)")
+build_cmd:flag_string("-d --dir", "Project directory (default: current directory)")
+build_cmd:flag("--no-lumos", "Do not bundle Lumos framework")
+build_cmd:flag("--strip-comments", "Remove comments to reduce binary payload size")
+build_cmd:flag_string("--cc", "Force a specific C compiler")
+build_cmd:flag("--static", "Produce a fully statically linked binary")
+build_cmd:flag("--bytecode", "Compile Lua payload to bytecode before embedding")
+build_cmd:flag("--debug-build", "Keep temporary C source file for debugging")
+
+build_cmd:flag("--analyze", "Analyze dependencies without building")
+
+build_cmd:action(function(ctx)
+    local native_build = safe_require('lumos.native_build')
+    if not native_build then
+        print(color.red("Error: Native build module not found."))
+        return false
+    end
+    
+    local entry_file = ctx.args[1]
+    if not entry_file then
+        print(color.red("Error: Entry file is required."))
+        print(color.yellow("Usage: lumos build <entry_file> [options]"))
+        print(color.yellow("Example: lumos build src/main.lua -o dist/myapp"))
+        return false
+    end
+    
+    if not lfs.attributes(entry_file) then
+        print(color.red("Error: Entry file not found: " .. entry_file))
+        return false
+    end
+    if lfs.attributes(entry_file, "mode") ~= "file" then
+        print(color.red("Error: Entry path is not a file: " .. entry_file))
+        return false
+    end
+    
+    local project_dir = ctx.flags.dir or "."
+    
+    -- Analyze mode (reuse bundle.analyze for consistent output)
+    if ctx.flags.analyze then
+        local bundle = safe_require('lumos.bundle')
+        print(color.cyan("Analyzing dependencies for: " .. entry_file))
+        local modules = bundle and bundle.analyze(entry_file, {project_dir, project_dir .. "/src", project_dir .. "/lib", "."}) or {}
+        
+        if #modules == 0 then
+            print(color.yellow("No local dependencies found."))
+        else
+            print(color.green("\nFound " .. #modules .. " dependencies:"))
+            for i, mod in ipairs(modules) do
+                print(string.format("  %d. %s", i, mod.name))
+                print(color.white("     -> " .. mod.path))
+            end
+        end
+        
+        if not ctx.flags["no_lumos"] then
+            print(color.cyan("\nLumos modules will also be bundled:"))
+            local lumos_mods = bundle.get_lumos_modules()
+            for _, mod_name in ipairs(lumos_mods) do
+                print("  - " .. mod_name)
+            end
+        end
+        
+        return true
+    end
+    
+    print(color.cyan("Building native binary..."))
+    print(color.white("  Entry: " .. entry_file))
+    
+    local options = {
+        entry = entry_file,
+        output = ctx.flags.output,
+        project_dir = project_dir,
+        include_lumos = not ctx.flags["no_lumos"],
+        strip_comments = ctx.flags["strip_comments"],
+        cc = ctx.flags.cc,
+        static = ctx.flags.static,
+        bytecode = ctx.flags.bytecode,
+        debug_build = ctx.flags["debug_build"],
+    }
+    
+    local success, err, info = native_build.create(options)
+    
+    if not success then
+        print(color.red("Error: " .. (err or "Unknown error")))
+        return false
+    end
+    
+    if info then
+        print(color.green("\n✅ Native binary built successfully!"))
+        print(color.white("  Output: " .. info.output))
+        print(color.white("  Modules bundled: " .. info.modules_count))
+        print(color.white("  Size: " .. string.format("%.2f KB", info.size / 1024)))
+        print(color.white("  Compiler: " .. info.compiler))
+        if info.bytecode then
+            print(color.white("  Bytecode: enabled"))
+        end
+        if info.missing_native and #info.missing_native > 0 then
+            print(color.yellow("  Warning: missing static archives for native modules: " .. table.concat(info.missing_native, ", ")))
+        end
+        if info.debug_build and info.main_c_path then
+            print(color.cyan("  Debug build: kept C wrapper at " .. info.main_c_path))
+        end
+        if not info.static then
+            print(color.yellow("  Warning: binary is dynamically linked to libc. Use --static for full portability."))
+        end
+        print(color.yellow("\nYour standalone CLI is ready!"))
+        print(color.yellow("Run it with: ./" .. info.output:match("([^/]+)$") .. " --help"))
+    end
+    
+    return true
+end)
+
+-- Package command for creating standalone executables without a C compiler
+local package_cmd = app:command("package", "Package a Lumos CLI project into a standalone executable using a precompiled stub")
+package_cmd:arg("entry", "Entry point file (e.g., src/main.lua)")
+package_cmd:flag_string("-o --output", "Output file path (default: dist/<name>)")
+package_cmd:flag_string("-d --dir", "Project directory (default: current directory)")
+package_cmd:flag_string("-t --target", "Target platform stub (default: linux-x86_64)")
+package_cmd:flag("--list-targets", "List available stub targets and exit")
+package_cmd:flag("--no-lumos", "Do not bundle Lumos framework")
+package_cmd:flag("--strip-comments", "Remove comments to reduce payload size")
+
+package_cmd:action(function(ctx)
+    local pkg = safe_require('lumos.package')
+    if not pkg then
+        print(color.red("Error: Package module not found."))
+        return false
+    end
+    
+    if ctx.flags["list_targets"] then
+        local targets = pkg.list_targets()
+        print(color.cyan("Available stub targets:"))
+        if #targets == 0 then
+            print(color.yellow("  No stubs found."))
+        else
+            for _, t in ipairs(targets) do
+                print("  - " .. t)
+            end
+        end
+        return true
+    end
+    
+    local entry_file = ctx.args[1]
+    if not entry_file then
+        print(color.red("Error: Entry file is required."))
+        print(color.yellow("Usage: lumos package <entry_file> [options]"))
+        print(color.yellow("Example: lumos package src/main.lua -o dist/myapp"))
+        return false
+    end
+    
+    if not lfs.attributes(entry_file) then
+        print(color.red("Error: Entry file not found: " .. entry_file))
+        return false
+    end
+    if lfs.attributes(entry_file, "mode") ~= "file" then
+        print(color.red("Error: Entry path is not a file: " .. entry_file))
+        return false
+    end
+    
+    local project_dir = ctx.flags.dir or "."
+    local target = ctx.flags.target or "linux-x86_64"
+    
+    print(color.cyan("Packaging standalone executable..."))
+    print(color.white("  Entry: " .. entry_file))
+    print(color.white("  Target: " .. target))
+    
+    local options = {
+        entry = entry_file,
+        output = ctx.flags.output,
+        project_dir = project_dir,
+        target = target,
+        include_lumos = not ctx.flags["no_lumos"],
+        strip_comments = ctx.flags["strip_comments"],
+    }
+    
+    local success, err, info = pkg.create(options)
+    
+    if not success then
+        print(color.red("Error: " .. (err or "Unknown error")))
+        return false
+    end
+    
+    if info then
+        print(color.green("\n✅ Package created successfully!"))
+        print(color.white("  Output: " .. info.output))
+        print(color.white("  Target: " .. info.target))
+        print(color.white("  Modules bundled: " .. info.modules_count))
+        print(color.white("  Total size: " .. string.format("%.2f KB", info.size / 1024)))
+        print(color.white("  Stub size: " .. string.format("%.2f KB", info.stub_size / 1024)))
+        print(color.yellow("\nYour standalone CLI is ready!"))
+        print(color.yellow("Run it with: ./" .. info.output:match("([^/]+)$") .. " --help"))
+    end
+    
+    return true
+end)
+
+os.exit(app:run(arg))

@@ -41,7 +41,10 @@ local LUMOS_MODULES = {
     "lumos.manpage",
     "lumos.markdown",
     "lumos.format",
-    "lumos.bundle"
+    "lumos.bundle",
+    "lumos.native_build",
+    "lumos.package",
+    "lumos.plugin"
 }
 
 --- Read file contents
@@ -266,55 +269,90 @@ local function generate_preloader(modules, config)
         end
     end
     
-    -- Add custom require loader
+    -- Add bundled module searcher (compatible Lua 5.1+ via package.loaders fallback)
     table.insert(lines, [[
--- Install bundled module loader
-local _original_require = require
-local function _bundled_require(name)
+-- Install bundled module searcher
+local _BUNDLED_SEARCHERS = package.searchers or package.loaders
+table.insert(_BUNDLED_SEARCHERS, 1, function(name)
     if _BUNDLED_MODULES[name] then
-        if package.loaded[name] == nil then
-            local result = _BUNDLED_MODULES[name]()
-            if result == nil then result = true end
-            package.loaded[name] = result
-        end
-        return package.loaded[name]
+        return _BUNDLED_MODULES[name]
     end
-    return _original_require(name)
-end
-require = _bundled_require
+    return nil
+end)
 ]])
     
     return table.concat(lines, "\n")
 end
 
---- Bundle a Lua CLI application
+-- Simple djb2 hash for cache keys
+local function djb2_hash(str)
+    local hash = 5381
+    for i = 1, #str do
+        hash = ((hash * 33) + str:byte(i)) % 4294967296
+    end
+    return string.format("%08x", hash)
+end
+
+local CACHE_DIR = ".lumos/cache"
+
+local function ensure_cache_dir()
+    mkdir_p(CACHE_DIR)
+end
+
+local function amalgamation_cache_key(entry_content, options, modules)
+    local key_parts = {
+        entry_content,
+        tostring(options.include_lumos),
+        tostring(options.strip_comments),
+        tostring(options.shebang or default_config.shebang),
+    }
+    -- Include dependency contents so cache is invalidated when any dependency changes
+    for _, mod in ipairs(modules or {}) do
+        local content = read_file(mod.path) or ""
+        table.insert(key_parts, content)
+    end
+    return djb2_hash(table.concat(key_parts, "|"))
+end
+
+--- Amalgamate a Lua CLI application into a single Lua string
 ---@param options table Bundle options
 ---@return boolean success
 ---@return string|nil error_message
-function bundle.create(options)
+---@return string|nil amalgamated_lua
+---@return number|nil modules_count
+function bundle.amalgamate(options)
     options = options or {}
-    
+
     local config = {}
     for k, v in pairs(default_config) do
-        config[k] = options[k] ~= nil and options[k] or v
+        if options[k] ~= nil then
+            config[k] = options[k]
+        else
+            config[k] = v
+        end
     end
-    
+
     local entry_file = options.entry
-    local output_file = options.output
     local project_dir = options.project_dir or "."
-    
+
     if not entry_file then
         return false, "Entry file is required"
     end
-    
+
     if not path_exists(entry_file) then
         return false, "Entry file not found: " .. entry_file
     end
-    
+
     if not is_file(entry_file) then
         return false, "Entry path is not a file: " .. entry_file
     end
-    
+
+    -- Read raw entry content
+    local raw_entry_content, err = read_file(entry_file)
+    if not raw_entry_content then
+        return false, err
+    end
+
     -- Determine search paths
     local search_paths = options.search_paths or {
         project_dir,
@@ -322,21 +360,21 @@ function bundle.create(options)
         project_dir .. "/lib",
         project_dir .. "/lumos"
     }
-    
+
     -- Add Lumos installation paths
     local home = os.getenv("HOME")
     if home then
         local version = _VERSION:match("%d+%.%d+") or "5.1"
         table.insert(search_paths, home .. "/.luarocks/share/lua/" .. version)
     end
-    
+
     -- Also check current working directory for local lumos
     table.insert(search_paths, ".")
-    
-    -- Collect all dependencies
+
+    -- Collect all dependencies BEFORE computing cache key
     local modules = {}
     local visited = {}
-    
+
     -- If include_lumos, add all Lumos modules first
     if config.include_lumos then
         for _, module_name in ipairs(LUMOS_MODULES) do
@@ -355,30 +393,40 @@ function bundle.create(options)
             end
         end
     end
-    
+
     -- Collect project dependencies
     collect_dependencies(entry_file, search_paths, modules, visited)
-    
-    -- Read entry file
-    local entry_content, err = read_file(entry_file)
-    if not entry_content then
-        return false, err
+
+    -- Compute cache key including all dependency contents
+    local cache_key = amalgamation_cache_key(raw_entry_content, options, modules)
+    local cache_path = CACHE_DIR .. "/amalgamate-" .. cache_key .. ".lua"
+    ensure_cache_dir()
+
+    -- Try cache first
+    local cached = read_file(cache_path)
+    if cached then
+        -- Count modules in cached bundle (approximate: count _BUNDLED_MODULES entries)
+        local modules_count = 0
+        for _ in cached:gmatch('_BUNDLED_MODULES%[%"') do
+            modules_count = modules_count + 1
+        end
+        return true, nil, cached, modules_count
     end
-    
-    -- Remove shebang from entry file (we'll add our own)
-    entry_content = entry_content:gsub("^#![^\n]*\n", "")
-    
+
+    -- Process entry content
+    local entry_content = raw_entry_content:gsub("^#![^\n]*\n", "")
+
     if config.strip_comments then
         entry_content = strip_comments(entry_content)
     end
-    
+
     -- Generate bundle
     local bundle_parts = {}
-    
+
     -- Shebang
     table.insert(bundle_parts, config.shebang)
     table.insert(bundle_parts, "")
-    
+
     -- Header comment
     table.insert(bundle_parts, "-- ============================================")
     table.insert(bundle_parts, "-- Bundled Lua CLI Application")
@@ -387,22 +435,49 @@ function bundle.create(options)
     table.insert(bundle_parts, string.format("-- Modules bundled: %d", #modules))
     table.insert(bundle_parts, "-- ============================================")
     table.insert(bundle_parts, "")
-    
+
     -- Preloader with all modules
     if #modules > 0 then
         table.insert(bundle_parts, generate_preloader(modules, config))
         table.insert(bundle_parts, "")
     end
-    
+
     -- Main entry code
     table.insert(bundle_parts, "-- ============================================")
     table.insert(bundle_parts, "-- Main Application")
     table.insert(bundle_parts, "-- ============================================")
     table.insert(bundle_parts, "")
     table.insert(bundle_parts, entry_content)
-    
+
     local final_bundle = table.concat(bundle_parts, "\n")
-    
+
+    -- Write to cache
+    write_file(cache_path, final_bundle)
+
+    return true, nil, final_bundle, #modules
+end
+
+--- Bundle a Lua CLI application
+---@param options table Bundle options
+---@return boolean success
+---@return string|nil error_message
+function bundle.create(options)
+    local success, err, final_bundle, modules_count = bundle.amalgamate(options)
+    if not success then
+        return false, err
+    end
+
+    local output_file = options.output
+    local entry_file = options.entry
+    local config = {}
+    for k, v in pairs(default_config) do
+        if options[k] ~= nil then
+            config[k] = options[k]
+        else
+            config[k] = v
+        end
+    end
+
     -- Determine output path
     if not output_file then
         local basename = entry_file:match("([^/]+)%.lua$") or "bundle"
@@ -415,21 +490,21 @@ function bundle.create(options)
             mkdir_p(parent_dir)
         end
     end
-    
+
     -- Write bundle
     local ok, write_err = write_file(output_file, final_bundle)
     if not ok then
         return false, write_err
     end
-    
+
     -- Make executable on Unix-like systems
     if not is_windows() then
         os.execute("chmod +x " .. security.shell_escape(output_file))
     end
-    
+
     return true, nil, {
         output = output_file,
-        modules_count = #modules,
+        modules_count = modules_count,
         size = #final_bundle
     }
 end

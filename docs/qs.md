@@ -205,12 +205,11 @@ end)
 ### Configuration
 ```lua
 local config = require('lumos.config')
-local core = require('lumos.core')
 
 -- Load from file and environment
 local settings = config.merge_configs(
     {timeout = 30, debug = false},  -- defaults
-    core.load_config("config.json"), -- JSON or key=value file
+    config.load_file("config.json"), -- JSON or key=value file
     config.load_env("MYAPP"),
     ctx.flags
 )
@@ -282,9 +281,18 @@ deploy:examples({
 ```
 
 ### Bundling for Distribution
+
+Lumos provides three ways to distribute your CLI:
+
 ```bash
-# Create a standalone executable
+# 1. Bundle — fast, creates a Lua script (requires Lua on target)
 lumos bundle src/main.lua -o dist/myapp
+
+# 2. Package — standalone executable, no C compiler needed
+lumos package src/main.lua -o dist/myapp
+
+# 3. Build — native binary with embedded Lua VM (requires C toolchain)
+lumos build src/main.lua -o dist/myapp
 
 # Test it
 ./dist/myapp --help

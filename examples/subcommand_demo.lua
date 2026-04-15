@@ -9,6 +9,7 @@ local lumos = require('lumos')
 local color = require('lumos.color')
 local json = require('lumos.json')
 
+local logger = require('lumos.logger')
 -- Create app
 local app = lumos.new_app({
     name = "subcmd_demo",
@@ -30,7 +31,7 @@ create_user:flag("-a --admin", "Grant admin privileges")
 create_user:action(function(ctx)
     local username = ctx.args[1]
     if not username then
-        print(color.status.error("Error: Username required"))
+        logger.error("Error: Username required")
         return false
     end
     
@@ -43,10 +44,10 @@ create_user:action(function(ctx)
     if ctx.flags.json then
         print(json.encode(user_data))
     else
-        print(color.status.success("✓ User created successfully:"))
-        print("  Username: " .. color.cyan(user_data.username))
-        print("  Admin: " .. (user_data.admin and color.yellow("Yes") or "No"))
-        print("  Created: " .. color.dim(user_data.created))
+        logger.info("✓ User created successfully:")
+        logger.info("  Username: " .. color.cyan(user_data.username))
+        logger.warn("  Admin: " .. (user_data.admin and color.yellow("Yes") or "No"))
+        logger.info("  Created: " .. color.dim(user_data.created))
     end
     
     return true
@@ -64,10 +65,10 @@ list_users:action(function(ctx)
     if ctx.flags.json then
         print(json.encode(users))
     else
-        print(color.bold("Users:"))
+        logger.info("Users:")
         for _, user in ipairs(users) do
             local admin_badge = user.admin and color.yellow(" [ADMIN]") or ""
-            print("• " .. color.cyan(user.username) .. admin_badge)
+            logger.info("• " .. color.cyan(user.username) .. admin_badge)
         end
     end
     
@@ -75,4 +76,4 @@ list_users:action(function(ctx)
 end)
 
 -- Run the app
-app:run(arg)
+os.exit(app:run(arg))

@@ -168,6 +168,10 @@ end
 
 -- Set log output destination
 function logger.set_output(output)
+    -- Close the previous file handle if it is a real file (not stdout/stderr)
+    if log_output and log_output ~= io.stdout and log_output ~= io.stderr then
+        pcall(function() log_output:close() end)
+    end
     if type(output) == "string" then
         -- Open file
         local file, err = io.open(output, "a")
@@ -250,7 +254,9 @@ function logger.child(fixed_context)
     local child = {}
     
     for method_name, method_func in pairs(logger) do
-        if type(method_func) == "function" and method_name:match("^[a-z]+$") then
+        -- Include all lowercase public functions: simple names (info, warn…)
+        -- and underscore-separated names (set_level, configure_from_env…)
+        if type(method_func) == "function" and method_name:match("^[a-z][a-z_]*$") then
             child[method_name] = function(message, context)
                 local merged_context = {}
                 if fixed_context then

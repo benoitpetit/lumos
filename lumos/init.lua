@@ -17,6 +17,10 @@ local format = require('lumos.format')
 local security = require('lumos.security')
 local logger = require('lumos.logger')
 local bundle = require('lumos.bundle')
+local config = require('lumos.config')
+local native_build = require('lumos.native_build')
+local package_mod = require('lumos.package')
+local plugin = require('lumos.plugin')
 
 -- Export the main interface
 return {
@@ -37,6 +41,11 @@ return {
     security = security,
     logger = logger,
     bundle = bundle,
-    version = "0.1.0",
+    config = config,
+    native_build = native_build,
+    package = package_mod,
+    plugin = plugin,
+    use = plugin.use,
+    version = "0.2.0",
     load_config = core.load_config
 }

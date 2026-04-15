@@ -37,9 +37,18 @@ end
 local Command = {}
 Command.__index = Command
 
-function Command:arg(name, description)
+function Command:arg(name, description, options)
     self.args = self.args or {}
-    table.insert(self.args, {name = name, description = description})
+    table.insert(self.args, {
+        name = name,
+        description = description,
+        required = options and options.required or false,
+        type = options and options.type or nil,
+        min = options and options.min or nil,
+        max = options and options.max or nil,
+        default = options and options.default or nil,
+        validate = options and options.validate or nil
+    })
     return self
 end
 
@@ -74,6 +83,7 @@ function Command:flag(spec, description)
     }
 
     self.flags[long or short] = flag
+    self._last_flag = flag
     return self
 end
 
@@ -99,6 +109,58 @@ function Command:alias(alias_name)
     return self
 end
 
+-- Add category support
+function Command:category(name)
+    self._category = name
+    return self
+end
+
+-- Hook support
+function Command:pre_run(fn)
+    self.pre_runs = self.pre_runs or {}
+    table.insert(self.pre_runs, fn)
+    return self
+end
+
+function Command:post_run(fn)
+    self.post_runs = self.post_runs or {}
+    table.insert(self.post_runs, fn)
+    return self
+end
+
+function Command:persistent_pre_run(fn)
+    self.persistent_pre_runs = self.persistent_pre_runs or {}
+    table.insert(self.persistent_pre_runs, fn)
+    return self
+end
+
+-- Fluent flag modifiers (operate on the most recently added flag)
+function Command:default(value)
+    if self._last_flag then self._last_flag.default = value end
+    return self
+end
+
+function Command:required(value)
+    if self._last_flag then self._last_flag.required = value ~= false end
+    return self
+end
+
+function Command:env(var)
+    if self._last_flag then self._last_flag.env = var end
+    return self
+end
+
+function Command:validate(fn)
+    if self._last_flag then self._last_flag.custom_validator = fn end
+    return self
+end
+
+function Command:use(plugin_fn, opts)
+    local plugin_mod = require('lumos.plugin')
+    plugin_mod.use(self, plugin_fn, opts)
+    return self
+end
+
 -- Add typed flag methods
 function Command:flag_int(spec, description, min, max)
     self.flags = self.flags or {}
@@ -118,6 +180,7 @@ function Command:flag_int(spec, description, min, max)
     }
 
     self.flags[long or short] = flag
+    self._last_flag = flag
     return self
 end
 
@@ -137,6 +200,7 @@ function Command:flag_string(spec, description)
     }
     
     self.flags[long or short] = flag
+    self._last_flag = flag
     return self
 end
 
@@ -156,6 +220,7 @@ function Command:flag_email(spec, description)
     }
     
     self.flags[long or short] = flag
+    self._last_flag = flag
     return self
 end
 
@@ -177,6 +242,7 @@ function Command:persistent_flag(spec, description)
     }
     
     self.persistent_flags[long or short] = flag
+    self._last_flag = flag
     return self
 end
 
@@ -190,6 +256,7 @@ function Command:persistent_flag_string(spec, description)
         short = short, long = long or short,
         description = description, type = "string", persistent = true
     }
+    self._last_flag = self.persistent_flags[long or short]
     return self
 end
 
@@ -204,6 +271,7 @@ function Command:persistent_flag_int(spec, description, min, max)
         description = description, type = "int",
         min = min, max = max, persistent = true
     }
+    self._last_flag = self.persistent_flags[long or short]
     return self
 end
 
@@ -217,6 +285,7 @@ function Command:persistent_flag_email(spec, description)
         short = short, long = long or short,
         description = description, type = "email", persistent = true
     }
+    self._last_flag = self.persistent_flags[long or short]
     return self
 end
 
@@ -230,6 +299,7 @@ function Command:flag_url(spec, description)
         short = short, long = long or short,
         description = description, type = "url"
     }
+    self._last_flag = self.flags[long or short]
     return self
 end
 
@@ -243,6 +313,7 @@ function Command:flag_path(spec, description)
         short = short, long = long or short,
         description = description, type = "path"
     }
+    self._last_flag = self.flags[long or short]
     return self
 end
 
@@ -291,6 +362,7 @@ function lumos.new_app(config)
         }
         
         self.persistent_flags[long or short] = flag
+        self._last_flag = flag
         return self
     end
 
@@ -302,6 +374,7 @@ function lumos.new_app(config)
             short = short, long = long or short,
             description = description, type = "string", persistent = true
         }
+        self._last_flag = self.persistent_flags[long or short]
         return self
     end
 
@@ -314,6 +387,7 @@ function lumos.new_app(config)
             description = description, type = "int",
             min = min, max = max, persistent = true
         }
+        self._last_flag = self.persistent_flags[long or short]
         return self
     end
 
@@ -325,6 +399,20 @@ function lumos.new_app(config)
             short = short, long = long or short,
             description = description, type = "email", persistent = true
         }
+        self._last_flag = self.persistent_flags[long or short]
+        return self
+    end
+    
+    -- App-level hooks
+    function app:persistent_pre_run(fn)
+        self.persistent_pre_runs = self.persistent_pre_runs or {}
+        table.insert(self.persistent_pre_runs, fn)
+        return self
+    end
+    
+    function app:persistent_post_run(fn)
+        self.persistent_post_runs = self.persistent_post_runs or {}
+        table.insert(self.persistent_post_runs, fn)
         return self
     end
 
@@ -343,6 +431,7 @@ function lumos.new_app(config)
         }
 
         self.global_flags[long or short] = flag
+        self._last_flag = flag
         return self
     end
 
@@ -376,14 +465,27 @@ function lumos.new_app(config)
             parsed.output_json = true
         end
 
-        -- Check for version flag
-        if parsed.flags.version or parsed.flags.v then
+        -- Check for version flag.
+        -- Only treat bare -v as --version if the user has NOT already defined a
+        -- -v short flag (e.g. --verbose -v).  --version is always honoured.
+        local user_claimed_v = false
+        for _, fdef in pairs(self.persistent_flags or {}) do
+            if fdef.short == "v" then user_claimed_v = true; break end
+        end
+        if not user_claimed_v then
+            for _, fdef in pairs(self.global_flags or {}) do
+                if fdef.short == "v" then user_claimed_v = true; break end
+            end
+        end
+        local version_triggered = parsed.flags.version or
+            (not user_claimed_v and parsed.flags.v)
+        if version_triggered then
             if parsed.output_json then
                 print(json.encode({version = self.version, name = self.name}))
             else
                 print(self.name .. " v" .. self.version)
             end
-            return true
+            return core.EXIT_OK
         end
         
         -- Check for global help
@@ -398,7 +500,7 @@ function lumos.new_app(config)
             else
                 if not parsed.command then 
                     core.show_help(self)
-                    return true
+                    return core.EXIT_OK
                 end
             end
         end

@@ -46,6 +46,8 @@ Lumos exports the following modules:
 - `lumos.security` - Input sanitization and validation
 - `lumos.logger` - Structured logging
 - `lumos.bundle` - Programmatic bundling API
+- `lumos.native_build` - Native binary compilation API
+- `lumos.package` - Standalone executable packaging API (stub-based)
 
 ## Application Methods
 
@@ -579,11 +581,15 @@ local final_config = config.merge_configs(
 ### Core Configuration Loading
 
 ```lua
-local core = require('lumos.core')
+local config = require('lumos.config')
 
--- load_config supports both JSON and simple key=value files
-local cfg = core.load_config("app.json")
-local cfg2 = core.load_config("app.conf")
+-- Preferred: use the config module directly
+local cfg = config.load_file("app.json")
+local cfg2 = config.load_file("app.conf")
+
+-- core.load_config is a convenience alias that delegates to config.load_file
+local core = require('lumos.core')
+local cfg3 = core.load_config("app.json")  -- equivalent to config.load_file
 ```
 
 ## Security Module (`lumos.security`)
@@ -684,6 +690,8 @@ logger.auto("User logged in")            -- Logs as INFO
 
 ## Bundle Module (`lumos.bundle`)
 
+`lumos.bundle` amalgamates Lua modules into a single portable script. It now uses `package.searchers` (or `package.loaders` on Lua 5.1) for clean module resolution instead of monkey-patching `require`. Results are automatically cached in `.lumos/cache/`.
+
 ### Programmatic API
 
 ```lua
@@ -713,6 +721,80 @@ end
 
 -- List Lumos modules
 local lumos_mods = bundle.get_lumos_modules()
+```
+
+## Native Build Module (`lumos.native_build`)
+
+### Programmatic API
+
+```lua
+local native_build = require('lumos.native_build')
+
+local ok, err, info = native_build.create({
+    entry = "src/main.lua",
+    output = "dist/myapp",
+    include_lumos = true,
+    strip_comments = true,
+    static = true,         -- force static linking
+    bytecode = true,       -- compile to bytecode before embedding
+    debug_build = true,    -- keep temporary C wrapper
+})
+
+if ok then
+    print("Binary built: " .. info.output)
+    print("Size: " .. info.size .. " bytes")
+    print("Compiler: " .. info.compiler)
+    if info.static then
+        print("Statically linked")
+    end
+    if info.debug_build then
+        print("C wrapper kept at: " .. info.main_c_path)
+    end
+else
+    print("Error: " .. err)
+end
+```
+
+### Toolchain Detection
+
+```lua
+local tc, err = native_build.detect_toolchain({ cc = "musl-gcc" })
+if tc then
+    print("Compiler: " .. tc.compiler)
+    print("Headers: " .. tc.lua_include_dir)
+end
+```
+
+## Package Module (`lumos.package`)
+
+### Programmatic API
+
+```lua
+local pkg = require('lumos.package')
+
+-- List available stub targets
+local targets = pkg.list_targets()
+for _, t in ipairs(targets) do
+    print("Target: " .. t)
+end
+
+-- Create a standalone package
+local ok, err, info = pkg.create({
+    entry = "src/main.lua",
+    output = "dist/myapp",
+    target = "linux-x86_64",
+    include_lumos = true,
+    strip_comments = true,
+})
+
+if ok then
+    print("Package created: " .. info.output)
+    print("Target: " .. info.target)
+    print("Total size: " .. info.size .. " bytes")
+    print("Stub size: " .. info.stub_size .. " bytes")
+else
+    print("Error: " .. err)
+end
 ```
 
 ## Documentation Generation

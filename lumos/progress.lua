@@ -4,7 +4,6 @@
 local progress = {}
 
 local color = require('lumos.color')
-local lumos_table = require('lumos.table')
 
 -- Progress bar class
 local ProgressBar = {}

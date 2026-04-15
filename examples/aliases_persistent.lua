@@ -9,6 +9,7 @@ package.path = package.path .. ";../?.lua;../?/init.lua;"
 local lumos = require('lumos')
 local color = require('lumos.color')
 
+local logger = require('lumos.logger')
 -- Create the application
 local app = lumos.new_app({
     name = "aliases_demo",
@@ -110,28 +111,28 @@ add:action(function(ctx)
     local count = ctx.flags.count or 1
     
     if not item then
-        print(color.status.error("Please provide an item to add"))
+        logger.error("Please provide an item to add")
         return false
     end
     
     if ctx.flags.verbose then
-        print(color.status.info("Verbose mode enabled"))
-        print("Command used: " .. (ctx.command.name or "unknown"))
-        print("Item to add: " .. item)
+        logger.info("Verbose mode enabled")
+        logger.info("Command used: " .. (ctx.command.name or "unknown"))
+        logger.info("Item to add: " .. item)
         local flag_names = {}
         for name, _ in pairs(ctx.flags or {}) do
             table.insert(flag_names, name)
         end
-        print("All flags: " .. table.concat(flag_names, ", "))
+        logger.info("All flags: " .. table.concat(flag_names, ", "))
     end
     
     if ctx.flags.dry_run then
-        print(color.status.warning("DRY RUN: Would add " .. count .. " " .. item .. "(s)"))
+        logger.warn("DRY RUN: Would add " .. count .. " " .. item .. "(s)")
     else
         if add_item(item, count) then
-            print(color.status.success("Added " .. count .. " " .. item .. "(s)"))
+            logger.info("Added " .. count .. " " .. item .. "(s)")
         else
-            print(color.status.error("Failed to add items"))
+            logger.error("Failed to add items")
             return false
         end
     end
@@ -152,26 +153,26 @@ remove:action(function(ctx)
     local item = ctx.args[1]
     
     if not item then
-        print(color.status.error("Please provide an item to remove"))
+        logger.error("Please provide an item to remove")
         return false
     end
     
     if ctx.flags.verbose then
-        print(color.status.info("Verbose mode enabled"))
-        print("Item to remove: " .. item)
+        logger.info("Verbose mode enabled")
+        logger.info("Item to remove: " .. item)
     end
     
     if ctx.flags.dry_run then
-        print(color.status.warning("DRY RUN: Would remove " .. item))
+        logger.warn("DRY RUN: Would remove " .. item)
     else
         if remove_item(item) then
             if ctx.flags.force then
-                print(color.status.success("Forcefully removed " .. item))
+                logger.info("Forcefully removed " .. item)
             else
-                print(color.status.success("Removed " .. item))
+                logger.info("Removed " .. item)
             end
         else
-            print(color.status.error("Item '" .. item .. "' not found"))
+            logger.error("Item '\''" .. item .. "\'' not found")
             return false
         end
     end
@@ -189,14 +190,14 @@ list:action(function(ctx)
     local items = load_items()
     
     if ctx.flags.verbose then
-        print(color.status.info("Listing all items from " .. data_file .. ":"))
+        logger.info("Listing all items from " .. data_file .. ":")
     end
     
     if #items == 0 then
-        print(color.status.warning("No items in the list"))
+        logger.warn("No items in the list")
     else
         for i, item in ipairs(items) do
-            print(i .. ". " .. color.cyan(item))
+            logger.info(i .. ". " .. color.cyan(item))
         end
     end
     
@@ -204,4 +205,4 @@ list:action(function(ctx)
 end)
 
 -- Run the app
-app:run(arg)
+os.exit(app:run(arg))

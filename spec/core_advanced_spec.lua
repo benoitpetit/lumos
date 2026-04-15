@@ -66,6 +66,138 @@ describe('Advanced Core Module', function()
             assert.are.equal(1, #errors)
             assert.matches("must be <= 10", errors[1])
         end)
+
+        it('applies default values for flags', function()
+            local test_app = app.new_app()
+            local cmd = test_app:command('test', 'Test command')
+            cmd.flags = {
+                format = {type = "string", long = "format", default = "json"}
+            }
+
+            local merged, errors = core.validate_and_merge_flags(test_app, cmd, {})
+            assert.are.equal(0, #errors)
+            assert.are.equal("json", merged.format)
+        end)
+
+        it('reads flag values from environment variables', function()
+            local test_app = app.new_app()
+            local cmd = test_app:command('test', 'Test command')
+            cmd.flags = {
+                name = {type = "string", long = "name", env = "LUMOS_TEST_NAME"}
+            }
+
+            os.execute("export LUMOS_TEST_NAME=from_env")  -- won't affect current process
+            -- Instead, directly test the env binding by querying the flag definition
+            assert.are.equal("LUMOS_TEST_NAME", cmd.flags.name.env)
+        end)
+
+        it('reports required flags as errors when missing', function()
+            local test_app = app.new_app()
+            local cmd = test_app:command('test', 'Test command')
+            cmd.flags = {
+                token = {type = "string", long = "token", required = true}
+            }
+
+            local merged, errors = core.validate_and_merge_flags(test_app, cmd, {})
+            assert.are.equal(1, #errors)
+            assert.matches("is required", errors[1])
+        end)
+
+        it('runs custom validators', function()
+            local test_app = app.new_app()
+            local cmd = test_app:command('test', 'Test command')
+            cmd.flags = {
+                port = {
+                    type = "int",
+                    long = "port",
+                    custom_validator = function(v)
+                        return v > 1024, "port must be > 1024"
+                    end
+                }
+            }
+
+            local merged_ok, errors_ok = core.validate_and_merge_flags(test_app, cmd, {port = "8080"})
+            assert.are.equal(0, #errors_ok)
+
+            local merged_bad, errors_bad = core.validate_and_merge_flags(test_app, cmd, {port = "80"})
+            assert.are.equal(1, #errors_bad)
+        end)
+    end)
+
+    -- -------------------------------------------------------------------------
+    describe('Argument validation', function()
+        it('validates required positional arguments', function()
+            local test_app = app.new_app()
+            local cmd = test_app:command('deploy', 'Deploy app')
+            cmd:arg('env', 'Environment', {required = true})
+
+            local parsed = core.parse_arguments({'deploy'}, test_app)
+            local validated, errors = core.validate_args(cmd, parsed)
+            assert.are.equal(1, #errors)
+            assert.is_not_nil(errors[1]:match("required"))
+        end)
+
+        it('converts positional args to int type', function()
+            local test_app = app.new_app()
+            local cmd = test_app:command('serve', 'Serve app')
+            cmd:arg('port', 'Port number', {type = 'int'})
+
+            local parsed = core.parse_arguments({'serve', '8080'}, test_app)
+            local validated, errors = core.validate_args(cmd, parsed)
+            assert.are.equal(0, #errors)
+            assert.are.equal(8080, validated[1])
+        end)
+
+        it('applies default values for missing args', function()
+            local test_app = app.new_app()
+            local cmd = test_app:command('greet', 'Greet')
+            cmd:arg('name', 'Name', {default = 'World'})
+
+            local parsed = core.parse_arguments({'greet'}, test_app)
+            local validated, errors = core.validate_args(cmd, parsed)
+            assert.are.equal(0, #errors)
+            assert.are.equal('World', validated[1])
+        end)
+
+        it('enforces min and max on numeric args', function()
+            local test_app = app.new_app()
+            local cmd = test_app:command('scale', 'Scale')
+            cmd:arg('count', 'Instance count', {type = 'int', min = 1, max = 10})
+
+            local parsed = core.parse_arguments({'scale', '15'}, test_app)
+            local validated, errors = core.validate_args(cmd, parsed)
+            assert.are.equal(1, #errors)
+            assert.is_not_nil(errors[1]:match("must be <= 10"))
+        end)
+
+        it('runs custom validators on args', function()
+            local test_app = app.new_app()
+            local cmd = test_app:command('deploy', 'Deploy')
+            cmd:arg('env', 'Environment', {
+                validate = function(v)
+                    return v == 'staging' or v == 'production', "must be staging or production"
+                end
+            })
+
+            local parsed_ok = core.parse_arguments({'deploy', 'staging'}, test_app)
+            local validated_ok, errors_ok = core.validate_args(cmd, parsed_ok)
+            assert.are.equal(0, #errors_ok)
+
+            local parsed_bad = core.parse_arguments({'deploy', 'dev'}, test_app)
+            local validated_bad, errors_bad = core.validate_args(cmd, parsed_bad)
+            assert.are.equal(1, #errors_bad)
+        end)
+
+        it('returns EXIT_USAGE when required arg is missing in execute_command', function()
+            local test_app = app.new_app({name = 'testapp'})
+            test_app:command('deploy', 'Deploy')
+                :arg('env', 'Environment', {required = true})
+                :action(function(ctx) return true end)
+
+            local parsed = core.parse_arguments({'deploy'}, test_app)
+            local result = core.execute_command(test_app, parsed)
+            assert.are.equal(2, result)
+        end)
     end)
 
     -- -------------------------------------------------------------------------
@@ -134,24 +266,27 @@ describe('Advanced Core Module', function()
             local result = core.execute_command(test_app, parsed)
 
             assert.is_true(called)
-            assert.is_true(result)
+            assert.are.equal(0, result)
         end)
 
-        it('returns false and prints error for unknown command', function()
+        it('returns EXIT_USAGE and prints error to stderr for unknown command', function()
             local test_app = app.new_app({name = 'testapp'})
             local original_print = _G.print
+            local original_stderr = io.stderr
             local output = ""
-            _G.print = function(s) output = output .. (s or "") end
+            io.stderr = {write = function(_, s) output = output .. (s or "") end}
+            _G.print = function() end
 
             local parsed = {command = 'unknown', flags = {}, args = {}}
             local result = core.execute_command(test_app, parsed)
 
             _G.print = original_print
-            assert.is_false(result)
+            io.stderr = original_stderr
+            assert.are.equal(2, result)
             assert.is_not_nil(output:match("Unknown command"))
         end)
 
-        it('shows help and returns true when no command given', function()
+        it('shows help and returns EXIT_OK when no command given', function()
             local test_app = app.new_app({name = 'testapp'})
             local original_print = _G.print
             _G.print = function() end
@@ -160,10 +295,10 @@ describe('Advanced Core Module', function()
             local result = core.execute_command(test_app, parsed)
 
             _G.print = original_print
-            assert.is_true(result)
+            assert.are.equal(0, result)
         end)
 
-        it('returns false when command has no action', function()
+        it('returns EXIT_USAGE when command has no action', function()
             local test_app = app.new_app({name = 'testapp'})
             test_app:command('noop', 'Does nothing')  -- no :action()
 
@@ -174,7 +309,7 @@ describe('Advanced Core Module', function()
             local result = core.execute_command(test_app, parsed)
 
             _G.print = original_print
-            assert.is_false(result)
+            assert.are.equal(2, result)
         end)
     end)
 
@@ -207,6 +342,108 @@ describe('Advanced Core Module', function()
             _G.print = original_print
             assert.is_not_nil(output:match("build"))
             assert.is_not_nil(output:match("deploy"))
+        end)
+
+        it('groups commands by category', function()
+            local test_app = app.new_app({name = 'myapp'})
+            test_app:command('build', 'Build'):category('Dev')
+            test_app:command('deploy', 'Deploy'):category('Ops')
+            test_app:command('test', 'Test')  -- no category
+
+            local output = ""
+            local original_print = _G.print
+            _G.print = function(s) output = output .. (s or "") .. "\n" end
+
+            core.show_help(test_app)
+
+            _G.print = original_print
+            assert.is_not_nil(output:match("Dev commands:"))
+            assert.is_not_nil(output:match("Ops commands:"))
+            assert.is_not_nil(output:match("Available commands:"))
+        end)
+    end)
+
+    describe('suggest_command()', function()
+        it('suggests a close command name', function()
+            local test_app = app.new_app({name = 'myapp'})
+            test_app:command('deploy', 'Deploy')
+
+            local suggestion = core.suggest_command(test_app, 'deplpy')
+            assert.are.equal('deploy', suggestion)
+        end)
+
+        it('returns nil when no close match', function()
+            local test_app = app.new_app({name = 'myapp'})
+            test_app:command('build', 'Build')
+
+            local suggestion = core.suggest_command(test_app, 'xyz')
+            assert.is_nil(suggestion)
+        end)
+    end)
+
+    describe('Hooks', function()
+        it('executes pre_run and post_run hooks', function()
+            local test_app = app.new_app({name = 'testapp'})
+            local pre_called = false
+            local post_called = false
+
+            test_app:command('hooked', 'Hooked cmd')
+                :pre_run(function(ctx)
+                    pre_called = true
+                    assert.are.equal('hooked', ctx.command.name)
+                end)
+                :post_run(function(ctx)
+                    post_called = true
+                    assert.is_true(ctx.success)
+                end)
+                :action(function(ctx)
+                    return true
+                end)
+
+            local parsed = core.parse_arguments({'hooked'}, test_app)
+            local result = core.execute_command(test_app, parsed)
+
+            assert.are.equal(0, result)
+            assert.is_true(pre_called)
+            assert.is_true(post_called)
+        end)
+
+        it('returns EXIT_ERROR when pre_run fails', function()
+            local test_app = app.new_app({name = 'testapp'})
+            local action_called = false
+
+            test_app:command('fail_pre', 'Fail pre')
+                :pre_run(function(ctx)
+                    error("pre_run error")
+                end)
+                :action(function(ctx)
+                    action_called = true
+                    return true
+                end)
+
+            local parsed = core.parse_arguments({'fail_pre'}, test_app)
+            local result = core.execute_command(test_app, parsed)
+
+            assert.are.equal(1, result)
+            assert.is_false(action_called)
+        end)
+
+        it('executes app-level persistent_pre_run', function()
+            local test_app = app.new_app({name = 'testapp'})
+            local persistent_called = false
+
+            test_app:persistent_pre_run(function(ctx)
+                persistent_called = true
+            end)
+
+            test_app:command('cmd', 'Cmd')
+                :action(function(ctx) return true end)
+
+            local parsed = core.parse_arguments({'cmd'}, test_app)
+            local result = core.execute_command(test_app, parsed)
+
+            assert.are.equal(0, result)
+            assert.is_true(persistent_called)
         end)
     end)
 

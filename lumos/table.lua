@@ -62,6 +62,12 @@ local function to_string(val)
     end
 end
 
+-- Return the visible width of a string (ANSI escape sequences are ignored)
+local function display_width(s)
+    s = tostring(s or "")
+    return #(s:gsub("\27%[[0-9;]*m", ""))
+end
+
 
 function tbl.boxed(items, options)
     options = options or {}
@@ -81,7 +87,7 @@ function tbl.boxed(items, options)
     if footer then table.insert(all_items, footer) end
     local max_len = 0
     for _, item in ipairs(all_items) do
-        if #item > max_len then max_len = #item end
+        if display_width(item) > max_len then max_len = display_width(item) end
     end
 
     -- If 'large' option, adapt width to terminal
@@ -94,7 +100,7 @@ function tbl.boxed(items, options)
     end
 
     local function align_text(text)
-        local text_len = #text
+        local text_len = display_width(text)
         local pad_left, pad_right = 0, 0
         if options.align == "center" then
             pad_left = math.floor((max_len - text_len) / 2)
@@ -183,7 +189,7 @@ function tbl.create(data, options)
     local col_widths = {}
     for _, row in ipairs(matrix) do
         for i, cell in ipairs(row) do
-            col_widths[i] = math.max(col_widths[i] or 0, #cell)
+            col_widths[i] = math.max(col_widths[i] or 0, display_width(cell))
         end
     end
     
@@ -225,7 +231,7 @@ function tbl.create(data, options)
         for i, cell in ipairs(row) do
             local width = col_widths[i]
             -- Truncate cell if it exceeds the column width (e.g. due to max_width)
-            if #cell > width then
+            if display_width(cell) > width then
                 cell = cell:sub(1, width)
             end
             local padded_cell
@@ -233,13 +239,13 @@ function tbl.create(data, options)
             -- Alignment
             local align = options.align and options.align[i] or "left"
             if align == "center" then
-                local pad_left = math.floor((width - #cell) / 2)
-                local pad_right = width - #cell - pad_left
+                local pad_left = math.floor((width - display_width(cell)) / 2)
+                local pad_right = width - display_width(cell) - pad_left
                 padded_cell = string.rep(" ", pad_left) .. cell .. string.rep(" ", pad_right)
             elseif align == "right" then
-                padded_cell = string.rep(" ", width - #cell) .. cell
+                padded_cell = string.rep(" ", width - display_width(cell)) .. cell
             else -- left
-                padded_cell = cell .. string.rep(" ", width - #cell)
+                padded_cell = cell .. string.rep(" ", width - display_width(cell))
             end
             
             line = line .. " " .. padded_cell .. " " .. border_chars.vertical
@@ -324,7 +330,7 @@ function tbl.simple(data, options)
     local col_widths = {}
     for _, row in ipairs(matrix) do
         for i, cell in ipairs(row) do
-            col_widths[i] = math.max(col_widths[i] or 0, #cell)
+            col_widths[i] = math.max(col_widths[i] or 0, display_width(cell))
         end
     end
     
@@ -336,20 +342,20 @@ function tbl.simple(data, options)
         for i, cell in ipairs(row) do
             local width = col_widths[i]
             -- Truncate cell if it exceeds the column width
-            if #cell > width then
+            if display_width(cell) > width then
                 cell = cell:sub(1, width)
             end
             local align = options.align and options.align[i] or "left"
             local padded_cell
             
             if align == "center" then
-                local pad_left = math.floor((width - #cell) / 2)
-                local pad_right = width - #cell - pad_left
+                local pad_left = math.floor((width - display_width(cell)) / 2)
+                local pad_right = width - display_width(cell) - pad_left
                 padded_cell = string.rep(" ", pad_left) .. cell .. string.rep(" ", pad_right)
             elseif align == "right" then
-                padded_cell = string.rep(" ", width - #cell) .. cell
+                padded_cell = string.rep(" ", width - display_width(cell)) .. cell
             else -- left
-                padded_cell = cell .. string.rep(" ", width - #cell)
+                padded_cell = cell .. string.rep(" ", width - display_width(cell))
             end
             
             table.insert(line_parts, padded_cell)
@@ -389,6 +395,44 @@ function tbl.key_value(data, options)
     else
         return tbl.create(items, table_options)
     end
+end
+
+-- Split rows into pages of a given size.
+function tbl.paginate(rows, page_size)
+    page_size = page_size or 10
+    local pages = {}
+    for i = 1, #rows, page_size do
+        local page = {}
+        for j = i, math.min(i + page_size - 1, #rows) do
+            table.insert(page, rows[j])
+        end
+        table.insert(pages, page)
+    end
+    return pages
+end
+
+-- Return a single page of rows along with pagination metadata.
+function tbl.page(rows, page_num, page_size)
+    page_num = page_num or 1
+    page_size = page_size or 10
+    local total_pages = math.max(1, math.ceil(#rows / page_size))
+    if page_num < 1 then page_num = 1 end
+    if page_num > total_pages then page_num = total_pages end
+    local start_idx = (page_num - 1) * page_size + 1
+    local end_idx = math.min(start_idx + page_size - 1, #rows)
+    local page = {}
+    for i = start_idx, end_idx do
+        table.insert(page, rows[i])
+    end
+    return {
+        data = page,
+        page = page_num,
+        total_pages = total_pages,
+        total_rows = #rows,
+        page_size = page_size,
+        has_next = page_num < total_pages,
+        has_prev = page_num > 1
+    }
 end
 
 return tbl

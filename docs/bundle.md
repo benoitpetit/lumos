@@ -4,13 +4,18 @@ Guide for creating portable CLI applications with Lumos.
 
 ## Overview
 
-The `lumos bundle` command creates a single, portable Lua file containing your CLI application and all its dependencies. This file can be distributed and executed on any machine with Lua installed, without requiring Lumos to be installed.
+The `lumos bundle` command creates a single, portable Lua file containing your CLI application and all its dependencies. This file can be distributed and executed on any machine with **Lua installed**, without requiring Lumos to be installed.
+
+The **`lumos build`** command compiles your application into a **native binary** (ELF/PE/Mach-O) that embeds the Lua VM, your code, and any available static native modules. When built with `--static` (automatic with `musl-gcc`), the resulting binary has **zero runtime dependencies** and works even on machines without Lua installed. This command requires a C toolchain on the build machine.
+
+The **`lumos package`** command provides the best of both worlds: it creates a standalone executable by combining a precompiled stub binary (which already contains a Lua interpreter) with your amalgamated Lua code. **No C compiler is required** on your machine—just the appropriate stub for your target platform.
 
 ## Requirements
 
-- **Lua runtime** must be installed on the target machine (Lua 5.1+)
-- **Native C modules** (e.g. `luafilesystem`) are *not* bundled and must be installed separately on the target if your app uses them
-- On **Windows**, run the bundle with `lua myapp` instead of `./myapp`
+- **`lumos bundle`**: **Lua runtime** must be installed on the target machine (Lua 5.1+). The output is a Lua script, not a native binary. Native C modules (e.g. `luafilesystem`) are *not* bundled and must be installed separately.
+- **`lumos build`**: Produces a native binary. No Lua runtime is required on the target. By default the binary is dynamically linked to `libc`; use `--static` for a fully standalone executable. Requires a C compiler + Lua headers. Static native C modules can be linked in if their `.a` archives are available on the build machine.
+- **`lumos package`**: Produces a standalone executable with **no C compiler required** on the build machine. The output is a precompiled stub + your Lua payload. Native C modules cannot be included in the package.
+- On **Windows**, run a bundle with `lua myapp` instead of `./myapp`. Native binaries built with `lumos build` or `lumos package` can run directly as `myapp.exe`.
 
 ## Quick Start
 
@@ -19,6 +24,14 @@ The `lumos bundle` command creates a single, portable Lua file containing your C
 lumos bundle src/main.lua -o dist/myapp
 
 # The generated file can be run directly on Unix
+./dist/myapp --help
+
+# Or build a fully standalone native binary
+lumos build src/main.lua -o dist/myapp
+./dist/myapp --help
+
+# Or package into a standalone executable without a C compiler
+lumos package src/main.lua -o dist/myapp
 ./dist/myapp --help
 ```
 
@@ -45,6 +58,94 @@ lumos bundle <entry_file> [options]
 | `--no-lumos` | Do not bundle Lumos framework (requires Lumos on target) |
 | `--strip-comments` | Remove comments to reduce file size |
 | `--analyze` | Analyze dependencies without creating bundle |
+
+## The `lumos build` Command
+
+### Syntax
+
+```bash
+lumos build <entry_file> [options]
+```
+
+### Arguments
+
+| Argument | Description |
+|----------|-------------|
+| `entry_file` | Entry point file of your CLI (e.g., `src/main.lua`) |
+
+### Options
+
+| Option | Description |
+|--------|-------------|
+| `-o, --output <path>` | Output binary path (default: `dist/<name>`) |
+| `-d, --dir <path>` | Project directory (default: current directory) |
+| `--no-lumos` | Do not bundle Lumos framework |
+| `--strip-comments` | Remove comments to reduce binary payload size |
+| `--cc <compiler>` | Force a specific C compiler (e.g. `gcc`, `musl-gcc`) |
+| `--static` | Produce a fully statically linked binary |
+| `--bytecode` | Compile Lua payload to bytecode before embedding |
+| `--analyze` | Analyze dependencies without building |
+
+### How It Works
+
+1. **Amalgamation**: `lumos build` first amalgamates your Lua code and dependencies exactly like `lumos bundle`.
+2. **C Wrapper Generation**: It generates a small C program that embeds the Lua payload as a byte array and initializes a `lua_State`.
+3. **Toolchain Detection**: It auto-detects your C compiler, Lua headers, and `liblua.a` static library.
+4. **Static Native Modules**: If your app uses supported native C modules (e.g. `lfs`, `socket`, `ssl`, `cjson`, `lsqlite3`) and their static archives (`.a`) are found, they are linked directly into the binary and registered in `package.preload`.
+5. **Compilation**: The C wrapper is compiled and linked into a single executable.
+
+### Cross-Platform Notes
+
+| Platform | Status | Notes |
+|----------|--------|-------|
+| **Linux** | ✅ Fully supported | Use `musl-gcc --static` for a 100% static, distro-independent binary. |
+| **Windows** | ✅ Supported | Cross-compile from Linux with `x86_64-w64-mingw32-gcc`. |
+| **macOS** | ⚠️ Partial | macOS does not allow fully static binaries, but `liblua.a` can still be linked statically. |
+
+## The `lumos package` Command
+
+### Syntax
+
+```bash
+lumos package <entry_file> [options]
+```
+
+### Arguments
+
+| Argument | Description |
+|----------|-------------|
+| `entry_file` | Entry point file of your CLI (e.g., `src/main.lua`) |
+
+### Options
+
+| Option | Description |
+|--------|-------------|
+| `-o, --output <path>` | Output file path (default: `dist/<name>`) |
+| `-d, --dir <path>` | Project directory (default: current directory) |
+| `-t, --target <name>` | Target platform stub (default: `linux-x86_64`) |
+| `--list-targets` | List available stub targets and exit |
+| `--no-lumos` | Do not bundle Lumos framework |
+| `--strip-comments` | Remove comments to reduce payload size |
+
+### How It Works
+
+1. **Amalgamation**: `lumos package` first amalgamates your Lua code and dependencies exactly like `lumos bundle`.
+2. **Stub Selection**: It loads a precompiled stub binary for the requested target platform. The stub already contains a statically linked Lua interpreter.
+3. **Concatenation**: The stub binary, the Lua payload, and an 8-byte size footer are concatenated into a single file.
+4. **Execution**: At runtime, the stub opens its own executable file, reads the size footer, extracts the Lua payload, and executes it via `luaL_loadbuffer`.
+
+### Stubs
+
+Stubs are precompiled static binaries stored in the `stubs/` directory of the Lumos installation. The following stubs are currently available:
+
+- `lumos-stub-linux-x86_64` — Linux x86_64 (statically linked)
+
+You can build additional stubs from `stubs/stub.c` using your platform's C compiler and `liblua.a`.
+
+### When to Use `package` vs `build`
+
+- Use **`lumos package`** when you want a standalone executable **quickly** and don't have a C toolchain installed. Ideal for CI/CD pipelines and rapid distribution.
+- Use **`lumos build`** when you need maximum control, want to embed static native C modules, or need to target a platform for which no stub is available.
 
 ## Examples
 
@@ -91,6 +192,46 @@ lumos bundle src/main.lua --analyze
 #   ...
 ```
 
+### Native Binary Build
+
+```bash
+# Build a standalone native binary
+lumos build src/main.lua -o dist/myapp
+
+# Result: dist/myapp (native executable, no Lua required on target)
+```
+
+### Package Build (No Compiler Required)
+
+```bash
+# List available stub targets
+lumos package --list-targets
+
+# Package for the default target (linux-x86_64)
+lumos package src/main.lua -o dist/myapp
+
+# Package for a specific target
+lumos package src/main.lua -t linux-x86_64 -o dist/myapp
+```
+
+### Build with Bytecode
+
+```bash
+# Compile Lua source to bytecode and embed it (obfuscation + smaller size)
+lumos build src/main.lua -o dist/myapp --bytecode
+```
+
+### Fully Static Binary (Linux)
+
+```bash
+# Build a 100% static binary using musl
+lumos build src/main.lua -o dist/myapp --static --cc musl-gcc
+
+# Verify it has no dynamic dependencies
+ldd dist/myapp
+# output: not a dynamic executable
+```
+
 ### Bundle Without Lumos
 
 If the target machine already has Lumos installed:
@@ -128,20 +269,20 @@ _BUNDLED_MODULES["lumos"] = assert(_loadcode(...))
 
 -- ... other modules ...
 
--- Install bundled module loader
-local _original_require = require
-local function _bundled_require(name)
+-- Install bundled module loader via package.searchers / package.loaders
+local _searchers = package.searchers or package.loaders
+table.insert(_searchers, 1, function(name)
     if _BUNDLED_MODULES[name] then
-        if package.loaded[name] == nil then
-            local result = _BUNDLED_MODULES[name]()
-            if result == nil then result = true end
-            package.loaded[name] = result
+        return function(...)
+            if package.loaded[name] == nil then
+                local result = _BUNDLED_MODULES[name](...)
+                if result == nil then result = true end
+                package.loaded[name] = result
+            end
+            return package.loaded[name]
         end
-        return package.loaded[name]
     end
-    return _original_require(name)
-end
-require = _bundled_require
+end)
 
 -- ============================================
 -- Main Application
@@ -194,14 +335,37 @@ myapp --help
 
 ## Limitations
 
-### Native C Modules
+### `lumos bundle` and Native C Modules
 
-Bundling cannot include native C modules such as:
-- `luafilesystem` (lfs)
-- `luasocket`
-- `luasec`
+`lumos bundle` creates a Lua script, so it cannot include native C modules such as `luasocket` or `luasec`. If your application uses these, they must be installed on the target machine.
 
-If your application uses these modules, they must be installed on the target machine.
+### `lumos build` and Native C Modules
+
+`lumos build` **can** statically link native C modules when their static archives (`.a` files) are available on the build machine. Currently supported modules include:
+
+- **Filesystem**: `lfs`
+- **Networking**: `socket`, `mime`, `ssl`
+- **JSON**: `cjson`, `rapidjson`, `yajl`
+- **Database**: `lsqlite3`, `dbi`
+- **Parsing**: `lpeg`, `lpeglabel`
+- **Crypto**: `bcrypt`, `argon2`, `md5`, `sha2`, `openssl`, `ossl`
+- **Compression**: `zlib`, `lz4`, `zstd`, `brotli`
+- **POSIX / OS**: `posix`, `unix`, `term`, `linenoise`, `readline`, `winio`
+- **System / Process**: `system`, `proc`, `spawn`, `lanes`, `pthread`
+- **Events**: `ev`, `inotify`, `epoll`, `kqueue`
+- **HTTP**: `curl`, `cURL`
+- **Serialization**: `pb`, `struct`, `uuid`, `base64`, `cmsgpack`
+- **Images**: `gd`, `vips`
+- **XML**: `expat`, `xmlreader`
+- **Encoding**: `iconv`, `utf8`
+- **Bitwise**: `bit`, `bit32`
+- **Misc**: `sysctl`, `expect`, `child`
+
+If a static archive is not found, `lumos build` will emit a warning but still produce the binary. In that case, the binary will fail at runtime if it attempts to `require` the missing module.
+
+### `lumos package` and Native C Modules
+
+`lumos package` uses a precompiled stub that only contains the Lua interpreter. It cannot include native C modules. If your app uses `lfs`, `socket`, or any other C module, you must use `lumos build` instead.
 
 ### Recommendations
 
@@ -211,7 +375,7 @@ If your application uses these modules, they must be installed on the target mac
 
 ## Programmatic API
 
-The `lumos.bundle` module can also be used directly in your scripts:
+The `lumos.bundle` and `lumos.native_build` modules can also be used directly in your scripts:
 
 ```lua
 local bundle = require('lumos.bundle')
@@ -243,13 +407,53 @@ local lumos_mods = bundle.get_lumos_modules()
 for _, name in ipairs(lumos_mods) do
     print(name)
 end
+
+-- Build a native binary programmatically
+local native_build = require('lumos.native_build')
+local ok, err, info = native_build.create({
+    entry = "src/main.lua",
+    output = "dist/myapp",
+    include_lumos = true,
+    strip_comments = true,
+    static = true,
+    cc = "musl-gcc"
+})
+
+if ok then
+    print("Binary built: " .. info.output)
+    print("Size: " .. info.size .. " bytes")
+    print("Compiler: " .. info.compiler)
+else
+    print("Error: " .. err)
+end
+
+-- Package a standalone executable programmatically
+local pkg = require('lumos.package')
+local ok, err, info = pkg.create({
+    entry = "src/main.lua",
+    output = "dist/myapp",
+    target = "linux-x86_64",
+    include_lumos = true,
+    strip_comments = true,
+})
+
+if ok then
+    print("Package created: " .. info.output)
+    print("Target: " .. info.target)
+    print("Total size: " .. info.size .. " bytes")
+    print("Stub size: " .. info.stub_size .. " bytes")
+else
+    print("Error: " .. err)
+end
 ```
 
 ## Comparison with Other Approaches
 
 | Approach | Advantages | Disadvantages |
 |----------|-----------|---------------|
-| **lumos bundle** | Simple, integrated | No native compilation |
+| **lumos bundle** | Simple, integrated | Requires Lua runtime on target |
+| **lumos build** | True native binary, zero dependencies, static C modules | Requires a C toolchain at build time |
+| **lumos package** | Standalone binary, no C compiler needed | Requires a precompiled stub for target platform |
 | **luastatic** | Native binary executable | Complex to configure |
 | **squish** | Very flexible | External tool required |
 | **LuaRocks** | Standard distribution | Requires LuaRocks on target |
@@ -257,7 +461,9 @@ end
 ## Best Practices
 
 1. **Use `--analyze` first** to understand what will be included
-2. **Test the bundle** on a machine without Lumos installed
-3. **Use `--strip-comments`** for production builds
-4. **Version your bundles** with a clear scheme (e.g., `myapp-1.0.0`)
-5. **Document prerequisites** (Lua version, required C modules)
+2. **Test the bundle/binary/package** on a machine without Lumos or Lua installed
+3. **Use `--strip-comments`** for production builds to reduce size
+4. **Use `lumos build --static`** for maximum portability on Linux
+5. **Use `lumos package`** when you need a standalone binary quickly without a C toolchain
+6. **Version your bundles** with a clear scheme (e.g., `myapp-1.0.0`)
+7. **Document prerequisites** only when using `lumos bundle` with native C modules

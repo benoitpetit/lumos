@@ -134,7 +134,7 @@ When adding new functionality:
 A successful test run shows:
 
 ```
-269 successes / 0 failures / 0 errors / 0 pending : X.XXXXX seconds
+295 successes / 0 failures / 0 errors / 0 pending : X.XXXXX seconds
 ```
 
 Any failures or errors indicate issues that need to be addressed before merging changes.

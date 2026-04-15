@@ -9,6 +9,7 @@ package.path = package.path .. ";../?.lua;../?/init.lua;"
 local lumos = require('lumos')
 local color = require('lumos.color')
 
+local logger = require('lumos.logger')
 -- Create the application
 local app = lumos.new_app({
     name = "myapp",
@@ -44,11 +45,11 @@ greet:action(function(ctx)
     end
     
     if ctx.flags.verbose then
-        print(color.dim("Verbose mode enabled"))
-        print(color.dim("Received arguments: " .. table.concat(ctx.args or {}, ", ")))
+        logger.info("Verbose mode enabled")
+        logger.info("Received arguments: " .. table.concat(ctx.args or {}, ", "))
     end
     
-    print(message)
+    logger.info(message)
     return true
 end)
 
@@ -57,18 +58,18 @@ local info = app:command("info", "Display application information")
 info:flag("-a --all", "Show all information")
 
 info:action(function(ctx)
-    print(color.bold("Application Information:"))
-    print("Name: " .. color.cyan("myapp"))
-    print("Version: " .. color.yellow("0.1.0"))
+    logger.info("Application Information:")
+    logger.info("Name: " .. color.cyan("myapp"))
+    logger.warn("Version: " .. color.yellow("0.1.0"))
     
     if ctx.flags.all then
-        print("Framework: " .. color.magenta("Lumos"))
-        print("Language: " .. color.blue("Lua"))
-        print("Available commands: greet, info")
+        logger.info("Framework: " .. color.magenta("Lumos"))
+        logger.info("Language: " .. color.blue("Lua"))
+        logger.info("Available commands: greet, info")
     end
     
     return true
 end)
 
 -- Run the application with command line arguments
-app:run(arg)
+os.exit(app:run(arg))

@@ -10,6 +10,7 @@ local color = require('lumos.color')
 local prompt = require('lumos.prompt')
 local json = require('lumos.json')
 
+local logger = require('lumos.logger')
 -- Create app
 local app = lumos.new_app({
     name = "json_demo",
@@ -34,7 +35,7 @@ list_cmd:action(function(ctx)
     if ctx.flags.json then
         print(json.encode(data))
     else
-        print(color.bold("Sample Data:"))
+        logger.info("Sample Data:")
         for _, user in ipairs(data.users) do
             print("• " .. color.cyan(user.name) .. " (" .. user.email .. ") - Age: " .. user.age)
         end
@@ -47,7 +48,7 @@ end)
 -- Command to test validation
 local validate_cmd = app:command("validate", "Test input validation")
 validate_cmd:action(function(ctx)
-    print(color.bold("=== Input Validation Demo ==="))
+    logger.info("=== Input Validation Demo ===")
     
     -- Email validation
     while true do
@@ -55,10 +56,10 @@ validate_cmd:action(function(ctx)
         local valid, error_msg = prompt.validate(email, prompt.validators.email, "Please enter a valid email address")
         
         if valid then
-            print(color.status.success("✓ Valid email: " .. email))
+            logger.info("Valid email: " .. email)
             break
         else
-            print(color.status.error("✗ " .. error_msg))
+            logger.error(error_msg)
         end
     end
     
@@ -68,21 +69,21 @@ validate_cmd:action(function(ctx)
         local valid, error_msg = prompt.validate(age, prompt.validators.number, "Please enter a valid number")
         
         if valid then
-            print(color.status.success("✓ Valid age: " .. age))
+            logger.info("Valid age: " .. age)
             break
         else
-            print(color.status.error("✗ " .. error_msg))
+            logger.error(error_msg)
         end
     end
     
-    print(color.status.info("Validation complete!"))
+    logger.info("Validation complete!")
     return true
 end)
 
 -- Command to test enhanced colors
 local colors_cmd = app:command("colors", "Test enhanced color features")
 colors_cmd:action(function(ctx)
-    print(color.bold("=== Enhanced Color Features ==="))
+    logger.info("=== Enhanced Color Features ===")
     
     -- Status colors
     print("Status colors:")
@@ -113,4 +114,4 @@ colors_cmd:action(function(ctx)
 end)
 
 -- Run the app
-app:run(arg)
+os.exit(app:run(arg))

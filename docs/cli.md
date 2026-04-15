@@ -310,6 +310,26 @@ lumos bundle src/main.lua -o dist/myapp
 
 Creates a self-contained single-file Lua script. See [Bundling Guide](bundle.md) for details.
 
+### Build Native Binaries
+
+```bash
+lumos build src/main.lua -o dist/myapp
+lumos build src/main.lua -o dist/myapp --static
+lumos build src/main.lua -o dist/myapp --bytecode --debug-build
+```
+
+Compiles your application into a native binary that embeds the Lua VM. Requires a C compiler and Lua development headers on the build machine. See [Bundling Guide](bundle.md) for details.
+
+### Package Standalone Executables
+
+```bash
+lumos package --list-targets
+lumos package src/main.lua -o dist/myapp
+lumos package src/main.lua -t linux-x86_64 -o dist/myapp
+```
+
+Creates a standalone executable by combining a precompiled stub binary (which already contains a Lua interpreter) with your amalgamated Lua code. **No C compiler is required** on your machine. See [Bundling Guide](bundle.md) for details.
+
 ## Development Tips
 
 1. **Testing**: Write tests in the `tests/` directory following the `*_spec.lua` naming pattern
@@ -342,4 +362,4 @@ Once your CLI is working:
 2. **Add completion**: Use Lumos completion features for shell integration
 3. **Documentation**: Generate man pages with Lumos documentation tools
 4. **Testing**: Add comprehensive tests for all commands and edge cases
-5. **Bundle it**: Create a standalone executable with `lumos bundle`
+5. **Bundle/Build/Package it**: Create a standalone executable with `lumos bundle`, `lumos build`, or `lumos package`

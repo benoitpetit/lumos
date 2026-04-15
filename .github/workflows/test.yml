@@ -1,0 +1,44 @@
+name: Test
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        lua: ['5.1', '5.2', '5.3', '5.4', 'luajit']
+        os: [ubuntu-latest]
+        include:
+          - lua: '5.4'
+            os: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Lua
+        uses: leafo/gh-actions-lua@v10
+        with:
+          luaVersion: ${{ matrix.lua }}
+
+      - name: Setup LuaRocks
+        uses: leafo/gh-actions-luarocks@v4
+
+      - name: Install dependencies
+        run: |
+          luarocks install luafilesystem
+          luarocks install busted
+
+      - name: Run tests
+        run: busted
+
+      - name: Lint rockspecs
+        run: |
+          luarocks lint lumos-dev-1.rockspec
+          luarocks lint lumos-0.2.0-1.rockspec

@@ -9,6 +9,7 @@ local lumos = require('lumos')
 local prompt = require('lumos.prompt')
 local json = require('lumos.json')
 
+local logger = require('lumos.logger')
 local app = lumos.new_app({
     name = "enhanced_app",
     version = "2.0.0",
@@ -26,11 +27,11 @@ users_cmd:action(function(ctx)
             print(json.encode(users))
         else
             for _, user in ipairs(users) do
-                print("User: " .. user.name)
+                logger.info("User: " .. user.name)
             end
         end
     else
-        print("No action specified")
+        logger.info("No action specified")
     end
     return true
 end)
@@ -47,15 +48,15 @@ validate_cmd:action(function(ctx)
 
     -- Guard against nil/empty input (e.g. EOF in non-interactive mode)
     if not email or email == "" then
-        print("No email provided.")
+        logger.info("No email provided.")
         return false
     end
 
     local valid, result = prompt.validate(email, prompt.validators.email)
     if valid then
-        print("Valid email: " .. result)
+        logger.info("Valid email: " .. result)
     else
-        print("Invalid email format!")
+        logger.info("Invalid email format!")
     end
     return valid
 end)
@@ -63,4 +64,4 @@ end)
 -- Add global flags
 app:flag("-j --json", "Output in JSON format")
 
-app:run(arg)
+os.exit(app:run(arg))

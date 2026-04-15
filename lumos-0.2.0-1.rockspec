@@ -1,10 +1,10 @@
 rockspec_format = "3.0"
 package = "lumos"
-version = "0.1.0-1"
+version = "0.2.0-1"
 
 source = {
    url = "git+https://github.com/benoitpetit/lumos.git",
-   tag = "v0.1.0"
+   tag = "v0.2.0"
 }
 
 description = {
@@ -54,7 +54,10 @@ build = {
       ["lumos.manpage"] = "lumos/manpage.lua",
       ["lumos.markdown"] = "lumos/markdown.lua",
       ["lumos.format"] = "lumos/format.lua",
-      ["lumos.bundle"] = "lumos/bundle.lua"
+      ["lumos.bundle"] = "lumos/bundle.lua",
+      ["lumos.native_build"] = "lumos/native_build.lua",
+      ["lumos.package"] = "lumos/package.lua",
+      ["lumos.plugin"] = "lumos/plugin.lua"
    },
    install = {
       bin = {

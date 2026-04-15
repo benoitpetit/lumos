@@ -261,10 +261,12 @@ function markdown.generate_main(app)
 end
 
 -- Generate command-specific documentation
+-- The standalone page uses H1 as the title, then H2 before the H3 sections
+-- produced by generate_command_docs, keeping the heading hierarchy valid.
 function markdown.generate_command(app, cmd)
     local content = string.format("# %s %s\n\n", app.name, cmd.name)
     content = content .. escape_markdown(cmd.description or "") .. "\n\n"
-    
+    content = content .. "## Reference\n\n"
     content = content .. generate_command_docs(app, cmd)
     
     return content

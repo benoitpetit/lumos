@@ -7,9 +7,10 @@ local logger = require('lumos.logger')
 local function escape_man(text)
     if not text then return "" end
     text = text:gsub("\\", "\\\\")
-    -- Escape hyphens at the start of the whole string and after each newline
-    text = text:gsub("^%-", "\\-")
-    text = text:gsub("\n%-", "\n\\-")
+    -- Escape ALL hyphens so groff/troff renders proper hyphen-minus characters.
+    -- This is required for flag descriptions (e.g. --flag-name) to display
+    -- correctly in man page renderers that interpret bare '-' as a soft-hyphen.
+    text = text:gsub("%-", "\\-")
     return text
 end
 
