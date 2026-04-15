@@ -355,9 +355,19 @@ function prompt.search(message, options)
     end
 end
 
+local IS_WINDOWS = _G.package.config:sub(1, 1) == "\\"
+local security = require("lumos.security")
+
 -- Open $EDITOR for multi-line input
 function prompt.editor(message, default)
-    local editor = os.getenv("EDITOR") or os.getenv("VISUAL") or "vi"
+    local editor = os.getenv("EDITOR") or os.getenv("VISUAL")
+    if not editor then
+        if IS_WINDOWS then
+            editor = "notepad.exe"
+        else
+            editor = "vi"
+        end
+    end
     local tmpfile = os.tmpname()
     local f = io.open(tmpfile, "w")
     if not f then
@@ -367,7 +377,8 @@ function prompt.editor(message, default)
         f:write(default)
     end
     f:close()
-    local ok = os.execute(editor .. " " .. tmpfile)
+    local cmd = editor .. " " .. security.shell_escape(tmpfile)
+    local ok = os.execute(cmd)
     if ok ~= 0 and ok ~= true then
         os.remove(tmpfile)
         error("Editor exited with error")

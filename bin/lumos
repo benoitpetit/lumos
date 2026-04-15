@@ -54,7 +54,8 @@ local color = safe_require('lumos.color', {
     yellow = function(s) return s end,
     green = function(s) return s end,
     white = function(s) return s end,
-    red = function(s) return s end
+    red = function(s) return s end,
+    dim = function(s) return s end
 })
 
 local prompt = safe_require('lumos.prompt', {
@@ -146,7 +147,7 @@ function M.run(args)
     -- Create the main application
     local app = lumos.new_app({
         name = "%s",
-        version = "0.2.0",
+        version = "0.2.1",
         description = "%s"
     })
 
@@ -184,7 +185,7 @@ function M.run(args)
     
     -- Add version handling
     if args and #args > 0 and args[1] == "--version" then
-        print("%s v0.2.0")
+        print("%s v0.2.1")
         print("Built with Lumos CLI Framework")
         return
     end
@@ -270,7 +271,7 @@ end
 -- Main CLI application
 local app = lumos.new_app({
     name = "lumos",
-    version = "0.2.0",
+    version = "0.2.1",
     description = "Lumos CLI framework and project generator"
 })
 
@@ -506,7 +507,7 @@ bundle_cmd:action(function(ctx)
             end
         end
         
-        if not ctx.flags["no_lumos"] then
+        if not ctx.flags["no_lumos"] and bundle then
             print(color.cyan("\nLumos modules will also be bundled:"))
             local lumos_mods = bundle.get_lumos_modules()
             for _, mod_name in ipairs(lumos_mods) do
@@ -672,6 +673,7 @@ package_cmd:flag_string("-t --target", "Target platform stub (default: linux-x86
 package_cmd:flag("--list-targets", "List available stub targets and exit")
 package_cmd:flag("--no-lumos", "Do not bundle Lumos framework")
 package_cmd:flag("--strip-comments", "Remove comments to reduce payload size")
+package_cmd:flag("--analyze", "Analyze dependencies without building")
 
 package_cmd:action(function(ctx)
     local pkg = safe_require('lumos.package')
@@ -711,6 +713,34 @@ package_cmd:action(function(ctx)
     end
     
     local project_dir = ctx.flags.dir or "."
+
+    -- Analyze mode
+    if ctx.flags.analyze then
+        local bundle = safe_require('lumos.bundle')
+        print(color.cyan("Analyzing dependencies for: " .. entry_file))
+        local modules = bundle and bundle.analyze(entry_file, {project_dir, project_dir .. "/src", project_dir .. "/lib", "."}) or {}
+
+        if #modules == 0 then
+            print(color.yellow("No local dependencies found."))
+        else
+            print(color.green("\nFound " .. #modules .. " dependencies:"))
+            for i, mod in ipairs(modules) do
+                print(string.format("  %d. %s", i, mod.name))
+                print(color.white("     -> " .. mod.path))
+            end
+        end
+
+        if not ctx.flags["no_lumos"] and bundle then
+            print(color.cyan("\nLumos modules will also be bundled:"))
+            local lumos_mods = bundle.get_lumos_modules()
+            for _, mod_name in ipairs(lumos_mods) do
+                print("  - " .. mod_name)
+            end
+        end
+
+        return true
+    end
+
     local target = ctx.flags.target or "linux-x86_64"
     
     print(color.cyan("Packaging standalone executable..."))

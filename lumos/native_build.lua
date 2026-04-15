@@ -1,6 +1,6 @@
 -- lumos/native_build.lua
 -- Native static binary builder for Lumos CLI applications.
--- Embeds the Lua VM, amalgamated Lua code (optionally as bytecode & compressed),
+-- Embeds the Lua VM, amalgamated Lua code (optionally as bytecode),
 -- and static native modules into a single executable.
 
 local native_build = {}
@@ -16,10 +16,30 @@ local function get_lfs()
     return lfs
 end
 
+local PATH_SEP = _G.package.config:sub(1, 1)
+local IS_WINDOWS = PATH_SEP == "\\"
+
+local BUILD_CACHE_DIR = ".lumos" .. PATH_SEP .. "cache"
+
+local function ensure_build_cache_dir()
+    local lfs_mod = get_lfs()
+    if not lfs_mod.attributes(BUILD_CACHE_DIR, "mode") then
+        lfs_mod.mkdir(BUILD_CACHE_DIR)
+    end
+end
+
+-- Generate a random filename inside the build cache
+local function random_tmp_name(ext)
+    ensure_build_cache_dir()
+    math.randomseed(os.time() + math.random(1, 10000))
+    local suffix = tostring(math.random(100000, 999999))
+    return BUILD_CACHE_DIR .. PATH_SEP .. "tmp_" .. suffix .. (ext or "")
+end
+
 -- Utility: execute shell command and return stdout, stderr, exit code
 local function shell_exec(cmd)
-    local tmpout = os.tmpname()
-    local tmperr = os.tmpname()
+    local tmpout = random_tmp_name(".out")
+    local tmperr = random_tmp_name(".err")
     local full_cmd = cmd .. " >" .. security.shell_escape(tmpout) .. " 2>" .. security.shell_escape(tmperr)
     local ok, _, code = os.execute(full_cmd)
     local fh = io.open(tmpout, "r")
@@ -38,11 +58,6 @@ local function file_exists(path)
     local f = io.open(path, "r")
     if f then f:close() return true end
     return false
-end
-
--- Utility: detect Windows
-local function is_windows()
-    return package.config:sub(1, 1) == "\\"
 end
 
 -- Preferred compiler candidates
@@ -76,36 +91,58 @@ function native_build.detect_compiler(preferred)
     return nil
 end
 
--- Detect available luac compiler
--- @return string|nil luac path
+-- Detect Lua version string used by pkg-config (e.g. "5.3")
+local function get_lua_version()
+    -- LuaJIT reports "LuaJIT 2.1.0-beta3" but uses 5.1 ABI
+    local v = _VERSION:match("%d+%.%d+") or "5.1"
+    return v
+end
+
+local function is_luajit()
+    return type(_G.jit) == "table" or (_VERSION and _VERSION:match("LuaJIT"))
+end
+
+-- Detect available luac compiler and verify version matches target VM
+-- @return string|nil luac path, string|nil error
 function native_build.detect_luac(preferred)
+    local target_ver = get_lua_version()
+    local candidates = {}
     if preferred then
-        local out, _, code = shell_exec("which " .. security.shell_escape(preferred) .. " 2>/dev/null")
-        if code == 0 then
-            local path = out:gsub("%s+$", "")
-            if path ~= "" then return path end
+        table.insert(candidates, preferred)
+    else
+        for _, name in ipairs(LUAC_CANDIDATES) do
+            table.insert(candidates, name)
         end
-        return nil
     end
-    for _, name in ipairs(LUAC_CANDIDATES) do
+
+    for _, name in ipairs(candidates) do
         local out, _, code = shell_exec("which " .. security.shell_escape(name) .. " 2>/dev/null")
         if code == 0 then
             local path = out:gsub("%s+$", "")
-            if path ~= "" then return path end
+            if path ~= "" then
+                -- Verify version match
+                local vout, _, vcode = shell_exec(security.shell_escape(path) .. " -v 2>&1")
+                if vcode == 0 then
+                    local luac_ver = vout:match("(%d+%.%d+)")
+                    if luac_ver == target_ver then
+                        return path
+                    end
+                end
+            end
         end
     end
-    return nil
+    return nil, "No luac compiler found matching Lua version " .. target_ver
 end
 
 -- Compile Lua source string to bytecode string
 -- @return string|nil bytecode, string|nil error
 function native_build.bytecode_compile(lua_code, preferred_luac)
-    local luac = native_build.detect_luac(preferred_luac)
+    local luac, lerr = native_build.detect_luac(preferred_luac)
     if not luac then
-        return nil, "No luac compiler found. Cannot compile to bytecode."
+        return nil, lerr or "No luac compiler found. Cannot compile to bytecode."
     end
-    local tmp_in = os.tmpname() .. ".lua"
-    local tmp_out = os.tmpname() .. ".luac"
+    local tmp_in = random_tmp_name(".lua")
+    local tmp_out = random_tmp_name(".luac")
     local f = io.open(tmp_in, "wb")
     if not f then
         return nil, "Cannot write temporary Lua file"
@@ -130,12 +167,6 @@ function native_build.bytecode_compile(lua_code, preferred_luac)
     fh:close()
     os.remove(tmp_out)
     return bytes, nil
-end
-
--- Detect Lua version string used by pkg-config (e.g. "5.3")
-local function get_lua_version()
-    local v = _VERSION:match("%d+%.%d+") or "5.1"
-    return v
 end
 
 -- Try pkg-config for a given module name
@@ -169,11 +200,16 @@ function native_build.detect_toolchain(options)
     local lua_include_dir = nil
 
     -- Try pkg-config variants
-    local pkg_names = {
-        "lua-" .. lua_ver,
-        "lua" .. lua_ver,
-        "lua"
-    }
+    local pkg_names = {}
+    if is_luajit() then
+        pkg_names = { "luajit" }
+    else
+        pkg_names = {
+            "lua-" .. lua_ver,
+            "lua" .. lua_ver,
+            "lua"
+        }
+    end
     for _, name in ipairs(pkg_names) do
         local pc_cflags, pc_libs = pkg_config(name)
         if pc_cflags then
@@ -203,15 +239,24 @@ function native_build.detect_toolchain(options)
         }
         for _, p in ipairs(common) do table.insert(search_paths, p) end
 
-        local env_lib = os.getenv("LUA_LIB")
+        local env_lib = os.getenv("LUA_LIB") or os.getenv("LUA_LIBDIR")
         if env_lib then table.insert(search_paths, 1, env_lib) end
 
-        local candidates = {
-            "liblua" .. lua_ver .. ".a",
-            "liblua" .. major .. ".a",
-            "liblua.a",
-            "liblua" .. short_ver .. ".a",
-        }
+        local candidates = {}
+        if is_luajit() then
+            candidates = {
+                "libluajit-5.1.a",
+                "libluajit.a",
+                "liblua5.1.a",
+            }
+        else
+            candidates = {
+                "liblua" .. lua_ver .. ".a",
+                "liblua" .. major .. ".a",
+                "liblua.a",
+                "liblua" .. short_ver .. ".a",
+            }
+        end
         for _, dir in ipairs(search_paths) do
             for _, cand in ipairs(candidates) do
                 local p = dir .. "/" .. cand
@@ -226,13 +271,27 @@ function native_build.detect_toolchain(options)
 
     -- Find headers
     if not lua_include_dir then
-        local inc_candidates = {
-            "/usr/include/lua" .. lua_ver,
-            "/usr/local/include/lua" .. lua_ver,
-            "/opt/homebrew/include/lua" .. lua_ver,
-            "/usr/include/lua" .. major,
-            "/usr/include",
-        }
+        local inc_candidates = {}
+        if is_luajit() then
+            inc_candidates = {
+                "/usr/include/luajit-2.1",
+                "/usr/include/luajit-2.0",
+                "/usr/local/include/luajit-2.1",
+                "/usr/local/include/luajit-2.0",
+                "/opt/homebrew/include/luajit-2.1",
+                "/opt/homebrew/include/luajit-2.0",
+            }
+        else
+            inc_candidates = {
+                "/usr/include/lua" .. lua_ver,
+                "/usr/local/include/lua" .. lua_ver,
+                "/opt/homebrew/include/lua" .. lua_ver,
+                "/usr/include/lua" .. major,
+                "/usr/include",
+            }
+        end
+        local env_inc = os.getenv("LUA_INCDIR")
+        if env_inc then table.insert(inc_candidates, 1, env_inc) end
         for _, dir in ipairs(inc_candidates) do
             if file_exists(dir .. "/lua.h") then
                 lua_include_dir = dir
@@ -246,9 +305,7 @@ function native_build.detect_toolchain(options)
     end
 
     if not liblua_path then
-        if ldflags == "" then
-            ldflags = "-llua" .. lua_ver
-        end
+        return nil, "Could not find static Lua library (liblua.a). Please install liblua-dev or lua-devel."
     end
 
     -- musl-gcc is typically used specifically for static linking
@@ -270,11 +327,11 @@ end
 -- Discover static archive for a native Lua C module (e.g. "lfs")
 -- @return string|nil path to lib<name>.a
 function native_build.find_static_native_module(name)
-    local home = os.getenv("HOME")
+    local home = os.getenv("HOME") or os.getenv("USERPROFILE")
     local lua_ver = get_lua_version()
     local search_paths = {}
     if home then
-        table.insert(search_paths, home .. "/.luarocks/lib/lua/" .. lua_ver)
+        table.insert(search_paths, home .. PATH_SEP .. ".luarocks" .. PATH_SEP .. "lib" .. PATH_SEP .. "lua" .. PATH_SEP .. lua_ver)
     end
     local common = {
         "/usr/lib/x86_64-linux-gnu",
@@ -365,6 +422,10 @@ static const size_t bundled_lua_len = sizeof(bundled_lua);]], hex)
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#ifndef LUA_OK
+#define LUA_OK 0
+#endif
 ]]
     local c_mid1 = [[
 
@@ -421,11 +482,15 @@ local KNOWN_NATIVE_MODULES = {
 
     -- Networking
     socket = "socket",
+    ["socket.core"] = "socket_core",
     mime = "mime",
+    ["mime.core"] = "mime_core",
     ssl = "ssl",
+    ["ssl.core"] = "ssl_core",
 
     -- JSON
     cjson = "cjson",
+    ["cjson.core"] = "cjson_core",
     rapidjson = "rapidjson",
     yajl = "yajl",
 
@@ -540,6 +605,7 @@ local function compile(main_c_path, output_path, toolchain, native_module_paths,
         security.shell_escape(toolchain.compiler),
         toolchain.cflags,
     }
+    local is_mingw = toolchain.compiler:find("mingw")
     if toolchain.static or options.static then
         table.insert(cmd_parts, "-static")
     end
@@ -557,7 +623,7 @@ local function compile(main_c_path, output_path, toolchain, native_module_paths,
     for _, mod_path in ipairs(native_module_paths or {}) do
         table.insert(cmd_parts, security.shell_escape(mod_path))
     end
-    if not is_windows() then
+    if not is_mingw and not IS_WINDOWS then
         table.insert(cmd_parts, "-lm -ldl")
     end
     table.insert(cmd_parts, "-o " .. security.shell_escape(output_path))
@@ -568,15 +634,6 @@ local function compile(main_c_path, output_path, toolchain, native_module_paths,
         return false, "Compilation failed.\nCommand: " .. cmd .. "\n" .. stderr .. stdout
     end
     return true, nil, cmd
-end
-
-local BUILD_CACHE_DIR = ".lumos/cache"
-
-local function ensure_build_cache_dir()
-    local lfs_mod = get_lfs()
-    if not lfs_mod.attributes(BUILD_CACHE_DIR, "mode") then
-        lfs_mod.mkdir(BUILD_CACHE_DIR)
-    end
 end
 
 local function djb2_hash(str)
@@ -611,7 +668,7 @@ function native_build.create(options)
     if options.bytecode then
         ensure_build_cache_dir()
         local bc_key = djb2_hash(lua_code)
-        local bc_cache = BUILD_CACHE_DIR .. "/bytecode-" .. bc_key .. ".luac"
+        local bc_cache = BUILD_CACHE_DIR .. PATH_SEP .. "bytecode-" .. bc_key .. ".luac"
         local f = io.open(bc_cache, "rb")
         if f then
             payload = f:read("*a")
@@ -642,21 +699,43 @@ function native_build.create(options)
     local output_path = options.output
     local entry_file = options.entry
     if not output_path then
-        local basename = entry_file:match("([^/]+)%.lua$") or "build"
+        local basename = entry_file:match("([^/\\]+)%.lua$") or "build"
         local out_dir = options.output_dir or "dist"
         local lfs_mod = get_lfs()
         if not lfs_mod.attributes(out_dir, "mode") then
             lfs_mod.mkdir(out_dir)
         end
-        output_path = out_dir .. "/" .. basename
+        output_path = out_dir .. PATH_SEP .. basename
     else
-        local parent = output_path:match("^(.+)/[^/]+$")
+        local parent = output_path:match("^(.+)[/\\][^/\\]+$")
         if parent then
             local lfs_mod = get_lfs()
             if not lfs_mod.attributes(parent, "mode") then
-                os.execute("mkdir -p " .. security.shell_escape(parent))
+                -- simple recursive mkdir using our cache dir helper logic
+                local parts = {}
+                for part in parent:gmatch("[^" .. PATH_SEP:gsub("\\", "\\\\") .. "]+") do
+                    table.insert(parts, part)
+                end
+                local current = ""
+                if not IS_WINDOWS and parent:sub(1, 1) == PATH_SEP then
+                    current = PATH_SEP
+                elseif IS_WINDOWS and parent:match("^%a:") then
+                    current = parts[1] .. PATH_SEP
+                    table.remove(parts, 1)
+                end
+                for _, part in ipairs(parts) do
+                    current = current .. part .. PATH_SEP
+                    if not lfs_mod.attributes(current, "mode") then
+                        lfs_mod.mkdir(current)
+                    end
+                end
             end
         end
+    end
+
+    -- Append .exe on Windows targets if missing
+    if IS_WINDOWS and not output_path:match("%.exe$") then
+        output_path = output_path .. ".exe"
     end
 
     -- Step 5: Detect native C modules used
@@ -677,7 +756,7 @@ function native_build.create(options)
         native_modules = native_modules,
     })
 
-    local main_c_path = os.tmpname() .. ".c"
+    local main_c_path = random_tmp_name(".c")
     local f = io.open(main_c_path, "w")
     if not f then
         return false, "Cannot write temporary C file: " .. main_c_path

@@ -27,11 +27,11 @@
 - **🎨 Rich UI Components** - Colors, progress bars, prompts, and tables out of the box
 - **🔧 Shell Integration** - Auto-completion, man pages, and documentation generation
 - **⚙️ Configuration Management** - JSON and key=value files, environment variables, and more
-- **🧪 Test-Ready** - Generated projects include complete test suites
+- **🧪 Test-Ready** - Generated projects include a Busted configuration and a starter test file
 - **📦 Minimal Dependencies** - Only requires `luafilesystem`, modular architecture
-- **🌍 Cross-Platform** - Linux, macOS, Windows (WSL) supported with cross-platform TTY detection
+- **🌍 Cross-Platform** - Linux and macOS fully supported; Windows support is best-effort via WSL or cross-compilation
 - **🚀 Portable Bundles** - Create self-contained single-file Lua scripts with `lumos bundle` (requires Lua runtime)
-- **📦 Standalone Packages** - Create true zero-dependency executables with `lumos package` (no C compiler required)
+- **📦 Standalone Packages** - Create zero-dependency executables with `lumos package` using a precompiled stub (Linux x86_64 included; other platforms require a matching stub)
 - **🔨 Native Builds** - Compile to native binaries with `lumos build` (embeds Lua VM + static linking)
 - **🔒 Security Built-in** - Input sanitization, safe file operations, rate limiting
 - **📝 Structured Logging** - 5-level logger with child loggers and environment configuration
@@ -196,6 +196,8 @@ local prompt = require('lumos.prompt')
 print(color.green("Success!"))
 progress.simple(75, 100)
 local name = prompt.input("Your name:", "Anonymous")
+local confirmed = prompt.confirm("Continue?", true)
+local choice = prompt.select("Choose", {"apple", "banana"})
 ```
 
 ### Configuration Management
@@ -212,15 +214,15 @@ local settings = config.merge_configs(
 ```
 
 ### Shell Integration
-```bash
-# Generate completions
-lumos-app --generate-completion bash > completion.sh
+```lua
+-- Generate completions
+local completion = app:generate_completion("bash")
 
-# Generate man pages  
-lumos-app --generate-manpage > lumos-app.1
+-- Generate man pages
+local manpage = app:generate_manpage()
 
-# Generate documentation
-lumos-app --generate-docs markdown
+-- Generate markdown documentation
+local docs = app:generate_docs("markdown", "./docs")
 ```
 
 ### Security & Logging
@@ -234,8 +236,68 @@ local safe = security.sanitize_output(user_input)
 -- Validate paths
 local path, err = security.sanitize_path(user_path)
 
+-- Safe file operations
+local ok, err = security.safe_mkdir("./data")
+local file, err = security.safe_open("./data/log.txt", "a")
+
 -- Structured logging
 logger.info("Action performed", {user = "john", id = 42})
+```
+
+### Advanced Prompts
+```lua
+local prompt = require('lumos.prompt')
+
+-- Numeric input with constraints
+local age = prompt.number("Age", 0, 120)
+
+-- Multi-line editor ($EDITOR or notepad.exe on Windows)
+local notes = prompt.editor("Notes", "Default text...")
+
+-- Form builder
+local profile = prompt.form("Profile", {
+    {name = "name", type = "input", required = true},
+    {name = "email", type = "input", validate = prompt.validators.email},
+    {name = "newsletter", type = "confirm", default = false}
+})
+
+-- Wizard
+local result = prompt.wizard("Setup", {
+    {title = "Profile", fields = {
+        {name = "username", type = "input", required = true}
+    }},
+    {title = "Confirm", fields = {
+        {name = "agree", type = "confirm", required = true}
+    }}
+})
+```
+
+### Plugins & Hooks
+```lua
+-- Register a plugin globally
+lumos.use("command", function(cmd, opts)
+    cmd:flag("--dry-run", "Simulate without side effects")
+end)
+
+-- Or attach to a single command
+app:command("deploy", "Deploy app")
+    :use(function(cmd, opts)
+        cmd:flag("--region", "Target region")
+    end)
+
+-- Hooks for setup / teardown
+app:command("migrate", "Run migrations")
+    :pre_run(function(ctx)
+        print("Connecting to database...")
+    end)
+    :post_run(function(ctx)
+        print("Migration complete!")
+    end)
+
+-- Global hooks
+app:persistent_pre_run(function(ctx)
+    logger.info("Starting command", {cmd = ctx.command.name})
+end)
 ```
 
 ## Documentation

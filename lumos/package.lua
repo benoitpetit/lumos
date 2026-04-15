@@ -15,6 +15,9 @@ local function get_lfs()
     return lfs
 end
 
+local PATH_SEP = _G.package.config:sub(1, 1)
+local IS_WINDOWS = PATH_SEP == "\\"
+
 --- Read file contents
 ---@param path string
 ---@return string|nil
@@ -51,15 +54,23 @@ end
 ---@return boolean
 local function mkdir_p(path)
     local parts = {}
-    for part in path:gmatch("[^/]+") do
+    for part in path:gmatch("[^" .. PATH_SEP:gsub("\\", "\\\\") .. "]+") do
         table.insert(parts, part)
     end
     local current = ""
-    if path:sub(1, 1) == "/" then
-        current = "/"
+    if not IS_WINDOWS then
+        if path:sub(1, 1) == PATH_SEP then
+            current = PATH_SEP
+        end
+    else
+        -- Windows drive letter handling (e.g., C:\)
+        if path:match("^%a:") then
+            current = parts[1] .. PATH_SEP
+            table.remove(parts, 1)
+        end
     end
     for _, part in ipairs(parts) do
-        current = current .. part .. "/"
+        current = current .. part .. PATH_SEP
         if not path_exists(current) then
             local ok, err = get_lfs().mkdir(current)
             if not ok and not path_exists(current) then
@@ -86,7 +97,9 @@ end
 local function get_module_dir()
     local source = debug.getinfo(1, "S").source
     if source:sub(1, 1) == "@" then
-        local dir = source:sub(2):match("^(.+)/package%.lua$")
+        local path = source:sub(2)
+        -- Cross-platform pattern for package.lua
+        local dir = path:match("^(.+)[/\\]package%.lua$")
         if dir then
             return dir
         end
@@ -98,8 +111,17 @@ end
 ---@return string
 local function get_project_root()
     local mod_dir = get_module_dir()
-    if mod_dir:match("/lumos$") then
-        return mod_dir:sub(1, -7)
+    local sep_pattern = PATH_SEP:gsub("\\", "\\\\")
+    if mod_dir:match(sep_pattern .. "lumos$") then
+        return mod_dir:sub(1, -(#PATH_SEP .. "lumos") + 0)
+    end
+    -- If installed as a rock, mod_dir might be something like
+    -- .../share/lua/5.x/lumos
+    -- Try to locate stubs via lfs upward search
+    local candidate = mod_dir .. PATH_SEP .. ".." .. PATH_SEP .. "stubs"
+    local attr = get_lfs().attributes(candidate)
+    if attr and attr.mode == "directory" then
+        return candidate
     end
     return "."
 end
@@ -107,33 +129,100 @@ end
 --- List available stub targets
 ---@return table targets
 function package.list_targets()
-    local root = get_project_root()
-    local stubs_dir = root .. "/stubs"
+    local roots = {}
+    -- Development checkout
+    local dev_root = get_module_dir():match("^(.+)[/\\]lumos$")
+    if dev_root then
+        table.insert(roots, dev_root)
+    end
+    -- Installed rock tree (module dir parent might contain stubs if copy_directories worked)
+    local mod_dir = get_module_dir()
+    if mod_dir and mod_dir ~= "lumos" then
+        local rock_root = mod_dir .. PATH_SEP .. ".." .. PATH_SEP .. ".."
+        table.insert(roots, rock_root)
+    end
     local targets = {}
-    if path_exists(stubs_dir) then
-        for file in get_lfs().dir(stubs_dir) do
-            if file:match("^lumos%-stub%-") then
-                local target = file:match("^lumos%-stub%-(.+)$")
-                if target then
-                    table.insert(targets, target)
+    for _, root in ipairs(roots) do
+        local stubs_dir = root .. PATH_SEP .. "stubs"
+        if path_exists(stubs_dir) then
+            for file in get_lfs().dir(stubs_dir) do
+                if file:match("^lumos%-stub%-") then
+                    local target = file:match("^lumos%-stub%-(.+)$")
+                    if target and not targets[target] then
+                        targets[target] = true
+                    end
                 end
             end
         end
     end
-    table.sort(targets)
-    return targets
+    local list = {}
+    for target in pairs(targets) do
+        table.insert(list, target)
+    end
+    table.sort(list)
+    return list
 end
 
 --- Find the stub binary path for a given target
 ---@param target string
 ---@return string|nil
 function package.find_stub(target)
-    local root = get_project_root()
-    local stub_path = root .. "/stubs/lumos-stub-" .. target
-    if path_exists(stub_path) then
-        return stub_path
+    local roots = {}
+    local dev_root = get_module_dir():match("^(.+)[/\\]lumos$")
+    if dev_root then
+        table.insert(roots, dev_root)
+    end
+    local mod_dir = get_module_dir()
+    if mod_dir and mod_dir ~= "lumos" then
+        local rock_root = mod_dir .. PATH_SEP .. ".." .. PATH_SEP .. ".."
+        table.insert(roots, rock_root)
+    end
+    for _, root in ipairs(roots) do
+        local stub_path = root .. PATH_SEP .. "stubs" .. PATH_SEP .. "lumos-stub-" .. target
+        if path_exists(stub_path) then
+            return stub_path
+        end
     end
     return nil
+end
+
+--- Detect the host platform target
+---@return string
+local function detect_host_target()
+    if IS_WINDOWS then
+        local arch = os.getenv("PROCESSOR_ARCHITECTURE") or "x86_64"
+        if arch:match("AMD64") or arch:match("x86_64") then
+            return "windows-x86_64"
+        end
+        return "windows-" .. arch:lower()
+    end
+    local uname_s = "Linux"
+    local uname_m = "x86_64"
+    local handle = io.popen("uname -s 2>/dev/null")
+    if handle then
+        local out = handle:read("*l")
+        if out then uname_s = out end
+        handle:close()
+    end
+    handle = io.popen("uname -m 2>/dev/null")
+    if handle then
+        local out = handle:read("*l")
+        if out then uname_m = out end
+        handle:close()
+    end
+    local sys = uname_s:lower()
+    if sys:find("darwin") then
+        sys = "darwin"
+    elseif sys:find("linux") then
+        sys = "linux"
+    end
+    local arch = uname_m:lower()
+    if arch:match("amd64") or arch:match("x86_64") then
+        arch = "x86_64"
+    elseif arch:match("aarch64") or arch:match("arm64") then
+        arch = "aarch64"
+    end
+    return sys .. "-" .. arch
 end
 
 --- Package a Lua CLI application into a standalone executable
@@ -154,7 +243,7 @@ function package.create(options)
         return false, "Entry file not found: " .. entry_file
     end
 
-    local target = options.target or "linux-x86_64"
+    local target = options.target or detect_host_target()
     local stub_path = package.find_stub(target)
     if not stub_path then
         local available = table.concat(package.list_targets(), ", ")
@@ -178,27 +267,45 @@ function package.create(options)
         return false, "Cannot read stub binary: " .. stub_path
     end
 
+    -- 100 MiB limit enforced by stub.c
+    local MAX_PAYLOAD = 100 * 1024 * 1024
+    if #lua_code > MAX_PAYLOAD then
+        return false, "Payload exceeds maximum size of 100 MiB (" .. tostring(#lua_code) .. " bytes)"
+    end
+
     local payload = stub_data .. lua_code .. u64_le(#lua_code)
 
     local output_file = options.output
     if not output_file then
-        local basename = entry_file:match("([^/]+)%.lua$") or "package"
+        local basename = entry_file:match("([^" .. PATH_SEP:gsub("\\", "\\\\") .. "]+)%.lua$") or "package"
         local out_dir = options.output_dir or "dist"
         mkdir_p(out_dir)
-        output_file = out_dir .. "/" .. basename
+        output_file = out_dir .. PATH_SEP .. basename
     else
-        local parent_dir = output_file:match("^(.+)/[^/]+$")
+        local parent_dir = output_file:match("^(.+)[/\\][^/\\]+$")
         if parent_dir then
             mkdir_p(parent_dir)
         end
     end
+
+    -- Append .exe on Windows targets if missing
+    if target:match("^windows") and not output_file:match("%.exe$") then
+        output_file = output_file .. ".exe"
+    end
+
+    -- Sanitize path before writing
+    local sanitized, sanitize_err = security.sanitize_path(output_file)
+    if not sanitized then
+        return false, "Invalid output path: " .. tostring(sanitize_err)
+    end
+    output_file = sanitized
 
     if not write_file(output_file, payload) then
         return false, "Cannot write output file: " .. output_file
     end
 
     -- Make executable on Unix-like systems
-    if _G.package.config:sub(1, 1) ~= "\\" then
+    if not IS_WINDOWS then
         os.execute("chmod +x " .. security.shell_escape(output_file))
     end
 

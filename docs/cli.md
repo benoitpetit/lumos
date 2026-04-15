@@ -22,7 +22,7 @@ This installs the `lumos` binary in `~/.luarocks/bin/`, making it available as a
 luarocks make --local lumos-dev-1.rockspec
 
 # For production
-luarocks make --local lumos-0.1.0-1.rockspec
+luarocks make --local lumos-dev-1.rockspec
 ```
 
 ---
@@ -159,13 +159,13 @@ function M.run(args)
     -- Create the main application
     local app = lumos.new_app({
         name = "todo-cli",
-        version = "0.1.0",
+        version = "0.2.1",
         description = "Simple task management CLI"
     })
 
     -- Add global flags
     app:flag("-v --verbose", "Enable verbose output")
-    app:flag("--version", "Show version information")
+    -- Lumos automatically handles --version when version is provided to new_app()
 
     -- Define the greet command (example)
     local greet = app:command("greet", "Greet someone politely")
@@ -195,12 +195,7 @@ function M.run(args)
         return true
     end)
     
-    -- Add version handling
-    if args and #args > 0 and args[1] == "--version" then
-        print("todo-cli v0.1.0")
-        print("Built with Lumos CLI Framework")
-        return
-    end
+    -- Version handling is automatic via app:run() when version is set in new_app()
 
     -- Run the application
     app:run(args)

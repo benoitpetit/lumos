@@ -3,19 +3,29 @@
 
 local security = {}
 
+local IS_WINDOWS = _G.package.config:sub(1, 1) == "\\"
+
 -- Escape shell arguments to prevent command injection
--- Wraps argument in single quotes and escapes any single quotes within
+-- On Unix: wraps argument in single quotes and escapes any single quotes within.
+-- On Windows: wraps in double quotes and escapes backslashes and double quotes.
 function security.shell_escape(arg)
     if not arg or arg == "" then
+        if IS_WINDOWS then return '""' end
         return "''"
     end
-    
+
     -- Convert to string if not already
     arg = tostring(arg)
-    
+
+    if IS_WINDOWS then
+        -- Windows CMD/PowerShell: escape backslashes and double quotes
+        arg = arg:gsub("(\\*)", "%1%1"):gsub("\"", "\\\"")
+        return '"' .. arg .. '"'
+    end
+
     -- Escape single quotes by ending quote, adding escaped quote, starting quote again
     arg = arg:gsub("'", "'\\''")
-    
+
     -- Wrap in single quotes
     return "'" .. arg .. "'"
 end
@@ -49,19 +59,51 @@ function security.sanitize_path(path)
     return sanitized
 end
 
--- Safely create directory with validation
+-- Safely create directory with validation (cross-platform)
 function security.safe_mkdir(path)
     local sanitized, err = security.sanitize_path(path)
     if not sanitized then
         return false, err
     end
-    
-    -- Use shell_escape for additional protection
-    local escaped_path = security.shell_escape(sanitized)
-    local cmd = "mkdir -p " .. escaped_path
-    
-    local success = os.execute(cmd)
-    return success == 0 or success == true, success and nil or "Failed to create directory"
+
+    local lfs = require("lfs")
+    local parts = {}
+    local sep = IS_WINDOWS and "\\" or "/"
+    local sep_escaped = IS_WINDOWS and "\\\\" or "/"
+    for part in sanitized:gmatch("[^" .. sep_escaped .. "]+") do
+        table.insert(parts, part)
+    end
+
+    local current = ""
+    if not IS_WINDOWS then
+        if sanitized:sub(1, 1) == sep then
+            current = sep
+        end
+    else
+        if sanitized:match("^%a:") then
+            current = parts[1] .. sep
+            table.remove(parts, 1)
+        end
+    end
+
+    for _, part in ipairs(parts) do
+        current = current .. part .. sep
+        local attr = lfs.attributes(current)
+        if not attr then
+            local ok, mkdir_err = lfs.mkdir(current)
+            if not ok then
+                -- It may have been created concurrently
+                attr = lfs.attributes(current)
+                if not attr then
+                    return false, mkdir_err or "Failed to create directory"
+                end
+            end
+        elseif attr.mode ~= "directory" then
+            return false, "Path exists but is not a directory: " .. current
+        end
+    end
+
+    return true
 end
 
 -- Safely open file with validation
@@ -72,7 +114,7 @@ function security.safe_open(path, mode)
     end
     
     -- Validate mode
-    local valid_modes = {r = true, w = true, a = true, ["r+"] = true, ["w+"] = true, ["a+"] = true}
+    local valid_modes = {r = true, w = true, a = true, ["r+"] = true, ["w+"] = true, ["a+"] = true, rb = true, wb = true, ab = true, ["rb+"] = true, ["wb+"] = true, ["ab+"] = true}
     if not valid_modes[mode] then
         return nil, "Invalid file mode"
     end

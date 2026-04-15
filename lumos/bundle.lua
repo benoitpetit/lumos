@@ -14,6 +14,9 @@ local function get_lfs()
     return lfs
 end
 
+local PATH_SEP = _G.package.config:sub(1, 1)
+local IS_WINDOWS = PATH_SEP == "\\"
+
 -- Default configuration
 local default_config = {
     include_lumos = true,
@@ -51,7 +54,7 @@ local LUMOS_MODULES = {
 ---@param path string
 ---@return string|nil, string|nil
 local function read_file(path)
-    local f, err = security.safe_open(path, "r")
+    local f, err = security.safe_open(path, "rb")
     if not f then
         return nil, "Cannot read file: " .. path .. " - " .. (err or "unknown error")
     end
@@ -65,7 +68,7 @@ end
 ---@param content string
 ---@return boolean, string|nil
 local function write_file(path, content)
-    local f, err = security.safe_open(path, "w")
+    local f, err = security.safe_open(path, "wb")
     if not f then
         return false, "Cannot write file: " .. path .. " - " .. (err or "unknown error")
     end
@@ -89,28 +92,31 @@ local function is_file(path)
     return get_lfs().attributes(path, "mode") == "file"
 end
 
---- Detect Windows
----@return boolean
-local function is_windows()
-    return package.config:sub(1, 1) == "\\"
-end
-
 --- Create directory recursively
 ---@param path string
 ---@return boolean
 local function mkdir_p(path)
     local parts = {}
-    for part in path:gmatch("[^/]+") do
+    local sep_escaped = PATH_SEP:gsub("\\", "\\\\")
+    for part in path:gmatch("[^" .. sep_escaped .. "]+") do
         table.insert(parts, part)
     end
-    
+
     local current = ""
-    if path:sub(1, 1) == "/" then
-        current = "/"
+    if not IS_WINDOWS then
+        if path:sub(1, 1) == PATH_SEP then
+            current = PATH_SEP
+        end
+    else
+        -- Windows drive letter handling (e.g., C:\)
+        if path:match("^%a:") then
+            current = parts[1] .. PATH_SEP
+            table.remove(parts, 1)
+        end
     end
-    
+
     for _, part in ipairs(parts) do
-        current = current .. part .. "/"
+        current = current .. part .. PATH_SEP
         if not path_exists(current) then
             local ok, err = get_lfs().mkdir(current)
             if not ok and not path_exists(current) then
@@ -121,22 +127,44 @@ local function mkdir_p(path)
     return true
 end
 
---- Strip Lua comments from code (simple version)
+--- Strip Lua comments from code
 ---@param code string
 ---@return string
 local function strip_comments(code)
-    -- Remove multi-line comments
-    code = code:gsub("%-%-%[%[.-%]%]", "")
-    -- Remove single-line comments (but preserve shebang)
-    local lines = {}
-    for line in code:gmatch("[^\n]*") do
-        if not line:match("^%s*%-%-") or line:match("^#!") then
-            -- Remove inline comments
-            local stripped = line:gsub("%s*%-%-[^\n]*$", "")
-            table.insert(lines, stripped)
+    local result = {}
+    local i = 1
+    local n = #code
+    while i <= n do
+        local c1 = code:sub(i, i)
+        local c2 = code:sub(i+1, i+1)
+        if c1 == "-" and c2 == "-" then
+            local c3 = code:sub(i+2, i+2)
+            local c4 = code:sub(i+3, i+3)
+            if c3 == "[" and c4 == "[" then
+                -- multi-line comment --[[ ... ]]
+                local j = i + 4
+                while j <= n do
+                    if code:sub(j, j+1) == "]]" then
+                        i = j + 2
+                        break
+                    end
+                    j = j + 1
+                end
+                if j > n then
+                    i = n + 1
+                end
+            else
+                -- single-line comment
+                while i <= n and code:sub(i, i) ~= "\n" do
+                    i = i + 1
+                end
+            end
+        else
+            table.insert(result, c1)
+            i = i + 1
         end
     end
-    return table.concat(lines, "\n")
+    return table.concat(result)
 end
 
 --- Find module file path
@@ -144,36 +172,38 @@ end
 ---@param search_paths table
 ---@return string|nil
 local function find_module(module_name, search_paths)
-    local file_path = module_name:gsub("%.", "/")
-    
+    local file_path = module_name:gsub("%.", PATH_SEP)
+
     for _, base_path in ipairs(search_paths) do
         -- Try direct path
-        local path = base_path .. "/" .. file_path .. ".lua"
+        local path = base_path .. PATH_SEP .. file_path .. ".lua"
         if path_exists(path) then
             return path
         end
-        
+
         -- Try init.lua for packages
-        path = base_path .. "/" .. file_path .. "/init.lua"
+        path = base_path .. PATH_SEP .. file_path .. PATH_SEP .. "init.lua"
         if path_exists(path) then
             return path
         end
     end
-    
+
     return nil
 end
 
 --- Extract required modules from Lua code
+--- Note: This pattern only catches static string requires (require("foo") or require('foo')).
+--- Dynamic requires (require(var), pcall(require, "foo"), long brackets) are not detected.
 ---@param code string
 ---@return table
 local function extract_requires(code)
     local requires = {}
-    
+
     -- Match require('module') and require("module")
     for module in code:gmatch("require%s*%(?%s*['\"]([^'\"]+)['\"]%s*%)?") do
         requires[module] = true
     end
-    
+
     return requires
 end
 
@@ -182,23 +212,23 @@ end
 ---@param search_paths table
 ---@param collected table
 ---@param visited table
----@return table, table
+---@return table, table, string|nil
 local function collect_dependencies(entry_file, search_paths, collected, visited)
     collected = collected or {}
     visited = visited or {}
-    
+
     if visited[entry_file] then
-        return collected, visited
+        return collected, visited, nil
     end
     visited[entry_file] = true
-    
+
     local content, err = read_file(entry_file)
     if not content then
-        return collected, visited
+        return collected, visited, err
     end
-    
+
     local requires = extract_requires(content)
-    
+
     for module_name, _ in pairs(requires) do
         -- Skip standard library modules and native C modules
         if not module_name:match("^string$") and
@@ -211,19 +241,22 @@ local function collect_dependencies(entry_file, search_paths, collected, visited
            not module_name:match("^package$") and
            not module_name:match("^lfs$") and
            not module_name:match("^utf8$") then
-            
+
             local module_path = find_module(module_name, search_paths)
             if module_path and not visited[module_path] then
                 table.insert(collected, {
                     name = module_name,
                     path = module_path
                 })
-                collect_dependencies(module_path, search_paths, collected, visited)
+                local _, _, child_err = collect_dependencies(module_path, search_paths, collected, visited)
+                if child_err then
+                    return collected, visited, child_err
+                end
             end
         end
     end
-    
-    return collected, visited
+
+    return collected, visited, nil
 end
 
 --- Generate the bundle preloader code
@@ -232,23 +265,23 @@ end
 ---@return string
 local function generate_preloader(modules, config)
     local lines = {}
-    
+
     table.insert(lines, "-- Bundled modules preloader")
     table.insert(lines, "-- Compatibility: use loadstring for Lua 5.1, load for 5.2+")
     table.insert(lines, "local _loadcode = loadstring or load")
     table.insert(lines, "local _BUNDLED_MODULES = {}")
     table.insert(lines, "")
-    
+
     for _, mod in ipairs(modules) do
         local content, err = read_file(mod.path)
         if content then
             -- Remove shebang if present
             content = content:gsub("^#![^\n]*\n", "")
-            
+
             if config.strip_comments then
                 content = strip_comments(content)
             end
-            
+
             -- Use long string with unique delimiter to avoid conflicts
             -- Find a delimiter that doesn't appear in the content
             local delimiter = "="
@@ -257,10 +290,10 @@ local function generate_preloader(modules, config)
                 level = level + 1
                 delimiter = string.rep("=", level)
             end
-            
+
             local open_bracket = "[" .. delimiter .. "["
             local close_bracket = "]" .. delimiter .. "]"
-            
+
             table.insert(lines, string.format("_BUNDLED_MODULES[%q] = assert(_loadcode(%s", mod.name, open_bracket))
             table.insert(lines, content)
             table.insert(lines, close_bracket .. string.format(", %q))", "@" .. mod.name))
@@ -268,7 +301,7 @@ local function generate_preloader(modules, config)
             table.insert(lines, "")
         end
     end
-    
+
     -- Add bundled module searcher (compatible Lua 5.1+ via package.loaders fallback)
     table.insert(lines, [[
 -- Install bundled module searcher
@@ -280,7 +313,7 @@ table.insert(_BUNDLED_SEARCHERS, 1, function(name)
     return nil
 end)
 ]])
-    
+
     return table.concat(lines, "\n")
 end
 
@@ -293,18 +326,24 @@ local function djb2_hash(str)
     return string.format("%08x", hash)
 end
 
-local CACHE_DIR = ".lumos/cache"
+local CACHE_DIR = ".lumos" .. PATH_SEP .. "cache"
 
 local function ensure_cache_dir()
     mkdir_p(CACHE_DIR)
 end
 
 local function amalgamation_cache_key(entry_content, options, modules)
+    local shebang_val
+    if options.shebang ~= nil then
+        shebang_val = tostring(options.shebang)
+    else
+        shebang_val = tostring(default_config.shebang)
+    end
     local key_parts = {
         entry_content,
         tostring(options.include_lumos),
         tostring(options.strip_comments),
-        tostring(options.shebang or default_config.shebang),
+        shebang_val,
     }
     -- Include dependency contents so cache is invalidated when any dependency changes
     for _, mod in ipairs(modules or {}) do
@@ -356,16 +395,16 @@ function bundle.amalgamate(options)
     -- Determine search paths
     local search_paths = options.search_paths or {
         project_dir,
-        project_dir .. "/src",
-        project_dir .. "/lib",
-        project_dir .. "/lumos"
+        project_dir .. PATH_SEP .. "src",
+        project_dir .. PATH_SEP .. "lib",
+        project_dir .. PATH_SEP .. "lumos"
     }
 
     -- Add Lumos installation paths
-    local home = os.getenv("HOME")
+    local home = os.getenv("HOME") or os.getenv("USERPROFILE")
     if home then
         local version = _VERSION:match("%d+%.%d+") or "5.1"
-        table.insert(search_paths, home .. "/.luarocks/share/lua/" .. version)
+        table.insert(search_paths, home .. PATH_SEP .. ".luarocks" .. PATH_SEP .. "share" .. PATH_SEP .. "lua" .. PATH_SEP .. version)
     end
 
     -- Also check current working directory for local lumos
@@ -395,11 +434,14 @@ function bundle.amalgamate(options)
     end
 
     -- Collect project dependencies
-    collect_dependencies(entry_file, search_paths, modules, visited)
+    local _, _, collect_err = collect_dependencies(entry_file, search_paths, modules, visited)
+    if collect_err then
+        return false, "Failed to collect dependencies: " .. collect_err
+    end
 
     -- Compute cache key including all dependency contents
     local cache_key = amalgamation_cache_key(raw_entry_content, options, modules)
-    local cache_path = CACHE_DIR .. "/amalgamate-" .. cache_key .. ".lua"
+    local cache_path = CACHE_DIR .. PATH_SEP .. "amalgamate-" .. cache_key .. ".lua"
     ensure_cache_dir()
 
     -- Try cache first
@@ -424,8 +466,10 @@ function bundle.amalgamate(options)
     local bundle_parts = {}
 
     -- Shebang
-    table.insert(bundle_parts, config.shebang)
-    table.insert(bundle_parts, "")
+    if config.shebang and config.shebang ~= "" then
+        table.insert(bundle_parts, config.shebang)
+        table.insert(bundle_parts, "")
+    end
 
     -- Header comment
     table.insert(bundle_parts, "-- ============================================")
@@ -480,12 +524,12 @@ function bundle.create(options)
 
     -- Determine output path
     if not output_file then
-        local basename = entry_file:match("([^/]+)%.lua$") or "bundle"
+        local basename = entry_file:match("([^" .. PATH_SEP:gsub("\\", "\\\\") .. "]+)%.lua$") or "bundle"
         mkdir_p(config.output_dir)
-        output_file = config.output_dir .. "/" .. basename
+        output_file = config.output_dir .. PATH_SEP .. basename
     else
         -- Create parent directory for custom output path
-        local parent_dir = output_file:match("^(.+)/[^/]+$")
+        local parent_dir = output_file:match("^(.+)[/\\][^/\\]+$")
         if parent_dir then
             mkdir_p(parent_dir)
         end
@@ -498,7 +542,7 @@ function bundle.create(options)
     end
 
     -- Make executable on Unix-like systems
-    if not is_windows() then
+    if not IS_WINDOWS then
         os.execute("chmod +x " .. security.shell_escape(output_file))
     end
 
@@ -521,10 +565,10 @@ end
 ---@return table
 function bundle.analyze(entry_file, search_paths)
     search_paths = search_paths or {"."}
-    
+
     local modules = {}
     collect_dependencies(entry_file, search_paths, modules, {})
-    
+
     return modules
 end
 

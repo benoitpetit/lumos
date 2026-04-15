@@ -224,7 +224,7 @@ local logger = require('lumos.logger')
 if security.is_elevated() then
     logger.warn("Running with elevated privileges", {
         user = os.getenv("USER"),
-        uid = os.getenv("UID")
+        uid = security.is_elevated() and 0 or nil
     })
     
     print("⚠️  Warning: Running as root/administrator")
@@ -485,4 +485,4 @@ This security guide is updated regularly. Review it before each major deployment
 
 **Guide Version:** 1.0  
 **Last Updated:** April 2026  
-**Lumos Framework:** v0.1.0+
+**Lumos Framework:** v0.2.1+

@@ -59,6 +59,9 @@ build = {
       ["lumos.package"] = "lumos/package.lua",
       ["lumos.plugin"] = "lumos/plugin.lua"
    },
+   copy_directories = {
+      "stubs"
+   },
    install = {
       bin = {
          ["lumos"] = "bin/lumos"

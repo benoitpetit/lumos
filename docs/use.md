@@ -31,23 +31,25 @@ list:action(function(ctx)
     
     for file in lfs.dir(dir) do
         if file ~= "." and file ~= ".." then
+            local skip = false
             if not ctx.flags.all and file:sub(1,1) == "." then
-                goto continue
+                skip = true
             end
-            
-            if ctx.flags.long then
-                local attr = lfs.attributes(dir .. "/" .. file)
-                if attr then
-                    local size = attr.size or 0
-                    local mode = attr.mode or "unknown"
-                    print(string.format("%s %8d %s", mode, size, file))
+
+            if not skip then
+                if ctx.flags.long then
+                    local attr = lfs.attributes(dir .. "/" .. file)
+                    if attr then
+                        local size = attr.size or 0
+                        local mode = attr.mode or "unknown"
+                        print(string.format("%s %8d %s", mode, size, file))
+                    end
+                else
+                    local file_color = lfs.attributes(dir .. "/" .. file, "mode") == "directory"
+                        and color.blue or color.white
+                    print(file_color(file))
                 end
-            else
-                local file_color = lfs.attributes(dir .. "/" .. file, "mode") == "directory" 
-                    and color.blue or color.white
-                print(file_color(file))
             end
-            ::continue::
         end
     end
     return true
@@ -271,14 +273,16 @@ list_cmd:action(function(ctx)
     -- Filter tasks
     local filtered = {}
     for _, task in ipairs(tasks) do
+        local include = true
         if ctx.flags.completed and not task.completed then
-            goto continue
+            include = false
         end
         if ctx.flags.pending and task.completed then
-            goto continue
+            include = false
         end
-        table.insert(filtered, task)
-        ::continue::
+        if include then
+            table.insert(filtered, task)
+        end
     end
     
     if ctx.flags.json then
