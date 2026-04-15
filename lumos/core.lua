@@ -168,44 +168,45 @@ function core.validate_args(cmd, parsed_args)
             value = arg_def.default
         end
         
-        -- Required check
-        if arg_def.required and (value == nil or value == "") then
-            table.insert(errors, "Argument '" .. arg_def.name .. "' is required")
-            goto continue
-        end
-        
-        -- Skip further validation if value is still nil (and not required)
-        if value == nil then
-            table.insert(validated, value)
-            goto continue
-        end
-        
-        -- Type validation via flags module (reuse flag_def shape)
-        local fake_flag = {
-            type = arg_def.type,
-            min = arg_def.min,
-            max = arg_def.max
-        }
-        local valid, result = flags.validate_flag(fake_flag, value)
-        if not valid then
-            table.insert(errors, "Argument '" .. arg_def.name .. "' " .. result)
-            goto continue
-        end
-        
-        -- Custom validator
-        if arg_def.validate then
-            local ok, err_msg = pcall(arg_def.validate, result)
-            if not ok then
-                table.insert(errors, "Argument '" .. arg_def.name .. "' validation failed: " .. tostring(err_msg))
-                goto continue
-            elseif err_msg == false then
-                table.insert(errors, "Argument '" .. arg_def.name .. "' is invalid")
-                goto continue
+        repeat
+            -- Required check
+            if arg_def.required and (value == nil or value == "") then
+                table.insert(errors, "Argument '" .. arg_def.name .. "' is required")
+                break
             end
-        end
-        
-        table.insert(validated, result)
-        ::continue::
+            
+            -- Skip further validation if value is still nil (and not required)
+            if value == nil then
+                table.insert(validated, value)
+                break
+            end
+            
+            -- Type validation via flags module (reuse flag_def shape)
+            local fake_flag = {
+                type = arg_def.type,
+                min = arg_def.min,
+                max = arg_def.max
+            }
+            local valid, result = flags.validate_flag(fake_flag, value)
+            if not valid then
+                table.insert(errors, "Argument '" .. arg_def.name .. "' " .. result)
+                break
+            end
+            
+            -- Custom validator
+            if arg_def.validate then
+                local ok, err_msg = pcall(arg_def.validate, result)
+                if not ok then
+                    table.insert(errors, "Argument '" .. arg_def.name .. "' validation failed: " .. tostring(err_msg))
+                    break
+                elseif err_msg == false then
+                    table.insert(errors, "Argument '" .. arg_def.name .. "' is invalid")
+                    break
+                end
+            end
+            
+            table.insert(validated, result)
+        until true
     end
     
     return validated, errors
