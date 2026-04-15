@@ -353,12 +353,14 @@ function core.execute_command(app, parsed_args)
                 
                 if not run_hooks(app.persistent_pre_runs, context) then return core.EXIT_ERROR end
                 if not run_hooks(subcmd.pre_runs, context) then return core.EXIT_ERROR end
-                local success, result = xpcall(subcmd.action, function(err)
+                local success, result = xpcall(function()
+                    return subcmd.action(context)
+                end, function(err)
                     if debug and type(debug.traceback) == "function" then
                         return err .. "\n" .. debug.traceback("", 2)
                     end
                     return err
-                end, context)
+                end)
                 run_hooks(subcmd.post_runs, {success = success, result = result, config = context.config, env = context.env, command = subcmd, parent = cmd, args = context.args, flags = context.flags})
                 run_hooks(app.persistent_post_runs, {success = success, result = result, config = context.config, env = context.env, command = subcmd, parent = cmd, args = context.args, flags = context.flags})
                 if not success then
@@ -429,7 +431,9 @@ function core.execute_command(app, parsed_args)
         
         if not run_hooks(app.persistent_pre_runs, context) then return core.EXIT_ERROR end
         if not run_hooks(cmd.pre_runs, context) then return core.EXIT_ERROR end
-        local success, result = xpcall(cmd.action, error_handler, context)
+        local success, result = xpcall(function()
+            return cmd.action(context)
+        end, error_handler)
         run_hooks(cmd.post_runs, {success = success, result = result, config = context.config, env = context.env, command = cmd, args = context.args, flags = context.flags})
         run_hooks(app.persistent_post_runs, {success = success, result = result, config = context.config, env = context.env, command = cmd, args = context.args, flags = context.flags})
         if not success then
