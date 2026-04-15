@@ -42,6 +42,7 @@ jobs:
         run: |
           luarocks install luafilesystem
           luarocks install busted
+          luarocks make lumos-dev-1.rockspec
 
       - name: Run tests
         run: |

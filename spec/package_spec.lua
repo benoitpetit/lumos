@@ -66,6 +66,12 @@ describe('Package Module', function()
                 return
             end
 
+            -- Skip binary execution on macOS (stub is linux-x86_64)
+            local uname_f = io.popen('uname -s')
+            local uname = uname_f and uname_f:read('*l') or ''
+            if uname_f then uname_f:close() end
+            local is_macos = uname == 'Darwin'
+
             local out = tmp_output_dir .. "/testpkg"
             local ok, err, info = pkg.create({
                 entry = tmp_entry,
@@ -90,13 +96,15 @@ describe('Package Module', function()
             assert.is_not_nil(f, "Output package should exist")
             if f then f:close() end
 
-            -- Try to run it
-            local handle = io.popen(out .. " 2>&1")
-            local output = handle and handle:read("*a") or ""
-            local rc = handle and { handle:close() } or { nil, "exit", 1 }
-            rc = (type(rc) == "table") and (rc[3] or 0) or 0
-            assert.are.equal(0, rc, "Package exited with non-zero code: " .. output)
-            assert.is_not_nil(output:find("hello from package"))
+            -- Try to run it (skip on macOS since binary is linux-x86_64)
+            if not is_macos then
+                local handle = io.popen(out .. " 2>&1")
+                local output = handle and handle:read("*a") or ""
+                local rc = handle and { handle:close() } or { nil, "exit", 1 }
+                rc = (type(rc) == "table") and (rc[3] or 0) or 0
+                assert.are.equal(0, rc, "Package exited with non-zero code: " .. output)
+                assert.is_not_nil(output:find("hello from package"))
+            end
         end)
     end)
 
