@@ -11,7 +11,7 @@ local color = require('lumos.color')
 local logger = require('lumos.logger')
 local app = lumos.new_app({
     name = "hooks_demo",
-    version = "0.2.1",
+    version = "0.2.2",
     description = "Demonstrates hooks and exit codes"
 })
 

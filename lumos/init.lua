@@ -46,6 +46,6 @@ return {
     package = package_mod,
     plugin = plugin,
     use = plugin.use,
-    version = "0.2.1",
+    version = "0.2.2",
     load_config = core.load_config
 }

@@ -159,7 +159,7 @@ function M.run(args)
     -- Create the main application
     local app = lumos.new_app({
         name = "todo-cli",
-        version = "0.2.1",
+        version = "0.2.2",
         description = "Simple task management CLI"
     })
 

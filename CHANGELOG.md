@@ -7,6 +7,27 @@ Lumos uses [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.2.2] — 2026-04-15
+
+### Fixed
+
+- `lumos/bundle.lua` — Replaced broken `strip_comments` with a line parser that correctly removes multi-line `--[[...]]` blocks.
+- `lumos/bundle.lua` — Switched file I/O to `"rb"`/`"wb"` for cross-platform binary safety and improved `mkdir_p` with native path separator support.
+- `lumos/native_build.lua` — Added `LUA_OK` compatibility for Lua 5.1 in generated C wrappers.
+- `lumos/native_build.lua` — Replaced predictable `os.tmpname()` with randomized temps inside `.lumos/cache/` to avoid TOCTOU issues.
+- `lumos/native_build.lua` — Reject dynamic-linking fallback when `liblua.a` is missing; build now fails with a clear error message.
+- `lumos/native_build.lua` — Added LuaJIT detection and dedicated header/library search paths.
+- `lumos/native_build.lua` — `detect_luac` now validates that the `luac` version matches the target VM.
+- `lumos/package.lua` — Added host platform auto-detection (`uname` / `PROCESSOR_ARCHITECTURE`) instead of hardcoding `linux-x86_64`.
+- `lumos/package.lua` — Stub search now works inside LuaRocks install trees (supports `copy_directories`).
+- `lumos/package.lua` — Enforces the 100 MiB stub payload limit and adds `.exe` extension on Windows targets.
+- `lumos/security.lua` — `safe_mkdir` now uses `lfs` recursively instead of POSIX-only `mkdir -p`.
+- `lumos/security.lua` — `shell_escape` is now Windows-aware (PowerShell/cmd double-quote escaping).
+- `lumos/prompt.lua` — `prompt.editor` uses platform-safe quoting and falls back to `notepad.exe` on Windows.
+- `bin/lumos` — Synced CLI and project-template versions; added `--analyze` to `package` command.
+- Rockspecs — Added `copy_directories = {"stubs"}` so `lumos package` works after `luarocks install`.
+- README / docs — Corrected false shell-integration examples, added Prompts/Plugins/Hooks sections, removed Lua 5.1-incompatible `goto` snippets.
+
 ## [0.2.1] — 2026-04-15
 
 ### Fixed
