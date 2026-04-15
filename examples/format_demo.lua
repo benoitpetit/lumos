@@ -14,7 +14,7 @@ local tbl = require('lumos.table')
 local logger = require('lumos.logger')
 local app = lumos.new_app({
     name = "format_demo",
-    version = "0.2.0",
+    version = "0.2.1",
     description = "Demonstrates the Lumos format module"
 })
 

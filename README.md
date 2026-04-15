@@ -110,7 +110,7 @@ local color = require('lumos.color')
 
 local app = lumos.new_app({
     name = "my-awesome-cli",
-    version = "0.2.0",
+    version = "0.2.1",
     description = "My awesome CLI application"
 })
 
@@ -172,7 +172,7 @@ luarocks make --local lumos-dev-1.rockspec
 ### Verify Installation
 ```bash
 lumos version
-# Should output: Lumos CLI Framework v0.2.0
+# Should output: Lumos CLI Framework v0.2.1
 ```
 
 **Note**: The `--local` flag installs Lumos in your user directory (`~/.luarocks/`). For system-wide installation, omit `--local` and use `sudo`.
@@ -281,11 +281,11 @@ make install && make test
 
 ## Project Status
 
-- **Version:** 0.2.0
+- **Version:** 0.2.1
 - **License:** MIT
 - **Lua Versions:** 5.1, 5.2, 5.3, 5.4, LuaJIT
 - **Platforms:** Linux, macOS, Windows (WSL)
-- **Tests:** 295 passing tests
+- **Tests:** 359 passing tests
 - **Dependencies:** luafilesystem
 
 ## Acknowledgments

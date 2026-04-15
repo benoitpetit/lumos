@@ -7,6 +7,15 @@ Lumos uses [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.2.1] — 2026-04-15
+
+### Fixed
+
+- `lumos/core.lua` — Replaced `goto continue` with `repeat … until true` loops to restore Lua 5.1 compatibility.
+- `lumos/core.lua` — Wrapped `xpcall` arguments in closures to work around Lua 5.1's inability to pass extra arguments to `xpcall`.
+- CI workflow — Added `luarocks make lumos-dev-1.rockspec` so GitHub Actions runners correctly resolve `require('lumos')`.
+- `spec/package_spec.lua` — Skipped Linux stub binary execution on macOS to prevent `cannot execute binary file` failures on `macos-latest` runners.
+
 ## [0.2.0] — 2026-04-15
 
 ### Added

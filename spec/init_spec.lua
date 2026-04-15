@@ -18,7 +18,7 @@ describe('Lumos Main Module', function()
     end)
 
     it('has correct version', function()
-      assert.are.equal('0.2.0', lumos.version)
+      assert.are.equal('0.2.1', lumos.version)
     end)
 
     it('can create an application', function()

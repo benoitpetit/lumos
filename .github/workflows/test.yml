@@ -53,4 +53,4 @@ jobs:
         run: |
           eval "$(luarocks path)"
           luarocks lint lumos-dev-1.rockspec
-          luarocks lint lumos-0.2.0-1.rockspec
+          luarocks lint lumos-0.2.1-1.rockspec
