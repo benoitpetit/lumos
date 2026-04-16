@@ -184,7 +184,7 @@ function Command:flag_int(spec, description, min, max)
     return self
 end
 
-function Command:flag_string(spec, description)
+function Command:flag_string(spec, description, options)
     self.flags = self.flags or {}
     local short, long = parse_flag_spec(spec)
     
@@ -192,11 +192,16 @@ function Command:flag_string(spec, description)
         error("Invalid flag specification: " .. spec)
     end
     
+    options = options or {}
     local flag = {
         short = short,
         long = long or short,
         description = description,
-        type = "string"
+        type = "string",
+        choices = options.choices,
+        min_length = options.min_length,
+        max_length = options.max_length,
+        pattern = options.pattern
     }
     
     self.flags[long or short] = flag
@@ -204,7 +209,7 @@ function Command:flag_string(spec, description)
     return self
 end
 
-function Command:flag_email(spec, description)
+function Command:flag_email(spec, description, options)
     self.flags = self.flags or {}
     local short, long = parse_flag_spec(spec)
     
@@ -212,11 +217,13 @@ function Command:flag_email(spec, description)
         error("Invalid flag specification: " .. spec)
     end
     
+    options = options or {}
     local flag = {
         short = short,
         long = long or short,
         description = description,
-        type = "email"
+        type = "email",
+        pattern = options.pattern
     }
     
     self.flags[long or short] = flag
@@ -289,31 +296,140 @@ function Command:persistent_flag_email(spec, description)
     return self
 end
 
-function Command:flag_url(spec, description)
+function Command:flag_url(spec, description, options)
     self.flags = self.flags or {}
     local short, long = parse_flag_spec(spec)
     if not long and not short then
         error("Invalid flag specification: " .. spec)
     end
+    options = options or {}
     self.flags[long or short] = {
         short = short, long = long or short,
-        description = description, type = "url"
+        description = description, type = "url",
+        schemes = options.schemes,
+        require_host = options.require_host,
+        require_path = options.require_path,
+        allow_localhost = options.allow_localhost
     }
     self._last_flag = self.flags[long or short]
     return self
 end
 
-function Command:flag_path(spec, description)
+function Command:flag_path(spec, description, options)
     self.flags = self.flags or {}
     local short, long = parse_flag_spec(spec)
     if not long and not short then
         error("Invalid flag specification: " .. spec)
     end
+    options = options or {}
     self.flags[long or short] = {
         short = short, long = long or short,
-        description = description, type = "path"
+        description = description, type = "path",
+        must_exist = options.must_exist,
+        allow_file = options.allow_file,
+        allow_dir = options.allow_dir,
+        extensions = options.extensions,
+        resolve = options.resolve,
+        absolute = options.absolute
     }
     self._last_flag = self.flags[long or short]
+    return self
+end
+
+function Command:flag_float(spec, description, options)
+    self.flags = self.flags or {}
+    local short, long = parse_flag_spec(spec)
+    if not long and not short then
+        error("Invalid flag specification: " .. spec)
+    end
+    options = options or {}
+    self.flags[long or short] = {
+        short = short, long = long or short,
+        description = description, type = "float",
+        min = options.min,
+        max = options.max,
+        precision = options.precision
+    }
+    self._last_flag = self.flags[long or short]
+    return self
+end
+
+function Command:flag_array(spec, description, options)
+    self.flags = self.flags or {}
+    local short, long = parse_flag_spec(spec)
+    if not long and not short then
+        error("Invalid flag specification: " .. spec)
+    end
+    options = options or {}
+    self.flags[long or short] = {
+        short = short, long = long or short,
+        description = description, type = "array",
+        separator = options.separator,
+        item_type = options.item_type,
+        min_items = options.min_items,
+        max_items = options.max_items,
+        unique = options.unique
+    }
+    self._last_flag = self.flags[long or short]
+    return self
+end
+
+function Command:flag_enum(spec, description, choices, options)
+    self.flags = self.flags or {}
+    local short, long = parse_flag_spec(spec)
+    if not long and not short then
+        error("Invalid flag specification: " .. spec)
+    end
+    if not choices or #choices == 0 then
+        error("Enum flag requires a non-empty choices table")
+    end
+    options = options or {}
+    self.flags[long or short] = {
+        short = short, long = long or short,
+        description = description, type = "enum",
+        choices = choices,
+        case_sensitive = options.case_sensitive
+    }
+    self._last_flag = self.flags[long or short]
+    return self
+end
+
+function Command:mutex_group(name, flags_list, options)
+    self.mutex_groups = self.mutex_groups or {}
+    local resolved_flags = {}
+    for _, item in ipairs(flags_list or {}) do
+        if type(item) == "string" then
+            -- item is a flag name key in cmd.flags
+            local flag_def = self.flags and self.flags[item]
+            if flag_def then
+                table.insert(resolved_flags, flag_def)
+            end
+        elseif type(item) == "table" and item.long then
+            -- item is a flag definition table
+            self.flags = self.flags or {}
+            if not self.flags[item.long] then
+                self.flags[item.long] = item
+            end
+            table.insert(resolved_flags, item)
+        end
+    end
+    self.mutex_groups[name] = {
+        flags = resolved_flags,
+        required = options and options.required or false
+    }
+    return self
+end
+
+function Command:use(middleware_fn, priority)
+    self.middleware_chain = self.middleware_chain or {}
+    table.insert(self.middleware_chain, {
+        fn = middleware_fn,
+        priority = priority or 100
+    })
+    -- Sort by priority
+    table.sort(self.middleware_chain, function(a, b)
+        return a.priority < b.priority
+    end)
     return self
 end
 
@@ -391,15 +507,113 @@ function lumos.new_app(config)
         return self
     end
 
-    function app:persistent_flag_email(spec, description)
+    function app:persistent_flag_email(spec, description, options)
         self.persistent_flags = self.persistent_flags or {}
         local short, long = parse_flag_spec(spec)
         if not long and not short then error("Invalid flag specification: " .. spec) end
+        options = options or {}
         self.persistent_flags[long or short] = {
             short = short, long = long or short,
-            description = description, type = "email", persistent = true
+            description = description, type = "email", persistent = true,
+            pattern = options.pattern
         }
         self._last_flag = self.persistent_flags[long or short]
+        return self
+    end
+
+    function app:persistent_flag_url(spec, description, options)
+        self.persistent_flags = self.persistent_flags or {}
+        local short, long = parse_flag_spec(spec)
+        if not long and not short then error("Invalid flag specification: " .. spec) end
+        options = options or {}
+        self.persistent_flags[long or short] = {
+            short = short, long = long or short,
+            description = description, type = "url", persistent = true,
+            schemes = options.schemes,
+            require_host = options.require_host,
+            require_path = options.require_path,
+            allow_localhost = options.allow_localhost
+        }
+        self._last_flag = self.persistent_flags[long or short]
+        return self
+    end
+
+    function app:persistent_flag_path(spec, description, options)
+        self.persistent_flags = self.persistent_flags or {}
+        local short, long = parse_flag_spec(spec)
+        if not long and not short then error("Invalid flag specification: " .. spec) end
+        options = options or {}
+        self.persistent_flags[long or short] = {
+            short = short, long = long or short,
+            description = description, type = "path", persistent = true,
+            must_exist = options.must_exist,
+            allow_file = options.allow_file,
+            allow_dir = options.allow_dir,
+            extensions = options.extensions,
+            resolve = options.resolve,
+            absolute = options.absolute
+        }
+        self._last_flag = self.persistent_flags[long or short]
+        return self
+    end
+
+    function app:persistent_flag_float(spec, description, options)
+        self.persistent_flags = self.persistent_flags or {}
+        local short, long = parse_flag_spec(spec)
+        if not long and not short then error("Invalid flag specification: " .. spec) end
+        options = options or {}
+        self.persistent_flags[long or short] = {
+            short = short, long = long or short,
+            description = description, type = "float", persistent = true,
+            min = options.min, max = options.max, precision = options.precision
+        }
+        self._last_flag = self.persistent_flags[long or short]
+        return self
+    end
+
+    function app:persistent_flag_array(spec, description, options)
+        self.persistent_flags = self.persistent_flags or {}
+        local short, long = parse_flag_spec(spec)
+        if not long and not short then error("Invalid flag specification: " .. spec) end
+        options = options or {}
+        self.persistent_flags[long or short] = {
+            short = short, long = long or short,
+            description = description, type = "array", persistent = true,
+            separator = options.separator,
+            item_type = options.item_type,
+            min_items = options.min_items,
+            max_items = options.max_items,
+            unique = options.unique
+        }
+        self._last_flag = self.persistent_flags[long or short]
+        return self
+    end
+
+    function app:persistent_flag_enum(spec, description, choices, options)
+        self.persistent_flags = self.persistent_flags or {}
+        local short, long = parse_flag_spec(spec)
+        if not long and not short then error("Invalid flag specification: " .. spec) end
+        if not choices or #choices == 0 then error("Enum flag requires a non-empty choices table") end
+        options = options or {}
+        self.persistent_flags[long or short] = {
+            short = short, long = long or short,
+            description = description, type = "enum", persistent = true,
+            choices = choices,
+            case_sensitive = options.case_sensitive
+        }
+        self._last_flag = self.persistent_flags[long or short]
+        return self
+    end
+
+    function app:use(middleware_fn, priority)
+        self.middleware_chain = self.middleware_chain or {}
+        table.insert(self.middleware_chain, {
+            fn = middleware_fn,
+            priority = priority or 100
+        })
+        table.sort(self.middleware_chain, function(a, b)
+            return a.priority < b.priority
+        end)
         return self
     end
     

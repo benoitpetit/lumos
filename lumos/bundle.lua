@@ -572,4 +572,199 @@ function bundle.analyze(entry_file, search_paths)
     return modules
 end
 
+--- Analyze dependencies of a source file and classify them
+---@param source_file string
+---@return table|nil deps
+---@return string|nil err
+function bundle.analyze_dependencies(source_file)
+    local file, err = read_file(source_file)
+    if not file then
+        return nil, err
+    end
+
+    local deps = {
+        required = {},
+        optional = {},
+        lumos_modules = {},
+        external_modules = {}
+    }
+
+    local patterns = {
+        { pattern = "require%s*%(%s*['\"]([^'\"]+)['\"]%s*%)", optional = false },
+        { pattern = "require%s+['\"]([^'\"]+)['\"]", optional = false },
+        { pattern = "pcall%s*%(%s*require%s*,%s*['\"]([^'\"]+)['\"]", optional = true },
+    }
+
+    for _, p in ipairs(patterns) do
+        for match in file:gmatch(p.pattern) do
+            local dep_list = p.optional and deps.optional or deps.required
+            dep_list[match] = true
+            if match:match("^lumos") then
+                deps.lumos_modules[match] = true
+            else
+                deps.external_modules[match] = true
+            end
+        end
+    end
+
+    return deps
+end
+
+--- Determine required Lumos modules from dependency analysis
+---@param deps table
+---@return table
+function bundle.get_required_lumos_modules(deps)
+    local required = {
+        "lumos.init",
+        "lumos.app",
+        "lumos.core",
+        "lumos.flags",
+    }
+
+    local submodule_map = {
+        ["lumos.color"] = "lumos.color",
+        ["lumos.format"] = "lumos.format",
+        ["lumos.loader"] = "lumos.loader",
+        ["lumos.progress"] = "lumos.progress",
+        ["lumos.prompt"] = "lumos.prompt",
+        ["lumos.table"] = "lumos.table",
+        ["lumos.json"] = "lumos.json",
+        ["lumos.config"] = "lumos.config",
+        ["lumos.security"] = "lumos.security",
+        ["lumos.logger"] = "lumos.logger",
+        ["lumos.completion"] = "lumos.completion",
+        ["lumos.manpage"] = "lumos.manpage",
+        ["lumos.markdown"] = "lumos.markdown",
+        ["lumos.bundle"] = "lumos.bundle",
+        ["lumos.native_build"] = "lumos.native_build",
+        ["lumos.package"] = "lumos.package",
+        ["lumos.plugin"] = "lumos.plugin",
+        ["lumos.error"] = "lumos.error",
+        ["lumos.error_codes"] = "lumos.error_codes",
+        ["lumos.platform"] = "lumos.platform",
+        ["lumos.terminal"] = "lumos.terminal",
+        ["lumos.middleware"] = "lumos.middleware",
+        ["lumos.profiler"] = "lumos.profiler",
+        ["lumos.config_cache"] = "lumos.config_cache",
+    }
+
+    for mod in pairs(deps.lumos_modules) do
+        local main_mod = mod:match("^(lumos%.[^%.]+)")
+        if main_mod and submodule_map[main_mod] then
+            table.insert(required, submodule_map[main_mod])
+        elseif mod == "lumos" then
+            -- require("lumos") implies init, but we also pull in commonly used modules
+            -- The core four are already included.
+        end
+    end
+
+    -- Deduplicate
+    local seen = {}
+    local unique = {}
+    for _, mod in ipairs(required) do
+        if not seen[mod] then
+            seen[mod] = true
+            table.insert(unique, mod)
+        end
+    end
+
+    return unique
+end
+
+--- Creates a minimal bundle containing only used modules
+---@param source_file string
+---@param output_file string
+---@param options table|nil { minify = boolean }
+---@return boolean success
+---@return string|nil error
+function bundle.minimal(source_file, output_file, options)
+    options = options or {}
+
+    local deps, err = bundle.analyze_dependencies(source_file)
+    if not deps then
+        return false, err
+    end
+
+    local lumos_modules = bundle.get_required_lumos_modules(deps)
+    local parts = {}
+
+    table.insert(parts, "-- Lumos Minimal Bundle")
+    table.insert(parts, "-- Source: " .. source_file)
+    table.insert(parts, "-- Generated: " .. os.date("%Y-%m-%d %H:%M:%S"))
+    table.insert(parts, "-- Modules: " .. table.concat(lumos_modules, ", "))
+    table.insert(parts, "")
+
+    for _, mod in ipairs(lumos_modules) do
+        local mod_path = mod:gsub("%.", PATH_SEP) .. ".lua"
+        local paths_to_try = {
+            "." .. PATH_SEP .. mod_path,
+            "." .. PATH_SEP .. "lumos" .. PATH_SEP .. mod:match("^lumos%.(.+)$") .. ".lua",
+            package.searchpath(mod, package.path)
+        }
+
+        local content
+        for _, try_path in ipairs(paths_to_try) do
+            if try_path then
+                local f = io.open(try_path, "r")
+                if f then
+                    content = f:read("*a")
+                    f:close()
+                    break
+                end
+            end
+        end
+
+        if content then
+            if options.minify then
+                content = bundle.minify(content)
+            end
+            table.insert(parts, "-- BEGIN " .. mod)
+            table.insert(parts, content)
+            table.insert(parts, "-- END " .. mod)
+            table.insert(parts, "")
+        end
+    end
+
+    -- Include main source
+    local main_f = io.open(source_file, "r")
+    if main_f then
+        local main_content = main_f:read("*a")
+        main_f:close()
+        table.insert(parts, "-- BEGIN main: " .. source_file)
+        table.insert(parts, main_content)
+        table.insert(parts, "-- END main: " .. source_file)
+    end
+
+    local out = io.open(output_file, "w")
+    if not out then
+        return false, "Cannot create output file: " .. output_file
+    end
+    out:write(table.concat(parts, "\n"))
+    out:close()
+
+    return true
+end
+
+--- Simple minification of Lua code
+---@param content string
+---@return string
+function bundle.minify(content)
+    -- Remove single-line comments (but keep --- doc comments)
+    content = content:gsub("\n%-%-[^%-].-\n", "\n")
+    content = content:gsub("%-%-[^%-].-\n", "\n")
+    content = content:gsub("%-%-[^%-].*$", "")
+    -- Remove multi-line comments --[[ ... ]]
+    content = content:gsub("%-%-%[%[.-%-%-%]%]", "")
+    -- Collapse multiple spaces/tabs
+    content = content:gsub("[ \t]+", " ")
+    -- Collapse multiple newlines
+    content = content:gsub("\n\n+", "\n")
+    -- Trim leading/trailing whitespace per line
+    content = content:gsub("^%s+", "")
+    content = content:gsub("%s+$", "")
+    content = content:gsub("\n%s+", "\n")
+    content = content:gsub("%s+\n", "\n")
+    return content
+end
+
 return bundle

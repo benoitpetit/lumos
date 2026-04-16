@@ -236,6 +236,140 @@ describe('App Module', function()
       -- show_help returns EXIT_OK
       assert.are.equal(0, result)
     end)
+
+    it('supports mutex groups', function()
+      local test_app = app.new_app({name = 'testapp'})
+      local cmd = test_app:command('deploy', 'Deploy')
+      cmd:flag_string('-f --file', 'File')
+      cmd:flag_string('-u --url', 'URL')
+      cmd:mutex_group('input', {'file', 'url'}, { required = true })
+      cmd:action(function() return true end)
+
+      local original_print = _G.print
+      _G.print = function() end
+      local original_stderr = io.stderr
+      local stderr_output = ""
+      _G.io.stderr = { write = function(_, s) stderr_output = stderr_output .. (s or "") end, flush = function() end }
+
+      -- Neither provided -> required error
+      local r1 = test_app:run({'deploy'})
+      assert.are.equal(2, r1)
+
+      -- Both provided -> mutex error
+      stderr_output = ""
+      local r2 = test_app:run({'deploy', '--file', 'a.txt', '--url', 'http://x'})
+      assert.are.equal(2, r2)
+      assert.truthy(stderr_output:find("mutually exclusive") or stderr_output:find("exclusive"))
+
+      -- One provided -> OK
+      local r3 = test_app:run({'deploy', '--file', 'a.txt'})
+      assert.are.equal(0, r3)
+
+      _G.io.stderr = original_stderr
+      _G.print = original_print
+    end)
+
+    it('supports middleware chain', function()
+      local test_app = app.new_app({name = 'testapp'})
+      local order = {}
+      test_app:use(function(ctx, next)
+        table.insert(order, 'app')
+        return next()
+      end)
+      local cmd = test_app:command('build', 'Build')
+      cmd:use(function(ctx, next)
+        table.insert(order, 'cmd')
+        return next()
+      end)
+      cmd:action(function(ctx)
+        table.insert(order, 'action')
+        return true
+      end)
+
+      test_app:run({'build'})
+      assert.same({'app', 'cmd', 'action'}, order)
+    end)
+
+    it('middleware can short-circuit action', function()
+      local test_app = app.new_app({name = 'testapp'})
+      local cmd = test_app:command('build', 'Build')
+      cmd:use(function(ctx, next)
+        return require('lumos.error').new("INVALID_ARGUMENT", "blocked")
+      end)
+      cmd:action(function(ctx)
+        return true
+      end)
+
+      local original_stderr = io.stderr
+      local stderr_output = ""
+      _G.io.stderr = { write = function(_, s) stderr_output = stderr_output .. (s or "") end, flush = function() end }
+      local result = test_app:run({'build'})
+      _G.io.stderr = original_stderr
+      assert.are.equal(1, result)
+      assert.truthy(stderr_output:find("blocked"))
+    end)
+
+    it('supports float flags', function()
+      local test_app = app.new_app({name = 'testapp'})
+      local received
+      test_app:command('scale', 'Scale')
+        :flag_float('-r --rate', 'Rate', { min = 0, max = 1, precision = 2 })
+        :action(function(ctx)
+          received = ctx.flags.rate
+          return true
+        end)
+      test_app:run({'scale', '--rate', '0.7555'})
+      assert.are.equal(0.76, received)
+    end)
+
+    it('supports array flags', function()
+      local test_app = app.new_app({name = 'testapp'})
+      local received
+      test_app:command('tags', 'Tags')
+        :flag_array('-t --tags', 'Tags', { separator = ',', unique = true })
+        :action(function(ctx)
+          received = ctx.flags.tags
+          return true
+        end)
+      test_app:run({'tags', '--tags', 'a,b,c'})
+      assert.same({'a', 'b', 'c'}, received)
+    end)
+
+    it('supports enum flags', function()
+      local test_app = app.new_app({name = 'testapp'})
+      local received
+      test_app:command('level', 'Level')
+        :flag_enum('-l --level', 'Level', {'debug', 'info', 'warn'})
+        :action(function(ctx)
+          received = ctx.flags.level
+          return true
+        end)
+      test_app:run({'level', '--level', 'INFO'})
+      assert.are.equal('info', received)
+    end)
+
+    it('handles typed errors from actions', function()
+      local test_app = app.new_app({name = 'testapp'})
+      test_app:command('fail', 'Fail'):action(function(ctx)
+        return require('lumos.error').new("EXECUTION_FAILED", "boom", { exit_code = 7 })
+      end)
+      local original_stderr = io.stderr
+      local stderr_output = ""
+      _G.io.stderr = { write = function(_, s) stderr_output = stderr_output .. (s or "") end, flush = function() end }
+      local result = test_app:run({'fail'})
+      _G.io.stderr = original_stderr
+      assert.are.equal(7, result)
+      assert.truthy(stderr_output:find("boom"))
+    end)
+
+    it('handles success objects from actions', function()
+      local test_app = app.new_app({name = 'testapp'})
+      test_app:command('ok', 'OK'):action(function(ctx)
+        return require('lumos.error').success({ id = 42 })
+      end)
+      local result = test_app:run({'ok'})
+      assert.are.equal(0, result)
+    end)
   end)
 end)
 

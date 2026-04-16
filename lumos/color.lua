@@ -50,8 +50,12 @@ local function supports_color()
         return true
     end
     
-    -- Reuse format module's TTY detection to avoid spawning a second subprocess
-    return format.is_tty()
+    -- Fallback to terminal detection (pipe-aware, platform-aware)
+    local ok, term = pcall(require, "lumos.terminal")
+    if ok and term then
+        return term.should_use_colors()
+    end
+    return false
 end
 
 local color_enabled = supports_color()

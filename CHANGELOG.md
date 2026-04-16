@@ -166,6 +166,37 @@ Lumos uses [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.3.0] — 2026-04-16
+
+### Added
+
+- `lumos/error.lua` — typed error system with `Error.new()`, `is_error()`, `format_user()`, `format_log()`, and `Error.success()`.
+- `lumos/error_codes.lua` — standardized exit codes (SUCCESS, INVALID_ARGUMENT, MUTEX_VIOLATION, EXECUTION_FAILED, etc.).
+- `lumos/middleware.lua` — Express-like middleware chain with builtin factories: `logger`, `auth`, `dry_run`, `confirm`, `rate_limit`.
+- `lumos/platform.lua` — cross-platform detection (Windows, macOS, Linux, FreeBSD, OpenBSD) with architecture, path, and TTY helpers.
+- `lumos/terminal.lua` — terminal control helpers: dimensions, cursor, clear, and pipe-aware color/animation decisions.
+- `lumos/profiler.lua` — integrated profiler with `start()`, `stop()`, `wrap()`, and `report()`.
+- `lumos/config_cache.lua` — in-memory configuration cache with mtime invalidation.
+- `lumos/flags.lua` — new flag types: `float`, `array`, `enum`; enriched validation for `path`, `url`, and `email`.
+- `lumos/app.lua` — new fluent flag methods: `flag_float()`, `flag_array()`, `flag_enum()`; `mutex_group()` for mutually exclusive flags; `use()` for middleware chaining at app and command level.
+- `lumos/bundle.lua` — `analyze_dependencies()`, `get_required_lumos_modules()`, `minimal()`, and `minify()` for tree-shaking bundles.
+- `tests/benchmark.lua` — basic benchmark suite for startup, command creation, parsing, and UI rendering.
+- `spec/error_spec.lua`, `spec/middleware_spec.lua`, `spec/platform_spec.lua`, `spec/terminal_spec.lua`, `spec/profiler_spec.lua` — full test coverage for new modules.
+
+### Changed
+
+- `lumos/init.lua` — converted to lazy-loading via `__index` metatable; modules are loaded on first access.
+- `lumos/core.lua` — `execute_command` now recognizes typed `Error` objects and `success` tables in addition to legacy boolean returns; integrated middleware execution.
+- `lumos/color.lua` — fallback color detection now uses `lumos.terminal.should_use_colors()` for automatic pipe-aware disable.
+- `lumos/prompt.lua` — now uses `lumos.platform` for Windows detection and improved native fallback paths.
+- `lumos/config.lua` — added `load_file_cached()` wrapper delegating to `lumos.config_cache`.
+
+### Fixed
+
+- `lumos/flags.lua` — `trim()` helper corrected so array splitting no longer drops items.
+
+---
+
 ## [Unreleased]
 
 ### Added

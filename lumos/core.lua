@@ -2,6 +2,7 @@
 local flags = require('lumos.flags')
 local logger = require('lumos.logger')
 local config_module = require('lumos.config')
+local Error = require('lumos.error')
 
 local core = {}
 
@@ -272,7 +273,27 @@ function core.validate_and_merge_flags(app, cmd, parsed_flags)
             merged_flags[flag_name] = flag_value
         end
     end
-    
+
+    -- Validate mutex groups
+    if cmd and cmd.mutex_groups then
+        for name, group in pairs(cmd.mutex_groups) do
+            local count = 0
+            local found = {}
+            for _, flag in ipairs(group.flags) do
+                local key = flag.long or flag.short
+                if merged_flags[key] ~= nil then
+                    count = count + 1
+                    table.insert(found, "--" .. key)
+                end
+            end
+            if count > 1 then
+                table.insert(errors, "Flags " .. table.concat(found, ", ") .. " are mutually exclusive")
+            elseif group.required and count == 0 then
+                table.insert(errors, "At least one of " .. name .. " flags is required")
+            end
+        end
+    end
+
     return merged_flags, errors
 end
 
@@ -287,6 +308,26 @@ local function run_hooks(hooks, context)
         end
     end
     return true
+end
+
+-- Execute action through middleware chain (app + command)
+function core.execute_action(app, cmd, context, action_fn)
+    local Middleware = require("lumos.middleware")
+    local chain = Middleware.new()
+
+    if app.middleware_chain then
+        for _, entry in ipairs(app.middleware_chain) do
+            chain:use(entry.fn, entry.priority)
+        end
+    end
+
+    if cmd and cmd.middleware_chain then
+        for _, entry in ipairs(cmd.middleware_chain) do
+            chain:use(entry.fn, entry.priority)
+        end
+    end
+
+    return chain:execute(context, action_fn)
 end
 
 -- Execute the appropriate command with parsed arguments
@@ -354,7 +395,9 @@ function core.execute_command(app, parsed_args)
                 if not run_hooks(app.persistent_pre_runs, context) then return core.EXIT_ERROR end
                 if not run_hooks(subcmd.pre_runs, context) then return core.EXIT_ERROR end
                 local success, result = xpcall(function()
-                    return subcmd.action(context)
+                    return core.execute_action(app, subcmd, context, function()
+                        return subcmd.action(context)
+                    end)
                 end, function(err)
                     if debug and type(debug.traceback) == "function" then
                         return err .. "\n" .. debug.traceback("", 2)
@@ -372,6 +415,15 @@ function core.execute_command(app, parsed_args)
                         io.stderr:write("Error executing command: " .. user_msg .. "\n")
                     end
                     return core.EXIT_ERROR
+                end
+                -- Handle typed errors, success objects, and legacy booleans
+                if Error.is_error(result) then
+                    if result.exit_code ~= 0 then
+                        io.stderr:write(result:format_user() .. "\n")
+                    end
+                    return result.exit_code
+                elseif type(result) == "table" and result.success ~= nil then
+                    return result.exit_code or (result.success and core.EXIT_OK or core.EXIT_ERROR)
                 end
                 return (result == false) and core.EXIT_ERROR or core.EXIT_OK
             else
@@ -432,7 +484,9 @@ function core.execute_command(app, parsed_args)
         if not run_hooks(app.persistent_pre_runs, context) then return core.EXIT_ERROR end
         if not run_hooks(cmd.pre_runs, context) then return core.EXIT_ERROR end
         local success, result = xpcall(function()
-            return cmd.action(context)
+            return core.execute_action(app, cmd, context, function()
+                return cmd.action(context)
+            end)
         end, error_handler)
         run_hooks(cmd.post_runs, {success = success, result = result, config = context.config, env = context.env, command = cmd, args = context.args, flags = context.flags})
         run_hooks(app.persistent_post_runs, {success = success, result = result, config = context.config, env = context.env, command = cmd, args = context.args, flags = context.flags})
@@ -446,6 +500,15 @@ function core.execute_command(app, parsed_args)
                 io.stderr:write("Error executing command: " .. user_msg .. "\n")
             end
             return core.EXIT_ERROR
+        end
+        -- Handle typed errors, success objects, and legacy booleans
+        if Error.is_error(result) then
+            if result.exit_code ~= 0 then
+                io.stderr:write(result:format_user() .. "\n")
+            end
+            return result.exit_code
+        elseif type(result) == "table" and result.success ~= nil then
+            return result.exit_code or (result.success and core.EXIT_OK or core.EXIT_ERROR)
         end
         return (result == false) and core.EXIT_ERROR or core.EXIT_OK
     else

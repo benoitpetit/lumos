@@ -1,0 +1,50 @@
+name: Publish to LuaRocks
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Lua
+        uses: hishamhm/gh-actions-lua@master
+        with:
+          luaVersion: '5.4'
+
+      - name: Setup LuaRocks
+        uses: hishamhm/gh-actions-luarocks@master
+
+      - name: Install dependencies
+        run: |
+          luarocks install luafilesystem
+          luarocks install busted
+
+      - name: Run tests
+        run: |
+          eval "$(luarocks path)"
+          busted
+
+      - name: Extract version from tag
+        id: get_version
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "rockspec=lumos-${VERSION}-1.rockspec" >> $GITHUB_OUTPUT
+
+      - name: Lint rockspec
+        run: |
+          eval "$(luarocks path)"
+          luarocks lint ${{ steps.get_version.outputs.rockspec }}
+
+      - name: Upload to LuaRocks
+        env:
+          LUAROCKS_API_KEY: ${{ secrets.LUAROCKS_API_KEY }}
+        run: |
+          eval "$(luarocks path)"
+          luarocks upload ${{ steps.get_version.outputs.rockspec }} --api-key="$LUAROCKS_API_KEY"

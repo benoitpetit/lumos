@@ -1,27 +1,28 @@
 rockspec_format = "3.0"
 package = "lumos"
-version = "dev-1"
+version = "0.3.0-1"
 
 source = {
-   url = ".",  -- Used for local builds
-   dir = "."
+   url = "git+https://github.com/benoitpetit/lumos.git",
+   tag = "v0.3.0"
 }
 
 description = {
-   summary = "A modern Lua CLI framework with advanced features (Development Version)",
+   summary = "A modern Lua CLI framework with advanced features",
    detailed = [[
       Lumos is a comprehensive CLI framework for Lua that provides:
       - Easy command and flag definition with fluent API
-      - Built-in validation and type checking
+      - Built-in validation and type checking (int, float, array, enum, path, url, email)
+      - Typed error system with middleware chain
+      - Cross-platform support (Windows, macOS, Linux)
+      - Lazy loading for fast startup
       - Automatic help generation and documentation
       - Shell completion support (Bash, Zsh, Fish)
       - Man page generation and Markdown docs
       - Progress bars and interactive prompts
       - JSON configuration support
-      - Color output with terminal detection
+      - Color output with terminal and pipe detection
       - Project scaffolding with 'lumos new' command
-      
-      This is the development version with latest features.
    ]],
    homepage = "https://github.com/benoitpetit/lumos",
    license = "MIT"
@@ -33,7 +34,8 @@ dependencies = {
 }
 
 test_dependencies = {
-   "busted >= 2.0"
+   "busted >= 2.0",
+   "luacov >= 0.14"
 }
 
 build = {
@@ -82,7 +84,7 @@ test = {
    type = "busted",
    platforms = {
       unix = {
-         flags = { "--exclude-tags=slow" }
+         flags = { "--coverage" }
       }
    }
 }

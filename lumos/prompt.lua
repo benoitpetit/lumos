@@ -2,17 +2,13 @@
 -- Provides interactive prompts for user input
 
 local color = require('lumos.color')
+local platform = require('lumos.platform')
 
 local prompt = {}
 
--- Detect if running on Windows
-local function is_windows()
-    return package.config:sub(1,1) == '\\'
-end
-
 -- Check if stty is available (Unix-like only)
 local function has_stty()
-    if is_windows() then return false end
+    if platform.is_windows() then return false end
     local ok = os.execute("stty size >/dev/null 2>&1")
     return ok == 0 or ok == true
 end
@@ -39,13 +35,15 @@ function prompt.password(message)
     io.flush()
     
     local input
-    if not is_windows() and has_stty() then
+    if not platform.is_windows() and has_stty() then
         -- Unix-like systems: disable echo
         os.execute("stty -echo 2>/dev/null")
         input = io.read("*l")
         os.execute("stty echo 2>/dev/null")
     else
         -- Fallback: read normally (Windows or no stty)
+        -- On Windows we could use powershell for secure input, but
+        -- to keep zero dependencies we read plain text.
         input = io.read("*l")
     end
     
@@ -118,7 +116,7 @@ end
 -- Interactive select with arrow keys
 function prompt.select(message, options, default)
     -- Use simple select on Windows or if terminal controls aren't available
-    if is_windows() or not has_stty() then
+    if platform.is_windows() or not has_stty() then
         return prompt.simple_select(message, options, default)
     end
     local current = default or 1
@@ -175,7 +173,7 @@ end
 -- Multi-selection prompt
 -- Interactive multiselect with arrow keys and space
 function prompt.multiselect(message, options)
-    if is_windows() or not has_stty() then
+    if platform.is_windows() or not has_stty() then
         -- Fallback on Windows or no stty: return empty (interactive not possible)
         print(message)
         print("(Interactive multi-selection not available on this platform)")
@@ -355,7 +353,7 @@ function prompt.search(message, options)
     end
 end
 
-local IS_WINDOWS = _G.package.config:sub(1, 1) == "\\"
+local IS_WINDOWS = platform.is_windows()
 local security = require("lumos.security")
 
 -- Open $EDITOR for multi-line input

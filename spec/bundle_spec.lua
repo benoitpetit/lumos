@@ -203,4 +203,45 @@ describe('Bundle Module', function()
         end)
     end)
 
+    describe('minimal bundle', function()
+        local tmp_entry
+        local tmp_output
+
+        before_each(function()
+            tmp_entry = os.tmpname() .. ".lua"
+            tmp_output = os.tmpname() .. ".lua"
+            local f = io.open(tmp_entry, "w")
+            f:write('local lumos = require("lumos")\n')
+            f:write('local app = lumos.new_app()\n')
+            f:write('app:run({"--version"})\n')
+            f:close()
+        end)
+
+        after_each(function()
+            os.remove(tmp_entry)
+            os.remove(tmp_output)
+        end)
+
+        it('creates a minimal bundle', function()
+            local ok, err = bundle.minimal(tmp_entry, tmp_output)
+            assert.is_true(ok, err)
+            local f = io.open(tmp_output, "r")
+            assert.is_not_nil(f)
+            local content = f:read("*a")
+            f:close()
+            assert.truthy(content:find("Lumos Minimal Bundle"))
+            assert.truthy(content:find("lumos.init"))
+        end)
+    end)
+
+    describe('minify', function()
+        it('removes comments and excess whitespace', function()
+            local code = "-- comment\nlocal x = 1\n\n\nlocal y = 2\n"
+            local min = bundle.minify(code)
+            assert.falsy(min:find("%-%- comment"))
+            assert.truthy(min:find("local x = 1"))
+            assert.falsy(min:find("\n\n"))
+        end)
+    end)
+
 end)

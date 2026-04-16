@@ -132,6 +132,12 @@ function config.validate_schema(data, schema)
     return #errors == 0, errors
 end
 
+-- Load a configuration file through the in-memory cache.
+function config.load_file_cached(path, options)
+    local config_cache = require("lumos.config_cache")
+    return config_cache.load(path, options)
+end
+
 -- Load and validate a configuration file.
 function config.load_validated(path, schema)
     local data, err = config.load_file(path)
