@@ -2,7 +2,7 @@
 -- This module provides the public API for the Lumos CLI framework
 
 local M = {}
-M.version = "0.3.0"
+M.version = "0.3.1"
 
 -- Module mapping for lazy loading
 local modules = {
