@@ -107,11 +107,11 @@ function platform.supports_colors()
             local ver = handle:read("*a") or ""
             handle:close()
             local major = ver:match("(%d+)%.%d+")
-            supports = tonumber(major) and tonumber(major) >= 10
+            supports = tonumber(major) ~= nil and tonumber(major) >= 10
         end
     else
         local term = os.getenv("TERM")
-        supports = term and term ~= "dumb"
+        supports = term ~= nil and term ~= "dumb"
     end
 
     platform._cache.supports_colors = supports
@@ -143,7 +143,7 @@ function platform.is_interactive()
             local stdout_tty = stdout_h:read("*l") == "yes"
             stdin_h:close()
             stdout_h:close()
-            interactive = stdin_tty and stdout_tty
+            interactive = (stdin_tty == true) and (stdout_tty == true)
         end
     end
 
