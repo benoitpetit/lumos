@@ -213,6 +213,9 @@ local settings = config.merge_configs(
     config.load_env("MYAPP"),
     ctx.flags
 )
+
+-- With in-memory cache (auto-invalidates on file change)
+local cached = config.load_file_cached("config.json")
 ```
 
 ### Security Features
@@ -233,38 +236,30 @@ end
 
 ## Common Patterns
 
-### Input Validation
+### Advanced Flag Types
 ```lua
-cmd:action(function(ctx)
-    local port = ctx.flags.port
-    if port then
-        local num = tonumber(port)
-        if not num or num < 1 or num > 65535 then
-            print(color.red("Error: Invalid port number"))
-            return false
-        end
-    end
-    return true
-end)
+cmd:flag_int("-p --port", "Port number", { min = 1, max = 65535 })
+cmd:flag_float("-r --rate", "Rate", { min = 0.0, max = 1.0, precision = 2 })
+cmd:flag_array("-t --tags", "Tags", { separator = ",", unique = true })
+cmd:flag_enum("-l --level", "Log level", {"debug", "info", "warn", "error"})
+cmd:flag_path("-c --config", "Config file", { must_exist = true })
 ```
 
 ### Error Handling
 ```lua
 cmd:action(function(ctx)
     if not ctx.args[1] then
-        print(color.red("Error: Missing required argument"))
-        return false
+        return lumos.error("MISSING_REQUIRED", "Missing required argument", {
+            suggestion = "Run with --help for usage"
+        })
     end
-    
-    -- do work
+
     local success = do_something()
     if not success then
-        print(color.red("Operation failed"))
-        return false
+        return lumos.error("EXECUTION_FAILED", "Operation failed")
     end
-    
-    print(color.green("Success!"))
-    return true
+
+    return lumos.success({ message = "Success!" })
 end)
 ```
 
@@ -280,6 +275,23 @@ deploy:examples({
 })
 ```
 
+### Middleware
+```lua
+app:use(lumos.middleware.logger())
+app:use(lumos.middleware.dry_run())
+
+cmd:use(lumos.middleware.auth({ env_var = "API_KEY" }))
+cmd:use(lumos.middleware.confirm({ message = "Continue?" }))
+```
+
+### Cross-Platform Detection
+```lua
+local platform = require('lumos.platform')
+print(platform.name())     -- "linux", "macos", "windows"
+platform.supports_colors() -- boolean (pipe-aware)
+platform.is_interactive()  -- boolean
+```
+
 ### Bundling for Distribution
 
 Lumos provides three ways to distribute your CLI:
@@ -288,10 +300,13 @@ Lumos provides three ways to distribute your CLI:
 # 1. Bundle — fast, creates a Lua script (requires Lua on target)
 lumos bundle src/main.lua -o dist/myapp
 
-# 2. Package — standalone executable, no C compiler needed
+# 2. Minimal bundle — only includes used Lumos modules
+lua -e 'require("lumos.bundle").minimal("src/main.lua", "dist/myapp.lua", {minify=true})'
+
+# 3. Package — standalone executable, no C compiler needed
 lumos package src/main.lua -o dist/myapp
 
-# 3. Build — native binary with embedded Lua VM (requires C toolchain)
+# 4. Build — native binary with embedded Lua VM (requires C toolchain)
 lumos build src/main.lua -o dist/myapp
 
 # Test it
@@ -312,7 +327,8 @@ lumos build src/main.lua -o dist/myapp
 1. **Start Simple**: Begin with basic commands and add complexity gradually
 2. **Use Colors**: Improve user experience with colored output
 3. **Add Help Text**: Provide clear descriptions for commands and flags
-4. **Handle Errors**: Return false from actions to indicate failure
+4. **Handle Errors**: Return `lumos.error()` or `lumos.success()` for structured results
 5. **Test Your CLI**: Write tests for your commands using the generated test suite
 6. **Secure Inputs**: Always sanitize user input with `lumos.security`
 7. **Log Actions**: Use `lumos.logger` for audit trails in production
+8. **Use Middleware**: Reuse `auth`, `confirm`, and `rate_limit` for common patterns
