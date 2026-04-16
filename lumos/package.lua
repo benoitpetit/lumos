@@ -5,81 +5,17 @@
 local package = {}
 
 local bundle = require("lumos.bundle")
+local fs = require("lumos.fs")
 local security = require("lumos.security")
-
-local lfs
-local function get_lfs()
-    if not lfs then
-        lfs = require("lfs")
-    end
-    return lfs
-end
 
 local PATH_SEP = _G.package.config:sub(1, 1)
 local IS_WINDOWS = PATH_SEP == "\\"
+local lfs = require("lfs")
 
---- Read file contents
----@param path string
----@return string|nil
-local function read_file(path)
-    local f = io.open(path, "rb")
-    if not f then return nil end
-    local content = f:read("*a")
-    f:close()
-    return content
-end
-
---- Write file contents
----@param path string
----@param content string
----@return boolean
-local function write_file(path, content)
-    local f = io.open(path, "wb")
-    if not f then return false end
-    f:write(content)
-    f:close()
-    return true
-end
-
---- Check if path exists
----@param path string
----@return boolean
-local function path_exists(path)
-    local attr = get_lfs().attributes(path)
-    return attr ~= nil
-end
-
---- Create directory recursively
----@param path string
----@return boolean
-local function mkdir_p(path)
-    local parts = {}
-    for part in path:gmatch("[^" .. PATH_SEP:gsub("\\", "\\\\") .. "]+") do
-        table.insert(parts, part)
-    end
-    local current = ""
-    if not IS_WINDOWS then
-        if path:sub(1, 1) == PATH_SEP then
-            current = PATH_SEP
-        end
-    else
-        -- Windows drive letter handling (e.g., C:\)
-        if path:match("^%a:") then
-            current = parts[1] .. PATH_SEP
-            table.remove(parts, 1)
-        end
-    end
-    for _, part in ipairs(parts) do
-        current = current .. part .. PATH_SEP
-        if not path_exists(current) then
-            local ok, err = get_lfs().mkdir(current)
-            if not ok and not path_exists(current) then
-                return false
-            end
-        end
-    end
-    return true
-end
+local read_file = fs.read_file
+local write_file = fs.write_file
+local path_exists = fs.path_exists
+local mkdir_p = fs.mkdir_p
 
 --- Encode a 64-bit unsigned integer as little-endian bytes
 ---@param n number
@@ -126,7 +62,7 @@ function package.list_targets()
     for _, root in ipairs(roots) do
         local stubs_dir = root .. PATH_SEP .. "stubs"
         if path_exists(stubs_dir) then
-            for file in get_lfs().dir(stubs_dir) do
+            for file in lfs.dir(stubs_dir) do
                 if file:match("^lumos%-stub%-") then
                     local target = file:match("^lumos%-stub%-(.+)$")
                     if target and not targets[target] then

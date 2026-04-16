@@ -4,15 +4,9 @@
 
 local bundle = {}
 
+local fs = require("lumos.fs")
 local security = require("lumos.security")
 
-local lfs
-local function get_lfs()
-    if not lfs then
-        lfs = require("lfs")
-    end
-    return lfs
-end
 
 local PATH_SEP = _G.package.config:sub(1, 1)
 local IS_WINDOWS = PATH_SEP == "\\"
@@ -47,85 +41,21 @@ local LUMOS_MODULES = {
     "lumos.bundle",
     "lumos.native_build",
     "lumos.package",
-    "lumos.plugin"
+    "lumos.plugin",
+    "lumos.error_codes",
+    "lumos.version",
+    "lumos.platform",
+    "lumos.terminal",
+    "lumos.middleware",
+    "lumos.profiler",
+    "lumos.config_cache"
 }
 
---- Read file contents
----@param path string
----@return string|nil, string|nil
-local function read_file(path)
-    local f, err = security.safe_open(path, "rb")
-    if not f then
-        return nil, "Cannot read file: " .. path .. " - " .. (err or "unknown error")
-    end
-    local content = f:read("*a")
-    f:close()
-    return content
-end
-
---- Write file contents
----@param path string
----@param content string
----@return boolean, string|nil
-local function write_file(path, content)
-    local f, err = security.safe_open(path, "wb")
-    if not f then
-        return false, "Cannot write file: " .. path .. " - " .. (err or "unknown error")
-    end
-    f:write(content)
-    f:close()
-    return true
-end
-
---- Check if path exists
----@param path string
----@return boolean
-local function path_exists(path)
-    local attr = get_lfs().attributes(path)
-    return attr ~= nil
-end
-
---- Check if path is a regular file
----@param path string
----@return boolean
-local function is_file(path)
-    return get_lfs().attributes(path, "mode") == "file"
-end
-
---- Create directory recursively
----@param path string
----@return boolean
-local function mkdir_p(path)
-    local parts = {}
-    local sep_escaped = PATH_SEP:gsub("\\", "\\\\")
-    for part in path:gmatch("[^" .. sep_escaped .. "]+") do
-        table.insert(parts, part)
-    end
-
-    local current = ""
-    if not IS_WINDOWS then
-        if path:sub(1, 1) == PATH_SEP then
-            current = PATH_SEP
-        end
-    else
-        -- Windows drive letter handling (e.g., C:\)
-        if path:match("^%a:") then
-            current = parts[1] .. PATH_SEP
-            table.remove(parts, 1)
-        end
-    end
-
-    for _, part in ipairs(parts) do
-        current = current .. part .. PATH_SEP
-        if not path_exists(current) then
-            local ok, err = get_lfs().mkdir(current)
-            if not ok and not path_exists(current) then
-                return false
-            end
-        end
-    end
-    return true
-end
+local read_file = fs.read_file
+local write_file = fs.write_file
+local path_exists = fs.path_exists
+local is_file = fs.is_file
+local mkdir_p = fs.mkdir_p
 
 --- Strip Lua comments from code
 ---@param code string
@@ -705,10 +635,9 @@ function bundle.minimal(source_file, output_file, options)
         local content
         for _, try_path in ipairs(paths_to_try) do
             if try_path then
-                local f = io.open(try_path, "r")
-                if f then
-                    content = f:read("*a")
-                    f:close()
+                local data = read_file(try_path)
+                if data then
+                    content = data
                     break
                 end
             end
@@ -726,21 +655,17 @@ function bundle.minimal(source_file, output_file, options)
     end
 
     -- Include main source
-    local main_f = io.open(source_file, "r")
-    if main_f then
-        local main_content = main_f:read("*a")
-        main_f:close()
+    local main_content = read_file(source_file)
+    if main_content then
         table.insert(parts, "-- BEGIN main: " .. source_file)
         table.insert(parts, main_content)
         table.insert(parts, "-- END main: " .. source_file)
     end
 
-    local out = io.open(output_file, "w")
-    if not out then
-        return false, "Cannot create output file: " .. output_file
+    local ok, err = write_file(output_file, table.concat(parts, "\n"))
+    if not ok then
+        return false, err or ("Cannot create output file: " .. output_file)
     end
-    out:write(table.concat(parts, "\n"))
-    out:close()
 
     return true
 end
@@ -749,21 +674,15 @@ end
 ---@param content string
 ---@return string
 function bundle.minify(content)
-    -- Remove single-line comments (but keep --- doc comments)
-    content = content:gsub("\n%-%-[^%-].-\n", "\n")
-    content = content:gsub("%-%-[^%-].-\n", "\n")
-    content = content:gsub("%-%-[^%-].*$", "")
-    -- Remove multi-line comments --[[ ... ]]
-    content = content:gsub("%-%-%[%[.-%-%-%]%]", "")
-    -- Collapse multiple spaces/tabs
+    -- Step 1: strip comments safely (preserves strings and long brackets)
+    content = strip_comments(content)
+    -- Step 2: collapse multiple spaces/tabs
     content = content:gsub("[ \t]+", " ")
-    -- Collapse multiple newlines
-    content = content:gsub("\n\n+", "\n")
-    -- Trim leading/trailing whitespace per line
-    content = content:gsub("^%s+", "")
-    content = content:gsub("%s+$", "")
+    -- Step 3: trim whitespace around lines
     content = content:gsub("\n%s+", "\n")
     content = content:gsub("%s+\n", "\n")
+    content = content:gsub("^%s+", "")
+    content = content:gsub("%s+$", "")
     return content
 end
 

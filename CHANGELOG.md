@@ -9,6 +9,32 @@ Lumos uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.4] — 2026-04-16
+
+### Fixed
+
+- **Critical**: `lumos/init.lua` — renamed `M.error` to `M.new_error` so the `lumos.error` module is accessible via lazy-loading.
+- **Critical**: `lumos/security.lua` — fixed `sanitize_path` false positives on legitimate paths containing `..` (e.g. `foo..bar.txt`).
+- `lumos/bundle.lua` — fixed `bundle.minify` to use `strip_comments` instead of dangerous regex replacements that could corrupt multi-line strings.
+- `lumos/config_cache.lua` — `get_mtime` now uses `lfs.attributes` for cross-platform compatibility (macOS/BSD).
+- `lumos/prompt.lua` — `prompt.password` now safely restores `stty echo` even if the user interrupts with Ctrl+C.
+- README / docs — corrected broken `flag_int` and `cmd:plugin` examples.
+
+### Changed
+
+- `lumos/core.lua` — refactored into specialized modules (`parser`, `validator`, `executor`, `help_renderer`) while keeping `core.lua` as a 100% backward-compatible facade.
+- `lumos/app.lua` — introduced `add_flag_to` factory to eliminate ~300 lines of duplicated flag constructor code.
+- `lumos/fs.lua` — new cross-platform file-system utility module; `bundle`, `package`, and `native_build` now reuse it instead of duplicating I/O helpers.
+- `lumos/native_build.lua` — migrated to `lumos.fs` helpers; `random_tmp_name` no longer calls `math.randomseed` to avoid polluting the global RNG.
+- `lumos/package.lua` — migrated to `lumos.fs` helpers, removing duplicated `read_file` / `write_file` / `mkdir_p` / `path_exists` logic.
+- `lumos/bundle.lua` — synchronized `LUMOS_MODULES` to include all framework modules (`error_codes`, `version`, `platform`, `terminal`, `middleware`, `profiler`, `config_cache`).
+- `lumos/init.lua` — `M.use(plugin_type, fn, opts)` now accepts the optional `opts` argument; `M.preload(...)` returns `M` to allow chaining.
+- Documentation (`docs/api.md`) — added missing API entries for `persistent_flag_*`, `prompt.number/editor/form/wizard`, `profiler.wrap/reset/disable`, `config.load_file_cached/load_validated`, `security.safe_mkdir/safe_open`, `terminal.*`, and `config_cache.load/invalidate`.
+
+### Added
+
+- New test coverage for subcommands, `safe_open`, `safe_mkdir`, `is_elevated`, `sanitize_path` regression, and `middleware.builtin.confirm`.
+
 ## [0.3.3] — 2026-04-16
 
 ### Added

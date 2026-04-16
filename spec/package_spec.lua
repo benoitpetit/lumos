@@ -1,4 +1,5 @@
 local pkg = require('lumos.package')
+local fs = require('lumos.fs')
 
 describe('Package Module', function()
 
@@ -36,12 +37,12 @@ describe('Package Module', function()
             f:close()
 
             tmp_output_dir = os.tmpname() .. "_d"
-            os.execute("mkdir -p " .. tmp_output_dir)
+            fs.mkdir_p(tmp_output_dir)
         end)
 
         after_each(function()
             os.remove(tmp_entry)
-            os.execute("rm -rf " .. tmp_output_dir)
+            fs.rmdir_p(tmp_output_dir)
         end)
 
         it('fails when entry file is missing', function()

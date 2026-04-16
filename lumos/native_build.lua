@@ -6,15 +6,9 @@
 local native_build = {}
 
 local bundle = require("lumos.bundle")
+local fs = require("lumos.fs")
 local security = require("lumos.security")
-
-local lfs
-local function get_lfs()
-    if not lfs then
-        lfs = require("lfs")
-    end
-    return lfs
-end
+local lfs = require("lfs")
 
 local PATH_SEP = _G.package.config:sub(1, 1)
 local IS_WINDOWS = PATH_SEP == "\\"
@@ -22,17 +16,17 @@ local IS_WINDOWS = PATH_SEP == "\\"
 local BUILD_CACHE_DIR = ".lumos" .. PATH_SEP .. "cache"
 
 local function ensure_build_cache_dir()
-    local lfs_mod = get_lfs()
-    if not lfs_mod.attributes(BUILD_CACHE_DIR, "mode") then
-        lfs_mod.mkdir(BUILD_CACHE_DIR)
+    if not fs.path_exists(BUILD_CACHE_DIR) then
+        fs.mkdir_p(BUILD_CACHE_DIR)
     end
 end
 
 -- Generate a random filename inside the build cache
+local counter = 0
 local function random_tmp_name(ext)
     ensure_build_cache_dir()
-    math.randomseed(os.time() + math.random(1, 10000))
-    local suffix = tostring(math.random(100000, 999999))
+    counter = counter + 1
+    local suffix = tostring(math.random(100000, 999999)) .. "_" .. tostring(counter) .. "_" .. tostring(os.time())
     return BUILD_CACHE_DIR .. PATH_SEP .. "tmp_" .. suffix .. (ext or "")
 end
 
@@ -53,12 +47,7 @@ local function shell_exec(cmd)
     return stdout, stderr, (ok == true or ok == 0) and 0 or (code or 1)
 end
 
--- Utility: check if file exists
-local function file_exists(path)
-    local f = io.open(path, "r")
-    if f then f:close() return true end
-    return false
-end
+
 
 -- Preferred compiler candidates
 local COMPILER_CANDIDATES = {
@@ -260,7 +249,7 @@ function native_build.detect_toolchain(options)
         for _, dir in ipairs(search_paths) do
             for _, cand in ipairs(candidates) do
                 local p = dir .. "/" .. cand
-                if file_exists(p) then
+                if fs.path_exists(p) then
                     liblua_path = p
                     break
                 end
@@ -293,14 +282,14 @@ function native_build.detect_toolchain(options)
         local env_inc = os.getenv("LUA_INCDIR")
         if env_inc then table.insert(inc_candidates, 1, env_inc) end
         for _, dir in ipairs(inc_candidates) do
-            if file_exists(dir .. "/lua.h") then
+            if fs.path_exists(dir .. "/lua.h") then
                 lua_include_dir = dir
                 break
             end
         end
     end
 
-    if not lua_include_dir or not file_exists(lua_include_dir .. "/lua.h") then
+    if not lua_include_dir or not fs.path_exists(lua_include_dir .. "/lua.h") then
         return nil, "Could not find Lua headers (lua.h). Please install lua-dev or liblua-dev."
     end
 
@@ -350,7 +339,7 @@ function native_build.find_static_native_module(name)
     for _, dir in ipairs(search_paths) do
         for _, cand in ipairs(candidates) do
             local p = dir .. "/" .. cand
-            if file_exists(p) then return p end
+            if fs.path_exists(p) then return p end
         end
     end
     return nil
@@ -701,34 +690,15 @@ function native_build.create(options)
     if not output_path then
         local basename = entry_file:match("([^/\\]+)%.lua$") or "build"
         local out_dir = options.output_dir or "dist"
-        local lfs_mod = get_lfs()
-        if not lfs_mod.attributes(out_dir, "mode") then
-            lfs_mod.mkdir(out_dir)
+        if not fs.path_exists(out_dir) then
+            fs.mkdir_p(out_dir)
         end
         output_path = out_dir .. PATH_SEP .. basename
     else
         local parent = output_path:match("^(.+)[/\\][^/\\]+$")
         if parent then
-            local lfs_mod = get_lfs()
-            if not lfs_mod.attributes(parent, "mode") then
-                -- simple recursive mkdir using our cache dir helper logic
-                local parts = {}
-                for part in parent:gmatch("[^" .. PATH_SEP:gsub("\\", "\\\\") .. "]+") do
-                    table.insert(parts, part)
-                end
-                local current = ""
-                if not IS_WINDOWS and parent:sub(1, 1) == PATH_SEP then
-                    current = PATH_SEP
-                elseif IS_WINDOWS and parent:match("^%a:") then
-                    current = parts[1] .. PATH_SEP
-                    table.remove(parts, 1)
-                end
-                for _, part in ipairs(parts) do
-                    current = current .. part .. PATH_SEP
-                    if not lfs_mod.attributes(current, "mode") then
-                        lfs_mod.mkdir(current)
-                    end
-                end
+            if not fs.path_exists(parent) then
+                fs.mkdir_p(parent)
             end
         end
     end
@@ -778,7 +748,7 @@ function native_build.create(options)
     return true, nil, {
         output = output_path,
         modules_count = modules_count,
-        size = get_lfs().attributes(output_path, "size") or 0,
+        size = lfs.attributes(output_path, "size") or 0,
         compiler = toolchain.compiler,
         command = cmd,
         missing_native = missing_native,

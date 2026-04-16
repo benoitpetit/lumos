@@ -588,13 +588,13 @@ local platform = require('lumos.platform')
 
 local app = lumos.new_app({
     name = "deployctl",
-    version = "0.3.3",
+    version = "0.3.4",
     description = "Modern deployment controller"
 })
 
 -- Global middleware
-app:use(lumos.middleware.logger())
-app:use(lumos.middleware.dry_run())
+app:use(lumos.middleware.builtin.logger())
+app:use(lumos.middleware.builtin.dry_run())
 
 -- Command with advanced flags and middleware
 local deploy = app:command("deploy", "Deploy an application")
@@ -603,7 +603,7 @@ deploy:arg("app", "Application name", { required = true })
 
 -- Typed flags
 deploy:flag_enum("-e --env", "Environment", {"dev", "staging", "prod"})
-deploy:flag_int("--workers", "Number of workers", { min = 1, max = 64 })
+deploy:flag_int("--workers", "Number of workers", 1, 64)
 deploy:flag_float("-r --rate", "Deployment rate", { min = 0.0, max = 1.0, precision = 2 })
 deploy:flag_array("-t --tags", "Deployment tags", { separator = ",", unique = true })
 deploy:flag_path("-c --config", "Config file", { must_exist = true, extensions = {".json"} })
@@ -616,8 +616,8 @@ deploy:mutex_group("target", {
 }, { required = true })
 
 -- Per-command middleware
-deploy:use(lumos.middleware.auth({ env_var = "DEPLOY_API_KEY" }))
-deploy:use(lumos.middleware.confirm({ message = "Deploy to production?", default = false }))
+deploy:use(lumos.middleware.builtin.auth({ env_var = "DEPLOY_API_KEY" }))
+deploy:use(lumos.middleware.builtin.confirm({ message = "Deploy to production?", default = false }))
 
 deploy:action(function(ctx)
     if ctx.dry_run then
@@ -626,7 +626,7 @@ deploy:action(function(ctx)
     end
 
     if not platform.is_interactive() and not ctx.flags.force then
-        return lumos.error("EXECUTION_FAILED", "Non-interactive mode requires --force")
+        return lumos.new_error("EXECUTION_FAILED", "Non-interactive mode requires --force")
     end
 
     print(color.green("Deploying " .. ctx.args[1] .. " to " .. ctx.flags.env))

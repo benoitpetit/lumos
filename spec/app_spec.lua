@@ -371,5 +371,81 @@ describe('App Module', function()
       assert.are.equal(0, result)
     end)
   end)
+
+  describe('Subcommands', function()
+    it('creates subcommands with fluent API', function()
+      local test_app = app.new_app()
+      local parent = test_app:command('parent', 'Parent command')
+      local child = parent:subcommand('child', 'Child command')
+      
+      assert.are.equal('child', child.name)
+      assert.are.equal('Child command', child.description)
+      assert.are.equal(parent, child.parent)
+      assert.are.equal(1, #parent.subcommands)
+    end)
+
+    it('executes subcommand actions', function()
+      local test_app = app.new_app({name = 'testapp'})
+      local parent = test_app:command('parent', 'Parent')
+      local child = parent:subcommand('child', 'Child')
+      local called = false
+      child:action(function(ctx)
+        called = true
+        return true
+      end)
+      
+      local result = test_app:run({'parent', 'child'})
+      assert.is_true(called)
+      assert.are.equal(0, result)
+    end)
+
+    it('validates subcommand args and flags', function()
+      local test_app = app.new_app({name = 'testapp'})
+      local parent = test_app:command('parent', 'Parent')
+      local child = parent:subcommand('child', 'Child')
+      child:arg('name', 'Name', {required = true})
+      child:flag_int('--count', 'Count', 1, 10)
+      child:action(function(ctx)
+        assert.are.equal('alice', ctx.args[1])
+        assert.are.equal(5, ctx.flags.count)
+        return true
+      end)
+      
+      local result = test_app:run({'parent', 'child', 'alice', '--count', '5'})
+      assert.are.equal(0, result)
+    end)
+
+    it('shows help for subcommand', function()
+      local test_app = app.new_app({name = 'testapp'})
+      local parent = test_app:command('parent', 'Parent')
+      local child = parent:subcommand('child', 'Child')
+      
+      local original_print = _G.print
+      local output = {}
+      _G.print = function(...) table.insert(output, table.concat({...}, ' ')) end
+      local result = test_app:run({'parent', 'child', '--help'})
+      _G.print = original_print
+      
+      assert.are.equal(0, result)
+      local text = table.concat(output, '\n')
+      assert.truthy(text:find('Usage:'))
+    end)
+
+    it('shows parent help when subcommand is unknown', function()
+      local test_app = app.new_app({name = 'testapp'})
+      local parent = test_app:command('parent', 'Parent')
+      parent:subcommand('child', 'Child')
+      
+      local original_print = _G.print
+      local output = {}
+      _G.print = function(...) table.insert(output, table.concat({...}, ' ')) end
+      local result = test_app:run({'parent', 'unknown'})
+      _G.print = original_print
+      
+      assert.are.equal(0, result)
+      local text = table.concat(output, '\n')
+      assert.truthy(text:find('Usage:'))
+    end)
+  end)
 end)
 

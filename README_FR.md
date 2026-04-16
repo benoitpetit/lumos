@@ -108,7 +108,7 @@ local color = require('lumos.color')
 
 local app = lumos.new_app({
     name = "my-awesome-cli",
-    version = "0.3.3",
+    version = "0.3.4",
     description = "My awesome CLI application"
 })
 
@@ -164,7 +164,7 @@ luarocks make --local lumos-dev-1.rockspec
 ### Vérifier l'installation
 ```bash
 lumos version
-# Devrait afficher : Lumos CLI Framework v0.3.3
+# Devrait afficher : Lumos CLI Framework v0.3.4
 ```
 
 ## Fonctionnalités clés
@@ -179,7 +179,7 @@ deploy:option("--timeout", "Deployment timeout")
 
 ### Flags typés avancés
 ```lua
-cmd:flag_int("-p --port", "Port number", { min = 1, max = 65535 })
+cmd:flag_int("-p --port", "Port number", 1, 65535)
 cmd:flag_float("-r --rate", "Rate", { min = 0.0, max = 1.0, precision = 2 })
 cmd:flag_array("-t --tags", "Tags", { separator = ",", unique = true })
 cmd:flag_enum("-l --level", "Log level", {"debug", "info", "warn", "error"})
@@ -200,7 +200,7 @@ cmd:mutex_group("input", {
 ```lua
 cmd:action(function(ctx)
     if not file_exists(ctx.flags.config) then
-        return lumos.error("CONFIG_ERROR", "Config file not found", {
+        return lumos.new_error("CONFIG_ERROR", "Config file not found", {
             path = ctx.flags.config,
             suggestion = "Create it with 'lumos init'"
         })
@@ -211,13 +211,13 @@ end)
 
 ### Middleware
 ```lua
-app:use(lumos.middleware.logger())
-app:use(lumos.middleware.dry_run())
+app:use(lumos.middleware.builtin.logger())
+app:use(lumos.middleware.builtin.dry_run())
 
 app:command("deploy", "Deploy")
-    :use(lumos.middleware.auth({ env_var = "API_KEY" }))
-    :use(lumos.middleware.confirm({ message = "Deploy to production?" }))
-    :use(lumos.middleware.rate_limit({ max_requests = 10, window_seconds = 60 }))
+    :use(lumos.middleware.builtin.auth({ env_var = "API_KEY" }))
+    :use(lumos.middleware.builtin.confirm({ message = "Deploy to production?" }))
+    :use(lumos.middleware.builtin.rate_limit({ max_requests = 10, window_seconds = 60 }))
     :action(function(ctx) ... end)
 ```
 
@@ -331,13 +331,14 @@ local result = prompt.wizard("Setup", {
 ### Plugins & Hooks
 ```lua
 -- Plugin global
-lumos.use("command", function(cmd, opts)
-    cmd:flag("--dry-run", "Simulate without side effects")
+-- Plugin global sur l'application
+lumos.use(app, function(app, opts)
+    app:flag("--dry-run", "Simulate without side effects")
 end)
 
 -- Ou attacher à une seule commande
 app:command("deploy", "Deploy app")
-    :use(function(cmd, opts)
+    :plugin(function(cmd, opts)
         cmd:flag("--region", "Target region")
     end)
 
@@ -394,7 +395,7 @@ make install && make test
 
 ## Statut du projet
 
-- **Version :** 0.3.3
+- **Version :** 0.3.4
 - **Licence :** MIT
 - **Versions Lua :** 5.1, 5.2, 5.3, 5.4, LuaJIT
 - **Plateformes :** Linux, macOS, Windows natif

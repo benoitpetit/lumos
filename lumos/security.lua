@@ -44,7 +44,7 @@ function security.sanitize_path(path)
     sanitized = sanitized:gsub("[;&|$`<>]", "")
     
     -- Check for path traversal attempts
-    if sanitized:match("%.%.") then
+    if sanitized:match("/%.%./") or sanitized:match("^%.%./") or sanitized:match("/%.%.$") or sanitized == ".." then
         return nil, "Path traversal detected"
     end
     

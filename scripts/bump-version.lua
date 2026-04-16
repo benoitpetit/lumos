@@ -2,7 +2,7 @@
 --[[
   Bump version script for Lumos.
   Usage: lua scripts/bump-version.lua <new-version>
-  Example: lua scripts/bump-version.lua 0.3.3
+  Example: lua scripts/bump-version.lua 0.3.4
 --]]
 
 local function read_file(path)

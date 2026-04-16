@@ -1,4 +1,5 @@
 local bundle = require('lumos.bundle')
+local fs = require('lumos.fs')
 
 describe('Bundle Module', function()
 
@@ -66,7 +67,7 @@ describe('Bundle Module', function()
 
         after_each(function()
             os.remove(tmp_entry)
-            os.execute("rm -rf .lumos/cache/")
+            fs.rmdir_p(".lumos/cache")
         end)
 
         it('fails when no entry file is provided', function()
@@ -130,13 +131,13 @@ describe('Bundle Module', function()
             -- Temporary output directory (append suffix to avoid conflict with the
             -- file that os.tmpname() itself creates on Linux)
             tmp_output_dir = os.tmpname() .. "_d"
-            os.execute("mkdir -p " .. tmp_output_dir)
+            fs.mkdir_p(tmp_output_dir)
         end)
 
         after_each(function()
             os.remove(tmp_entry)
-            os.execute("rm -rf " .. tmp_output_dir)
-            os.execute("rm -rf .lumos/cache/")
+            fs.rmdir_p(tmp_output_dir)
+            fs.rmdir_p(".lumos/cache")
         end)
 
         it('fails when no entry file is provided', function()

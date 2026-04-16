@@ -36,7 +36,7 @@ setup:
 # Install from rockspec for production
 install-prod:
 	@echo "Installing Lumos from production rockspec..."
-	@luarocks make --local lumos-0.3.3-1.rockspec
+	@luarocks make --local lumos-$(shell cat VERSION)-1.rockspec
 
 # Build documentation
 doc:

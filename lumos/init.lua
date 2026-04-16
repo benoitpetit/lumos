@@ -32,6 +32,11 @@ local modules = {
     middleware = "lumos.middleware",
     profiler = "lumos.profiler",
     config_cache = "lumos.config_cache",
+    fs = "lumos.fs",
+    parser = "lumos.parser",
+    validator = "lumos.validator",
+    executor = "lumos.executor",
+    help_renderer = "lumos.help_renderer",
 }
 
 local cache = {}
@@ -51,11 +56,11 @@ function M.new_app(config)
     return require("lumos.app").new_app(config)
 end
 
-function M.use(plugin_type, fn)
-    return require("lumos.plugin").use(plugin_type, fn)
+function M.use(plugin_type, fn, opts)
+    return require("lumos.plugin").use(plugin_type, fn, opts)
 end
 
-function M.error(error_type, message, context)
+function M.new_error(error_type, message, context)
     return require("lumos.error").new(error_type, message, context)
 end
 
@@ -74,6 +79,7 @@ function M.preload(...)
             cache[name] = require(modules[name])
         end
     end
+    return M
 end
 
 return M

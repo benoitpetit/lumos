@@ -86,7 +86,6 @@ describe('Advanced Core Module', function()
                 name = {type = "string", long = "name", env = "LUMOS_TEST_NAME"}
             }
 
-            os.execute("export LUMOS_TEST_NAME=from_env")  -- won't affect current process
             -- Instead, directly test the env binding by querying the flag definition
             assert.are.equal("LUMOS_TEST_NAME", cmd.flags.name.env)
         end)
@@ -468,6 +467,58 @@ describe('Advanced Core Module', function()
             local result, err = core.load_config("/nonexistent/file.json")
             assert.is_nil(result)
             assert.is_not_nil(err)
+        end)
+    end)
+
+    describe('Subcommand support', function()
+        it('finds subcommands by name', function()
+            local test_app = app.new_app()
+            local parent = test_app:command('parent', 'Parent')
+            local child = parent:subcommand('child', 'Child')
+            
+            assert.are.equal(child, core.find_subcommand(parent, 'child'))
+            assert.is_nil(core.find_subcommand(parent, 'missing'))
+        end)
+
+        it('shows command help for a specific command', function()
+            local test_app = app.new_app({name = 'testapp'})
+            local cmd = test_app:command('hello', 'Say hello')
+            
+            local original_print = _G.print
+            local output = {}
+            _G.print = function(...) table.insert(output, table.concat({...}, ' ')) end
+            core.show_command_help(test_app, cmd)
+            _G.print = original_print
+            
+            local text = table.concat(output, '\n')
+            assert.truthy(text:find('Usage:'))
+            assert.truthy(text:find('hello'))
+        end)
+
+        it('executes subcommand action through execute_command', function()
+            local test_app = app.new_app({name = 'testapp'})
+            local parent = test_app:command('parent', 'Parent')
+            local child = parent:subcommand('child', 'Child')
+            local called = false
+            child:action(function(ctx)
+                called = true
+                return true
+            end)
+            
+            local parsed = core.parse_arguments({'parent', 'child'}, test_app)
+            local result = core.execute_command(test_app, parsed)
+            assert.is_true(called)
+            assert.are.equal(0, result)
+        end)
+
+        it('returns EXIT_USAGE when subcommand action is missing', function()
+            local test_app = app.new_app({name = 'testapp'})
+            local parent = test_app:command('parent', 'Parent')
+            parent:subcommand('child', 'Child')
+            
+            local parsed = core.parse_arguments({'parent', 'child'}, test_app)
+            local result = core.execute_command(test_app, parsed)
+            assert.are.equal(2, result)
         end)
     end)
 end)

@@ -32,6 +32,29 @@ local function parse_flag_spec(spec)
     return nil, nil
 end
 
+-- Internal helper to create flag definitions and reduce duplication
+local function add_flag_to(target_table, spec, description, flag_type, options)
+    local short, long = parse_flag_spec(spec)
+    if not long and not short then
+        error("Invalid flag specification: " .. spec)
+    end
+    options = options or {}
+    if flag_type == "enum" and (not options.choices or #options.choices == 0) then
+        error("Enum flag requires a non-empty choices table")
+    end
+    local flag = {
+        short = short,
+        long = long or short,
+        description = description,
+        type = flag_type or "boolean"
+    }
+    for k, v in pairs(options) do
+        flag[k] = v
+    end
+    target_table[long or short] = flag
+    return flag
+end
+
 -- Command class for fluent API
 local Command = {}
 Command.__index = Command
@@ -68,21 +91,7 @@ end
 
 function Command:flag(spec, description)
     self.flags = self.flags or {}
-    local short, long = parse_flag_spec(spec)
-
-    if not long and not short then
-        error("Invalid flag specification: " .. spec)
-    end
-
-    local flag = {
-        short = short,
-        long = long or short,
-        description = description,
-        type = "boolean"
-    }
-
-    self.flags[long or short] = flag
-    self._last_flag = flag
+    self._last_flag = add_flag_to(self.flags, spec, description, "boolean")
     return self
 end
 
@@ -160,236 +169,116 @@ function Command:plugin(plugin_fn, opts)
     return self
 end
 
--- Add typed flag methods
+-- Typed flag methods
 function Command:flag_int(spec, description, min, max)
     self.flags = self.flags or {}
-    local short, long = parse_flag_spec(spec)
-    
-    if not long and not short then
-        error("Invalid flag specification: " .. spec)
-    end
-
-    local flag = {
-        short = short,
-        long = long or short,
-        description = description,
-        type = "int",
-        min = min,
-        max = max
-    }
-
-    self.flags[long or short] = flag
-    self._last_flag = flag
+    self._last_flag = add_flag_to(self.flags, spec, description, "int", {min = min, max = max})
     return self
 end
 
 function Command:flag_string(spec, description, options)
     self.flags = self.flags or {}
-    local short, long = parse_flag_spec(spec)
-    
-    if not long and not short then
-        error("Invalid flag specification: " .. spec)
-    end
-    
     options = options or {}
-    local flag = {
-        short = short,
-        long = long or short,
-        description = description,
-        type = "string",
+    self._last_flag = add_flag_to(self.flags, spec, description, "string", {
         choices = options.choices,
         min_length = options.min_length,
         max_length = options.max_length,
         pattern = options.pattern
-    }
-    
-    self.flags[long or short] = flag
-    self._last_flag = flag
+    })
     return self
 end
 
 function Command:flag_email(spec, description, options)
     self.flags = self.flags or {}
-    local short, long = parse_flag_spec(spec)
-    
-    if not long and not short then
-        error("Invalid flag specification: " .. spec)
-    end
-    
     options = options or {}
-    local flag = {
-        short = short,
-        long = long or short,
-        description = description,
-        type = "email",
+    self._last_flag = add_flag_to(self.flags, spec, description, "email", {
         pattern = options.pattern
-    }
-    
-    self.flags[long or short] = flag
-    self._last_flag = flag
+    })
     return self
 end
 
--- Add persistent flag support (inherited by subcommands)
+-- Persistent flag methods
 function Command:persistent_flag(spec, description)
     self.persistent_flags = self.persistent_flags or {}
-    local short, long = parse_flag_spec(spec)
-    
-    if not long and not short then
-        error("Invalid flag specification: " .. spec)
-    end
-    
-    local flag = {
-        short = short,
-        long = long or short,
-        description = description,
-        type = "boolean",
-        persistent = true
-    }
-    
-    self.persistent_flags[long or short] = flag
-    self._last_flag = flag
+    self._last_flag = add_flag_to(self.persistent_flags, spec, description, "boolean", {persistent = true})
     return self
 end
 
 function Command:persistent_flag_string(spec, description)
     self.persistent_flags = self.persistent_flags or {}
-    local short, long = parse_flag_spec(spec)
-    if not long and not short then
-        error("Invalid flag specification: " .. spec)
-    end
-    self.persistent_flags[long or short] = {
-        short = short, long = long or short,
-        description = description, type = "string", persistent = true
-    }
-    self._last_flag = self.persistent_flags[long or short]
+    self._last_flag = add_flag_to(self.persistent_flags, spec, description, "string", {persistent = true})
     return self
 end
 
 function Command:persistent_flag_int(spec, description, min, max)
     self.persistent_flags = self.persistent_flags or {}
-    local short, long = parse_flag_spec(spec)
-    if not long and not short then
-        error("Invalid flag specification: " .. spec)
-    end
-    self.persistent_flags[long or short] = {
-        short = short, long = long or short,
-        description = description, type = "int",
-        min = min, max = max, persistent = true
-    }
-    self._last_flag = self.persistent_flags[long or short]
+    self._last_flag = add_flag_to(self.persistent_flags, spec, description, "int", {min = min, max = max, persistent = true})
     return self
 end
 
 function Command:persistent_flag_email(spec, description)
     self.persistent_flags = self.persistent_flags or {}
-    local short, long = parse_flag_spec(spec)
-    if not long and not short then
-        error("Invalid flag specification: " .. spec)
-    end
-    self.persistent_flags[long or short] = {
-        short = short, long = long or short,
-        description = description, type = "email", persistent = true
-    }
-    self._last_flag = self.persistent_flags[long or short]
+    self._last_flag = add_flag_to(self.persistent_flags, spec, description, "email", {persistent = true})
     return self
 end
 
 function Command:flag_url(spec, description, options)
     self.flags = self.flags or {}
-    local short, long = parse_flag_spec(spec)
-    if not long and not short then
-        error("Invalid flag specification: " .. spec)
-    end
     options = options or {}
-    self.flags[long or short] = {
-        short = short, long = long or short,
-        description = description, type = "url",
+    self._last_flag = add_flag_to(self.flags, spec, description, "url", {
         schemes = options.schemes,
         require_host = options.require_host,
         require_path = options.require_path,
         allow_localhost = options.allow_localhost
-    }
-    self._last_flag = self.flags[long or short]
+    })
     return self
 end
 
 function Command:flag_path(spec, description, options)
     self.flags = self.flags or {}
-    local short, long = parse_flag_spec(spec)
-    if not long and not short then
-        error("Invalid flag specification: " .. spec)
-    end
     options = options or {}
-    self.flags[long or short] = {
-        short = short, long = long or short,
-        description = description, type = "path",
+    self._last_flag = add_flag_to(self.flags, spec, description, "path", {
         must_exist = options.must_exist,
         allow_file = options.allow_file,
         allow_dir = options.allow_dir,
         extensions = options.extensions,
         resolve = options.resolve,
         absolute = options.absolute
-    }
-    self._last_flag = self.flags[long or short]
+    })
     return self
 end
 
 function Command:flag_float(spec, description, options)
     self.flags = self.flags or {}
-    local short, long = parse_flag_spec(spec)
-    if not long and not short then
-        error("Invalid flag specification: " .. spec)
-    end
     options = options or {}
-    self.flags[long or short] = {
-        short = short, long = long or short,
-        description = description, type = "float",
+    self._last_flag = add_flag_to(self.flags, spec, description, "float", {
         min = options.min,
         max = options.max,
         precision = options.precision
-    }
-    self._last_flag = self.flags[long or short]
+    })
     return self
 end
 
 function Command:flag_array(spec, description, options)
     self.flags = self.flags or {}
-    local short, long = parse_flag_spec(spec)
-    if not long and not short then
-        error("Invalid flag specification: " .. spec)
-    end
     options = options or {}
-    self.flags[long or short] = {
-        short = short, long = long or short,
-        description = description, type = "array",
+    self._last_flag = add_flag_to(self.flags, spec, description, "array", {
         separator = options.separator,
         item_type = options.item_type,
         min_items = options.min_items,
         max_items = options.max_items,
         unique = options.unique
-    }
-    self._last_flag = self.flags[long or short]
+    })
     return self
 end
 
 function Command:flag_enum(spec, description, choices, options)
     self.flags = self.flags or {}
-    local short, long = parse_flag_spec(spec)
-    if not long and not short then
-        error("Invalid flag specification: " .. spec)
-    end
-    if not choices or #choices == 0 then
-        error("Enum flag requires a non-empty choices table")
-    end
     options = options or {}
-    self.flags[long or short] = {
-        short = short, long = long or short,
-        description = description, type = "enum",
+    self._last_flag = add_flag_to(self.flags, spec, description, "enum", {
         choices = choices,
         case_sensitive = options.case_sensitive
-    }
-    self._last_flag = self.flags[long or short]
+    })
     return self
 end
 
@@ -462,145 +351,89 @@ function lumos.new_app(config)
     -- Add persistent flag support at app level
     function app:persistent_flag(spec, description)
         self.persistent_flags = self.persistent_flags or {}
-        local short, long = parse_flag_spec(spec)
-        
-        if not long and not short then
-            error("Invalid flag specification: " .. spec)
-        end
-        
-        local flag = {
-            short = short,
-            long = long or short,
-            description = description,
-            type = "boolean",
-            persistent = true
-        }
-        
-        self.persistent_flags[long or short] = flag
-        self._last_flag = flag
+        self._last_flag = add_flag_to(self.persistent_flags, spec, description, "boolean", {persistent = true})
         return self
     end
 
     function app:persistent_flag_string(spec, description)
         self.persistent_flags = self.persistent_flags or {}
-        local short, long = parse_flag_spec(spec)
-        if not long and not short then error("Invalid flag specification: " .. spec) end
-        self.persistent_flags[long or short] = {
-            short = short, long = long or short,
-            description = description, type = "string", persistent = true
-        }
-        self._last_flag = self.persistent_flags[long or short]
+        self._last_flag = add_flag_to(self.persistent_flags, spec, description, "string", {persistent = true})
         return self
     end
 
     function app:persistent_flag_int(spec, description, min, max)
         self.persistent_flags = self.persistent_flags or {}
-        local short, long = parse_flag_spec(spec)
-        if not long and not short then error("Invalid flag specification: " .. spec) end
-        self.persistent_flags[long or short] = {
-            short = short, long = long or short,
-            description = description, type = "int",
-            min = min, max = max, persistent = true
-        }
-        self._last_flag = self.persistent_flags[long or short]
+        self._last_flag = add_flag_to(self.persistent_flags, spec, description, "int", {min = min, max = max, persistent = true})
         return self
     end
 
     function app:persistent_flag_email(spec, description, options)
         self.persistent_flags = self.persistent_flags or {}
-        local short, long = parse_flag_spec(spec)
-        if not long and not short then error("Invalid flag specification: " .. spec) end
         options = options or {}
-        self.persistent_flags[long or short] = {
-            short = short, long = long or short,
-            description = description, type = "email", persistent = true,
-            pattern = options.pattern
-        }
-        self._last_flag = self.persistent_flags[long or short]
+        self._last_flag = add_flag_to(self.persistent_flags, spec, description, "email", {persistent = true, pattern = options.pattern})
         return self
     end
 
     function app:persistent_flag_url(spec, description, options)
         self.persistent_flags = self.persistent_flags or {}
-        local short, long = parse_flag_spec(spec)
-        if not long and not short then error("Invalid flag specification: " .. spec) end
         options = options or {}
-        self.persistent_flags[long or short] = {
-            short = short, long = long or short,
-            description = description, type = "url", persistent = true,
+        self._last_flag = add_flag_to(self.persistent_flags, spec, description, "url", {
+            persistent = true,
             schemes = options.schemes,
             require_host = options.require_host,
             require_path = options.require_path,
             allow_localhost = options.allow_localhost
-        }
-        self._last_flag = self.persistent_flags[long or short]
+        })
         return self
     end
 
     function app:persistent_flag_path(spec, description, options)
         self.persistent_flags = self.persistent_flags or {}
-        local short, long = parse_flag_spec(spec)
-        if not long and not short then error("Invalid flag specification: " .. spec) end
         options = options or {}
-        self.persistent_flags[long or short] = {
-            short = short, long = long or short,
-            description = description, type = "path", persistent = true,
+        self._last_flag = add_flag_to(self.persistent_flags, spec, description, "path", {
+            persistent = true,
             must_exist = options.must_exist,
             allow_file = options.allow_file,
             allow_dir = options.allow_dir,
             extensions = options.extensions,
             resolve = options.resolve,
             absolute = options.absolute
-        }
-        self._last_flag = self.persistent_flags[long or short]
+        })
         return self
     end
 
     function app:persistent_flag_float(spec, description, options)
         self.persistent_flags = self.persistent_flags or {}
-        local short, long = parse_flag_spec(spec)
-        if not long and not short then error("Invalid flag specification: " .. spec) end
         options = options or {}
-        self.persistent_flags[long or short] = {
-            short = short, long = long or short,
-            description = description, type = "float", persistent = true,
+        self._last_flag = add_flag_to(self.persistent_flags, spec, description, "float", {
+            persistent = true,
             min = options.min, max = options.max, precision = options.precision
-        }
-        self._last_flag = self.persistent_flags[long or short]
+        })
         return self
     end
 
     function app:persistent_flag_array(spec, description, options)
         self.persistent_flags = self.persistent_flags or {}
-        local short, long = parse_flag_spec(spec)
-        if not long and not short then error("Invalid flag specification: " .. spec) end
         options = options or {}
-        self.persistent_flags[long or short] = {
-            short = short, long = long or short,
-            description = description, type = "array", persistent = true,
+        self._last_flag = add_flag_to(self.persistent_flags, spec, description, "array", {
+            persistent = true,
             separator = options.separator,
             item_type = options.item_type,
             min_items = options.min_items,
             max_items = options.max_items,
             unique = options.unique
-        }
-        self._last_flag = self.persistent_flags[long or short]
+        })
         return self
     end
 
     function app:persistent_flag_enum(spec, description, choices, options)
         self.persistent_flags = self.persistent_flags or {}
-        local short, long = parse_flag_spec(spec)
-        if not long and not short then error("Invalid flag specification: " .. spec) end
-        if not choices or #choices == 0 then error("Enum flag requires a non-empty choices table") end
         options = options or {}
-        self.persistent_flags[long or short] = {
-            short = short, long = long or short,
-            description = description, type = "enum", persistent = true,
+        self._last_flag = add_flag_to(self.persistent_flags, spec, description, "enum", {
+            persistent = true,
             choices = choices,
             case_sensitive = options.case_sensitive
-        }
-        self._last_flag = self.persistent_flags[long or short]
+        })
         return self
     end
 
@@ -630,21 +463,7 @@ function lumos.new_app(config)
     end
 
     function app:flag(spec, description)
-        local short, long = parse_flag_spec(spec)
-        
-        if not long and not short then
-            error("Invalid flag specification: " .. spec)
-        end
-
-        local flag = {
-            short = short,
-            long = long or short,
-            description = description,
-            type = "boolean"
-        }
-
-        self.global_flags[long or short] = flag
-        self._last_flag = flag
+        self._last_flag = add_flag_to(self.global_flags, spec, description, "boolean")
         return self
     end
 

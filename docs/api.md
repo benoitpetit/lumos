@@ -13,6 +13,8 @@ Creates a new CLI application.
   - `name` (string): Application name (required)
   - `version` (string): Version string (optional)
   - `description` (string): Description (optional)
+  - `config_file` (string): Path to a configuration file auto-loaded at run time (optional)
+  - `env_prefix` (string): Prefix for environment variables auto-loaded at run time (optional)
 
 **Returns:** Application instance
 
@@ -102,6 +104,26 @@ Parses arguments and executes commands.
 app:run(arg)
 ```
 
+### `app:persistent_pre_run(fn)`
+
+Registers a global hook that runs before every command action.
+
+```lua
+app:persistent_pre_run(function(ctx)
+    print("Starting command: " .. ctx.command.name)
+end)
+```
+
+### `app:persistent_post_run(fn)`
+
+Registers a global hook that runs after every command action.
+
+```lua
+app:persistent_post_run(function(ctx)
+    print("Command finished")
+end)
+```
+
 ## Command Methods
 
 ### `cmd:arg(name, description)`
@@ -155,6 +177,40 @@ cmd:action(function(ctx)
     -- ctx.command - command reference
     -- ctx.parent - parent command (for subcommands)
     return true  -- success
+end)
+```
+
+### `cmd:plugin(plugin_fn, opts)`
+
+Attaches a plugin function to a single command. The plugin receives the command instance and optional options.
+
+```lua
+cmd:plugin(function(cmd, opts)
+    cmd:flag("--region", "Target region")
+end)
+```
+
+### `cmd:pre_run(fn)` / `cmd:post_run(fn)`
+
+Register hooks that run before or after the command action.
+
+```lua
+cmd:pre_run(function(ctx)
+    print("Starting...")
+end)
+
+cmd:post_run(function(ctx)
+    print("Done!")
+end)
+```
+
+### `cmd:persistent_pre_run(fn)`
+
+Register a hook on a command that runs before its action (similar to `pre_run`).
+
+```lua
+cmd:persistent_pre_run(function(ctx)
+    print("Preparing command...")
 end)
 ```
 
@@ -245,7 +301,7 @@ Attaches middleware to a command.
 
 ```lua
 local lumos = require('lumos')
-cmd:use(lumos.middleware.auth({ env_var = "API_KEY" }), 100)
+cmd:use(lumos.middleware.builtin.auth({ env_var = "API_KEY" }), 100)
 ```
 
 ### `app:use(middleware_fn, priority)`
@@ -253,17 +309,37 @@ cmd:use(lumos.middleware.auth({ env_var = "API_KEY" }), 100)
 Attaches global middleware to the app.
 
 ```lua
-app:use(lumos.middleware.logger())
+app:use(lumos.middleware.builtin.logger())
 ```
+
+## Persistent Typed Flags
+
+Both `app` and `Command` support persistent variants of all typed flags. Persistent flags are inherited by subcommands.
+
+### `app:persistent_flag_string(spec, description)` / `cmd:persistent_flag_string(spec, description)`
+
+### `app:persistent_flag_int(spec, description, min, max)` / `cmd:persistent_flag_int(spec, description, min, max)`
+
+### `app:persistent_flag_email(spec, description, options)` / `cmd:persistent_flag_email(spec, description, options)`
+
+### `app:persistent_flag_url(spec, description, options)` / `cmd:persistent_flag_url(spec, description, options)`
+
+### `app:persistent_flag_path(spec, description, options)` / `cmd:persistent_flag_path(spec, description, options)`
+
+### `app:persistent_flag_float(spec, description, options)` / `cmd:persistent_flag_float(spec, description, options)`
+
+### `app:persistent_flag_array(spec, description, options)` / `cmd:persistent_flag_array(spec, description, options)`
+
+### `app:persistent_flag_enum(spec, description, choices, options)` / `cmd:persistent_flag_enum(spec, description, choices, options)`
 
 ## Error Module (`lumos.error`)
 
-### `lumos.error(error_type, message, context)`
+### `lumos.new_error(error_type, message, context)`
 
 Creates a typed error object.
 
 ```lua
-local err = lumos.error("CONFIG_ERROR", "Config file not found", {
+local err = lumos.new_error("CONFIG_ERROR", "Config file not found", {
     path = "/etc/app.json",
     suggestion = "Run 'app init' to create one"
 })
@@ -537,6 +613,45 @@ prompt.validators.email("test@example.com")   -- true
 prompt.validators.number("42")                -- true
 ```
 
+### `prompt.number(message, min, max, default)`
+
+Prompts for a numeric value with optional range constraints.
+
+```lua
+local age = prompt.number("Age", 0, 120, 18)
+```
+
+### `prompt.editor(message, default)`
+
+Opens `$EDITOR` (or `notepad.exe` on Windows) for multi-line input.
+
+```lua
+local notes = prompt.editor("Notes", "Default text...")
+```
+
+### `prompt.form(title, fields)`
+
+Builds a multi-field form interactively.
+
+```lua
+local profile = prompt.form("Profile", {
+    {name = "name", type = "input", required = true},
+    {name = "email", type = "input", validate = prompt.validators.email},
+    {name = "newsletter", type = "confirm", default = false}
+})
+```
+
+### `prompt.wizard(title, steps)`
+
+Runs a multi-step wizard.
+
+```lua
+local result = prompt.wizard("Setup", {
+    {title = "Profile", fields = {{name = "username", type = "input", required = true}}},
+    {title = "Confirm", fields = {{name = "agree", type = "confirm", required = true}}}
+})
+```
+
 ## Loader Module (`lumos.loader`)
 
 ### Basic Loading Animation
@@ -701,6 +816,25 @@ local cfg2 = config.load_file("app.conf")
 -- core.load_config is a convenience alias that delegates to config.load_file
 local core = require('lumos.core')
 local cfg3 = core.load_config("app.json")  -- equivalent to config.load_file
+```
+
+### `config.load_file_cached(path)`
+
+Loads a configuration file with in-memory caching and automatic mtime invalidation.
+
+```lua
+local cfg = config.load_file_cached("config.json")
+```
+
+### `config.load_validated(path, schema)`
+
+Loads a configuration file and validates it against a schema.
+
+```lua
+local cfg, err = config.load_validated("config.json", {
+    host = {type = "string", required = true},
+    port = {type = "number", default = 8080}
+})
 ```
 
 ## Security Module (`lumos.security`)
@@ -938,7 +1072,7 @@ Commands can return legacy booleans, typed errors, or success objects:
 ```lua
 cmd:action(function(ctx)
     if not ctx.args[1] then
-        return lumos.error("INVALID_ARGUMENT", "Argument required", {
+        return lumos.new_error("INVALID_ARGUMENT", "Argument required", {
             suggestion = "Run with --help for usage"
         })
     end
@@ -992,11 +1126,11 @@ local subcmd = cmd:subcommand("start", "Start deployment")
 local lumos = require('lumos')
 
 -- Builtin middlewares
-app:use(lumos.middleware.logger())
-app:use(lumos.middleware.dry_run())
-app:use(lumos.middleware.auth({ env_var = "API_KEY" }))
-app:use(lumos.middleware.confirm({ message = "Continue?", default = false }))
-app:use(lumos.middleware.rate_limit({ max_requests = 100, window_seconds = 60 }))
+app:use(lumos.middleware.builtin.logger())
+app:use(lumos.middleware.builtin.dry_run())
+app:use(lumos.middleware.builtin.auth({ env_var = "API_KEY" }))
+app:use(lumos.middleware.builtin.confirm({ message = "Continue?", default = false }))
+app:use(lumos.middleware.builtin.rate_limit({ max_requests = 100, window_seconds = 60 }))
 
 -- Custom middleware
 app:use(function(ctx, next)
@@ -1095,3 +1229,4 @@ local mods = bundle.get_required_lumos_modules(deps)
 -- Simple minification
 local minified = bundle.minify(code)
 ```
+

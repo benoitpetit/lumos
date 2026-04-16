@@ -6,6 +6,13 @@ local config_cache = {}
 local cache = {}
 
 local function get_mtime(path)
+    -- Prefer lfs (cross-platform) over stat command
+    local ok, lfs = pcall(require, "lfs")
+    if ok and lfs then
+        local attr = lfs.attributes(path, "modification")
+        if attr then return attr end
+    end
+    -- Fallback for POSIX systems without lfs
     local handle = io.popen("stat -c %Y " .. path .. " 2>/dev/null")
     if handle then
         local mtime = handle:read("*n")

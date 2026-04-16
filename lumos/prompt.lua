@@ -2,6 +2,7 @@
 -- Provides interactive prompts for user input
 
 local platform = require('lumos.platform')
+local security = require('lumos.security')
 
 local prompt = {}
 
@@ -35,10 +36,13 @@ function prompt.password(message)
     
     local input
     if not platform.is_windows() and has_stty() then
-        -- Unix-like systems: disable echo
-        os.execute("stty -echo 2>/dev/null")
-        input = io.read("*l")
+        -- Unix-like systems: disable echo with guaranteed restore
+        local ok, err = pcall(function()
+            os.execute("stty -echo 2>/dev/null")
+            input = io.read("*l")
+        end)
         os.execute("stty echo 2>/dev/null")
+        if not ok then error(err, 2) end
     else
         -- Fallback: read normally (Windows or no stty)
         -- On Windows we could use powershell for secure input, but
@@ -353,7 +357,6 @@ function prompt.search(message, options)
 end
 
 local IS_WINDOWS = platform.is_windows()
-local security = require("lumos.security")
 
 -- Open $EDITOR for multi-line input
 function prompt.editor(message, default)

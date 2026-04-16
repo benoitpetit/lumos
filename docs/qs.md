@@ -238,7 +238,7 @@ end
 
 ### Advanced Flag Types
 ```lua
-cmd:flag_int("-p --port", "Port number", { min = 1, max = 65535 })
+cmd:flag_int("-p --port", "Port number", 1, 65535)
 cmd:flag_float("-r --rate", "Rate", { min = 0.0, max = 1.0, precision = 2 })
 cmd:flag_array("-t --tags", "Tags", { separator = ",", unique = true })
 cmd:flag_enum("-l --level", "Log level", {"debug", "info", "warn", "error"})
@@ -249,14 +249,14 @@ cmd:flag_path("-c --config", "Config file", { must_exist = true })
 ```lua
 cmd:action(function(ctx)
     if not ctx.args[1] then
-        return lumos.error("MISSING_REQUIRED", "Missing required argument", {
+        return lumos.new_error("MISSING_REQUIRED", "Missing required argument", {
             suggestion = "Run with --help for usage"
         })
     end
 
     local success = do_something()
     if not success then
-        return lumos.error("EXECUTION_FAILED", "Operation failed")
+        return lumos.new_error("EXECUTION_FAILED", "Operation failed")
     end
 
     return lumos.success({ message = "Success!" })
@@ -277,8 +277,8 @@ deploy:examples({
 
 ### Middleware
 ```lua
-app:use(lumos.middleware.logger())
-app:use(lumos.middleware.dry_run())
+app:use(lumos.middleware.builtin.logger())
+app:use(lumos.middleware.builtin.dry_run())
 
 cmd:use(lumos.middleware.auth({ env_var = "API_KEY" }))
 cmd:use(lumos.middleware.confirm({ message = "Continue?" }))
@@ -327,7 +327,7 @@ lumos build src/main.lua -o dist/myapp
 1. **Start Simple**: Begin with basic commands and add complexity gradually
 2. **Use Colors**: Improve user experience with colored output
 3. **Add Help Text**: Provide clear descriptions for commands and flags
-4. **Handle Errors**: Return `lumos.error()` or `lumos.success()` for structured results
+4. **Handle Errors**: Return `lumos.new_error()` or `lumos.success()` for structured results
 5. **Test Your CLI**: Write tests for your commands using the generated test suite
 6. **Secure Inputs**: Always sanitize user input with `lumos.security`
 7. **Log Actions**: Use `lumos.logger` for audit trails in production

@@ -89,4 +89,33 @@ describe("Middleware Module", function()
         assert.equal("ok", result)
         assert.is_nil(err)
     end)
+
+    it('builtin confirm proceeds when user confirms', function()
+        local prompt = require('lumos.prompt')
+        local original_confirm = prompt.confirm
+        prompt.confirm = function() return true end
+        
+        local mw = Middleware.builtin.confirm({ message = "Continue?" })
+        local ctx = { flags = {} }
+        local result, err = mw(ctx, function() return "ok" end)
+        
+        prompt.confirm = original_confirm
+        assert.equal("ok", result)
+        assert.is_nil(err)
+    end)
+
+    it('builtin confirm cancels when user declines', function()
+        local prompt = require('lumos.prompt')
+        local original_confirm = prompt.confirm
+        prompt.confirm = function() return false end
+        
+        local mw = Middleware.builtin.confirm({ message = "Continue?" })
+        local ctx = { flags = {} }
+        local result, err = mw(ctx, function() return "ok" end)
+        
+        prompt.confirm = original_confirm
+        assert.is_nil(result)
+        assert.is_not_nil(err)
+        assert.equal("INVALID_ARGUMENT", err.type)
+    end)
 end)

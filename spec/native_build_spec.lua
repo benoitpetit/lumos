@@ -1,4 +1,5 @@
 local native_build = require('lumos.native_build')
+local fs = require('lumos.fs')
 
 describe('Native Build Module', function()
 
@@ -94,12 +95,12 @@ describe('Native Build Module', function()
             f:close()
 
             tmp_output_dir = os.tmpname() .. "_d"
-            os.execute("mkdir -p " .. tmp_output_dir)
+            fs.mkdir_p(tmp_output_dir)
         end)
 
         after_each(function()
             os.remove(tmp_entry)
-            os.execute("rm -rf " .. tmp_output_dir)
+            fs.rmdir_p(tmp_output_dir)
         end)
 
         it('builds a runnable native binary', function()
