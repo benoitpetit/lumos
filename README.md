@@ -108,7 +108,7 @@ local color = require('lumos.color')
 
 local app = lumos.new_app({
     name = "my-awesome-cli",
-    version = "0.3.2",
+    version = "0.3.3",
     description = "My awesome CLI application"
 })
 
@@ -166,7 +166,7 @@ luarocks make --local lumos-dev-1.rockspec
 ### Verify Installation
 ```bash
 lumos version
-# Should output: Lumos CLI Framework v0.3.2
+# Should output: Lumos CLI Framework v0.3.3
 ```
 
 ## Key Features
@@ -396,7 +396,7 @@ make install && make test
 
 ## Project Status
 
-- **Version:** 0.3.2
+- **Version:** 0.3.3
 - **License:** MIT
 - **Lua Versions:** 5.1, 5.2, 5.3, 5.4, LuaJIT
 - **Platforms:** Linux, macOS, Windows (native)

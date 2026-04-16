@@ -588,7 +588,7 @@ local platform = require('lumos.platform')
 
 local app = lumos.new_app({
     name = "deployctl",
-    version = "0.3.2",
+    version = "0.3.3",
     description = "Modern deployment controller"
 })
 

@@ -9,7 +9,7 @@ Lumos uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-## [0.3.2] — 2026-04-16
+## [0.3.3] — 2026-04-16
 
 ### Added
 
@@ -21,14 +21,14 @@ Lumos uses [Semantic Versioning](https://semver.org/).
 - `lumos/init.lua` — `M.version` now resolves dynamically from `lumos.version` instead of a hard-coded string.
 - `bin/lumos` — CLI version now uses `lumos.version` dynamically instead of hard-coding the release number.
 - `examples/*.lua` — all demo scripts now reference `require('lumos').version` instead of a static version string.
-- `Makefile`, `scripts/install.sh`, `README.md`, `README_FR.md`, `docs/` — synchronized to version `0.3.2`.
+- `Makefile`, `scripts/install.sh`, `README.md`, `README_FR.md`, `docs/` — synchronized to version `0.3.3`.
 
 ### Fixed
 
 - `lumos/app.lua` — resolved collision between `Command:use()` (plugin) and `Command:use()` (middleware) by renaming the plugin method to `Command:plugin()`.
 - `lumos/prompt.lua` — removed unused `require('lumos.color')` import.
 - `lumos/package.lua` — removed dead local function `get_project_root()`.
-- `bin/lumos` — fixed outdated embedded version (`0.2.2` → `0.3.2`).
+- `bin/lumos` — fixed outdated embedded version (`0.2.2` → `0.3.3`).
 - `Makefile` — added missing `build:` target (delegates to `install-prod`).
 
 ## [0.3.1] — 2026-04-16
