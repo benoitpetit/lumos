@@ -107,25 +107,6 @@ local function get_module_dir()
     return "lumos"
 end
 
---- Get the project root directory (parent of lumos module dir)
----@return string
-local function get_project_root()
-    local mod_dir = get_module_dir()
-    local sep_pattern = PATH_SEP:gsub("\\", "\\\\")
-    if mod_dir:match(sep_pattern .. "lumos$") then
-        return mod_dir:sub(1, -(#PATH_SEP .. "lumos") + 0)
-    end
-    -- If installed as a rock, mod_dir might be something like
-    -- .../share/lua/5.x/lumos
-    -- Try to locate stubs via lfs upward search
-    local candidate = mod_dir .. PATH_SEP .. ".." .. PATH_SEP .. "stubs"
-    local attr = get_lfs().attributes(candidate)
-    if attr and attr.mode == "directory" then
-        return candidate
-    end
-    return "."
-end
-
 --- List available stub targets
 ---@return table targets
 function package.list_targets()

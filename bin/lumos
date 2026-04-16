@@ -147,7 +147,7 @@ function M.run(args)
     -- Create the main application
     local app = lumos.new_app({
         name = "%s",
-        version = "0.2.2",
+        version = lumos.version,
         description = "%s"
     })
 
@@ -185,7 +185,7 @@ function M.run(args)
     
     -- Add version handling
     if args and #args > 0 and args[1] == "--version" then
-        print("%s v0.2.2")
+        print("%s v" .. lumos.version)
         print("Built with Lumos CLI Framework")
         return
     end
@@ -271,7 +271,7 @@ end
 -- Main CLI application
 local app = lumos.new_app({
     name = "lumos",
-    version = "0.2.2",
+    version = lumos.version,
     description = "Lumos CLI framework and project generator"
 })
 

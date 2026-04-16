@@ -1,10 +1,10 @@
 rockspec_format = "3.0"
 package = "lumos"
-version = "0.3.1-1"
+version = "0.3.2-1"
 
 source = {
    url = "git+https://github.com/benoitpetit/lumos.git",
-   tag = "v0.3.1"
+   tag = "v0.3.2"
 }
 
 description = {
@@ -68,7 +68,8 @@ build = {
       ["lumos.platform"] = "lumos/platform.lua",
       ["lumos.terminal"] = "lumos/terminal.lua",
       ["lumos.profiler"] = "lumos/profiler.lua",
-      ["lumos.config_cache"] = "lumos/config_cache.lua"
+      ["lumos.config_cache"] = "lumos/config_cache.lua",
+      ["lumos.version"] = "lumos/version.lua"
    },
    copy_directories = {
       "stubs"

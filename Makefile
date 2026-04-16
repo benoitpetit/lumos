@@ -1,6 +1,6 @@
 # Lumos CLI Framework Makefile
 
-.PHONY: test test-coverage install build clean doc examples help
+.PHONY: test test-coverage install build clean doc examples help test-cli check-rockspec
 
 # Resolve the busted binary at recipe execution time (not parse time) so it
 # always reflects what is on PATH when make runs.
@@ -36,7 +36,7 @@ setup:
 # Install from rockspec for production
 install-prod:
 	@echo "Installing Lumos from production rockspec..."
-	@luarocks make --local lumos-0.3.1-1.rockspec
+	@luarocks make --local lumos-0.3.2-1.rockspec
 
 # Build documentation
 doc:
@@ -50,6 +50,9 @@ examples:
 	@echo "Running examples..."
 	@cd examples && lua basic_app.lua --help
 	@cd examples && lua advanced_features.lua user list
+
+# Build placeholder (delegates to install-prod)
+build: install-prod
 
 # Clean build artifacts
 clean:
@@ -83,4 +86,4 @@ test-cli:
 check-rockspec:
 	@echo "Checking rockspec syntax..."
 	@luarocks lint lumos-dev-1.rockspec
-	@luarocks lint lumos-0.3.1-1.rockspec
+	@luarocks lint lumos-0.3.2-1.rockspec

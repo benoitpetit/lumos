@@ -1,6 +1,5 @@
 -- Lumos Application Module
 local core = require('lumos.core')
-local logger = require('lumos.logger')
 
 local lumos = {}
 
@@ -155,7 +154,7 @@ function Command:validate(fn)
     return self
 end
 
-function Command:use(plugin_fn, opts)
+function Command:plugin(plugin_fn, opts)
     local plugin_mod = require('lumos.plugin')
     plugin_mod.use(self, plugin_fn, opts)
     return self

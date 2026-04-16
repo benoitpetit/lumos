@@ -11,7 +11,7 @@ local color = require('lumos.color')
 local logger = require('lumos.logger')
 local app = lumos.new_app({
     name = "plugin_demo",
-    version = "0.2.2",
+    version = require("lumos").version,
     description = "Demonstrates the Lumos plugin system"
 })
 
@@ -37,7 +37,7 @@ local logging_plugin = {
 
 -- Chain plugin on a command
 local deploy = app:command("deploy", "Deploy app")
-    :use(logging_plugin)
+    :plugin(logging_plugin)
 
 deploy:action(function(ctx)
     if ctx.flags.debug then

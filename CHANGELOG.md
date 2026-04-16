@@ -7,6 +7,37 @@ Lumos uses [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [Unreleased]
+
+## [0.3.2] — 2026-04-16
+
+### Added
+
+- `lumos/version.lua` — centralized version module; single source of truth for the framework version.
+- `scripts/bump-version.lua` — automated version-bumping script that updates `VERSION`, `lumos/version.lua`, rockspecs, and all version references across the codebase.
+
+### Changed
+
+- `lumos/init.lua` — `M.version` now resolves dynamically from `lumos.version` instead of a hard-coded string.
+- `bin/lumos` — CLI version now uses `lumos.version` dynamically instead of hard-coding the release number.
+- `examples/*.lua` — all demo scripts now reference `require('lumos').version` instead of a static version string.
+- `Makefile`, `scripts/install.sh`, `README.md`, `README_FR.md`, `docs/` — synchronized to version `0.3.2`.
+
+### Fixed
+
+- `lumos/app.lua` — resolved collision between `Command:use()` (plugin) and `Command:use()` (middleware) by renaming the plugin method to `Command:plugin()`.
+- `lumos/prompt.lua` — removed unused `require('lumos.color')` import.
+- `lumos/package.lua` — removed dead local function `get_project_root()`.
+- `bin/lumos` — fixed outdated embedded version (`0.2.2` → `0.3.2`).
+- `Makefile` — added missing `build:` target (delegates to `install-prod`).
+
+## [0.3.1] — 2026-04-16
+
+### Fixed
+
+- `lumos/platform.lua` — `supports_colors()` and `is_interactive()` now always return booleans instead of truthy numeric or file-handle values.
+- README / docs — synchronized documentation for v0.3.1 features and corrected quick-start examples.
+
 ## [0.2.2] — 2026-04-15
 
 ### Fixed
@@ -194,62 +225,6 @@ Lumos uses [Semantic Versioning](https://semver.org/).
 ### Fixed
 
 - `lumos/flags.lua` — `trim()` helper corrected so array splitting no longer drops items.
-
----
-
-## [Unreleased]
-
-### Added
-- `lumos/security.lua` — new security module with `shell_escape`, `sanitize_path`,
-  `safe_open`, `safe_mkdir`, `validate_email`, `validate_url`, `validate_integer`,
-  `sanitize_command_name`, `sanitize_output`, `is_elevated`, and `rate_limit`
-- `lumos/logger.lua` — new structured logging module with five levels (ERROR/WARN/INFO/DEBUG/TRACE),
-  context key-value pairs, configurable timestamps and colours, environment-variable
-  configuration, output redirection, and child loggers
-- `spec/logger_spec.lua` — 30 unit tests for the logger module
-- `spec/config_spec.lua` — 17 unit tests for configuration file loading
-- `spec/bundle_spec.lua` — 11 unit tests for application bundling
-- Extended `spec/core_advanced_spec.lua` with 16 tests covering argument parsing,
-  command execution, help display, and config loading
-- Extended `spec/json_spec.lua` with 13 decode tests including nested objects and
-  error handling
-- Extended `spec/app_spec.lua` with 5 `app:run()` scenario tests
-- `make test-coverage` target (requires `luacov`)
-
-### Changed
-- `.busted` — local module path now takes priority over `~/.luarocks` so the source
-  under test is always loaded instead of any previously installed version
-- `Makefile` — `busted` binary is resolved at build time via `which busted` rather
-  than a hard-coded `~/.luarocks/bin/busted` path
-- `lumos/logger.lua` — `set_output` now accepts table-type handles (enables
-  in-memory capture mocks in tests)
-- `lumos/core.lua` — `execute_command` uses `rawget(cmd, 'action')` instead of
-  `cmd.action` so that the `Command:action` setter method inherited from the
-  metatable is not mistaken for a user-provided action callback
-- `lumos/bundle.lua` — all `os.execute` calls now pass arguments through
-  `security.shell_escape` to prevent shell injection
-- `lumos/bundle.lua` — file operations use `security.safe_open` instead of raw
-  `io.open`
-- `lumos/config.lua` — file operations use `security.safe_open`; extracted
-  `parse_key_value()` as a public function to avoid duplicate parsing logic in
-  `core.lua`
-- `lumos/core.lua` — delegates key-value config parsing to `config.parse_key_value()`
-- `lumos/app.lua` — renamed local variable `config` to `config_module` to eliminate
-  shadowing of the `config` parameter in `new_app`
-- `spec/bundle_spec.lua` — temporary output directory now uses
-  `os.tmpname() .. "_d"` to avoid a conflict with the empty file that
-  `os.tmpname()` creates on Linux
-- `spec/app_spec.lua`, `spec/core_advanced_spec.lua` — `print` mocks now target
-  `_G.print` directly so that modules loaded via `require` (which use `_G`) see
-  the mock
-
-### Fixed
-- `lumos/color.lua` — incorrect Lua regex pattern for ANSI escape stripping
-- `lumos/format.lua` — incorrect Lua regex pattern for word-wrap logic
-- `lumos/security.lua` — invalid character class in `sanitize_output` ANSI regex
-- `lumos/init.lua` — inconsistent indentation
-- `lumos-0.1.0-1.rockspec` — missing `lumos.security` and `lumos.logger` module
-  entries
 
 ---
 

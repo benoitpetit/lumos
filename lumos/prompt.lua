@@ -1,7 +1,6 @@
 -- Lumos Prompt Module
 -- Provides interactive prompts for user input
 
-local color = require('lumos.color')
 local platform = require('lumos.platform')
 
 local prompt = {}

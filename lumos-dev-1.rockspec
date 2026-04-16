@@ -66,7 +66,8 @@ build = {
       ["lumos.platform"] = "lumos/platform.lua",
       ["lumos.terminal"] = "lumos/terminal.lua",
       ["lumos.profiler"] = "lumos/profiler.lua",
-      ["lumos.config_cache"] = "lumos/config_cache.lua"
+      ["lumos.config_cache"] = "lumos/config_cache.lua",
+      ["lumos.version"] = "lumos/version.lua"
    },
    copy_directories = {
       "stubs"

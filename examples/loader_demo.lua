@@ -13,7 +13,7 @@ local color = require('lumos.color')
 local logger = require('lumos.logger')
 local app = lumos.new_app({
     name = "loader_demo",
-    version = "0.2.2",
+    version = require("lumos").version,
     description = "Demonstrates the Lumos loader module"
 })
 
