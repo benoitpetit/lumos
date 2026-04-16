@@ -447,6 +447,47 @@ else
 end
 ```
 
+## Bundle Minimal (Tree-Shaking)
+
+Starting with Lumos 0.3.x, you can create a **minimal bundle** that includes only the Lumos modules actually used by your application. This can significantly reduce bundle size.
+
+### CLI Usage
+
+```bash
+# Not yet exposed via CLI; use the programmatic API below
+```
+
+### Programmatic API
+
+```lua
+local bundle = require('lumos.bundle')
+
+-- Analyze dependencies
+local deps = bundle.analyze_dependencies("src/main.lua")
+for mod, _ in pairs(deps.lumos_modules) do
+    print("Uses: " .. mod)
+end
+
+-- Create a minimal bundle
+local ok, err = bundle.minimal("src/main.lua", "dist/myapp.lua", {
+    minify = true
+})
+
+if ok then
+    print("Minimal bundle created at dist/myapp.lua")
+end
+
+-- Simple minification
+local minified = bundle.minify(code)
+```
+
+### How It Works
+
+1. Parses `require()` and `pcall(require, ...)` calls in your entry file
+2. Maps detected Lumos submodules to their top-level modules
+3. Includes only the necessary Lumos modules plus core modules (`init`, `app`, `core`, `flags`)
+4. Optionally strips comments and excess whitespace
+
 ## Comparison with Other Approaches
 
 | Approach | Advantages | Disadvantages |

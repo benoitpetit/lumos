@@ -5,102 +5,102 @@
 </p>
 
 <p align="center">
-    <strong>A modern CLI framework for Lua</strong><br>
-    Build powerful command-line applications with ease
+    <strong>Un framework CLI moderne pour Lua</strong><br>
+    Construisez des applications en ligne de commande puissantes avec facilité
 </p>
 
 <p align="center">
-    <a href="docs/qs.md">🚀 Quick Start</a> •
-    <a href="docs/api.md">📚 API Docs</a> •
-    <a href="docs/use.md">💡 Examples</a> •
-    <a href="#installation">⚡ Install</a>
+    <a href="docs/qs.md">🚀 Démarrage rapide</a> •
+    <a href="docs/api.md">📚 API</a> •
+    <a href="docs/use.md">💡 Exemples</a> •
+    <a href="#installation">⚡ Installation</a>
 </p>
 
 ---
 
-**Lumos** (Latin for "light") brings clarity to CLI development in Lua. Inspired by Cobra for Go, it provides everything you need to build professional command-line applications with minimal code and maximum functionality.
+**Lumos** (latin pour "lumière") apporte de la clarté au développement CLI en Lua. Inspiré par Cobra pour Go, il fournit tout le nécessaire pour construire des applications en ligne de commande professionnelles avec un minimum de code et un maximum de fonctionnalités.
 
-## ✨ What Makes Lumos Special
+## ✨ Ce qui rend Lumos spécial
 
-- **🚀 Project Generator** - `lumos new` creates complete CLI projects in seconds
-- **🎯 Intuitive API** - Fluent, chainable methods for defining commands and flags
-- **🎨 Rich UI Components** - Colors, progress bars, prompts, and tables out of the box
-- **🔗 Middleware Chain** - Express-like middleware with auth, dry-run, rate-limiting, and more
-- **⚔️ Advanced Flags** - int, float, array, enum, path, url, email with built-in validation
-- **🔧 Shell Integration** - Auto-completion, man pages, and documentation generation
-- **⚙️ Configuration Management** - JSON and key=value files, environment variables, built-in cache
-- **🧪 Test-Ready** - Generated projects include a Busted configuration and a starter test file
-- **📦 Minimal Dependencies** - Only requires `luafilesystem`, modular architecture
-- **🌍 Cross-Platform** - Linux, macOS, and native Windows with automatic detection
-- **🚀 Portable Bundles** - Create self-contained single-file Lua scripts with `lumos bundle`
-- **📦 Standalone Packages** - Create zero-dependency executables with `lumos package`
-- **🔨 Native Builds** - Compile to native binaries with `lumos build` (embeds Lua VM)
-- **🔒 Security Built-in** - Input sanitization, safe file operations, rate limiting
-- **📝 Structured Logging** - 5-level logger with child loggers and environment configuration
-- **⚡ Lazy Loading** - On-demand module loading for fast startup (< 30ms)
+- **🚀 Générateur de projets** - `lumos new` crée des projets CLI complets en quelques secondes
+- **🎯 API intuitive** - Méthodes chaînables et fluides pour définir commandes et flags
+- **🎨 Composants UI riches** - Couleurs, barres de progression, prompts et tableaux natifs
+- **🔗 Middleware** - Chaîne de middleware Express-like avec auth, dry-run, rate-limiting, etc.
+- **⚔️ Flags avancés** - int, float, array, enum, path, url, email avec validation intégrée
+- **🔧 Intégration shell** - Auto-complétion, pages de manuel et génération de documentation
+- **⚙️ Gestion de configuration** - Fichiers JSON et key=value, variables d'environnement, cache intégré
+- **🧪 Prêt pour les tests** - Les projets générés incluent Busted et un fichier de test de démarrage
+- **📦 Dépendances minimales** - Seulement `luafilesystem`, architecture modulaire
+- **🌍 Multiplateforme** - Linux, macOS et Windows natif avec détection automatique
+- **🚀 Bundles portables** - Scripts Lua autonomes avec `lumos bundle`
+- **📦 Packages autonomes** - Exécutables sans dépendance avec `lumos package`
+- **🔨 Builds natives** - Compilation en binaire natif avec `lumos build`
+- **🔒 Sécurité intégrée** - Sanitization, opérations fichier sécurisées, rate limiting
+- **📝 Logging structuré** - Logger 5 niveaux avec loggers enfants et configuration environnementale
+- **⚡ Lazy loading** - Chargement à la demande des modules pour un démarrage rapide (< 30ms)
 
-## 🚀 5-Minute Quick Start
+## 🚀 Démarrage rapide en 5 minutes
 
 ### 📎 TL;DR
 
 ```bash
-# Install Lumos from LuaRocks
+# Installer Lumos depuis LuaRocks
 luarocks install --local lumos
 
-# Create your first CLI app
+# Créer votre première app CLI
 lumos new hello-world && cd hello-world
 
-# Run it!
-lua src/main.lua greet "CLI Master"
-# Output: Hello, CLI Master!
+# Lancer !
+lua src/main.lua greet "Maître CLI"
+# Sortie : Hello, Maître CLI !
 ```
 
-### 🔍 Step-by-Step Guide
+### 🔍 Guide étape par étape
 
-**Step 1: Install Lumos**
+**Étape 1 : Installer Lumos**
 ```bash
 luarocks install --local lumos
 
-# Add to PATH if needed
+# Ajouter au PATH si nécessaire
 echo 'export PATH="$HOME/.luarocks/bin:$PATH"' >> ~/.bashrc
 source ~/.bashrc
 ```
 
-**Step 2: Create Your CLI Project**
+**Étape 2 : Créer votre projet CLI**
 ```bash
 lumos new my-awesome-cli
-# Follow the interactive prompts
+# Suivre les prompts interactifs
 cd my-awesome-cli
 ```
 
-**Step 3: Test Your CLI**
+**Étape 3 : Tester votre CLI**
 ```bash
-lua src/main.lua --help        # See generated help
-lua src/main.lua greet World   # Try the sample command
+lua src/main.lua --help        # Voir l'aide générée
+lua src/main.lua greet World   # Essayer la commande d'exemple
 ```
 
-**Step 4: Develop & Test**
+**Étape 4 : Développer & Tester**
 ```bash
-make install  # Install test dependencies
-make test     # Run the test suite
+make install  # Installer les dépendances de test
+make test     # Lancer la suite de tests
 ```
 
-**Step 5: Distribute Your CLI (Optional)**
+**Étape 5 : Distribuer (Optionnel)**
 
 ```bash
-# Fast: bundled Lua script (requires Lua on target)
+# Rapide : script Lua bundle (nécessite Lua sur la cible)
 lumos bundle src/main.lua -o dist/myapp
 
-# Zero dependencies: standalone package using a precompiled stub
+# Zéro dépendance : exécutable autonome via stub précompilé
 lumos package src/main.lua -o dist/myapp
 
-# Maximum control: native binary with embedded Lua VM
+# Contrôle maximal : binaire natif avec VM Lua embarquée
 lumos build src/main.lua -o dist/myapp
 
 ./dist/myapp --help
 ```
 
-## Example CLI Code
+## Exemple de code CLI
 
 ```lua
 local lumos = require('lumos')
@@ -138,40 +138,38 @@ app:run(arg)
 
 ## ⚡ Installation
 
-### Prerequisites
-- Lua 5.1+ or LuaJIT
+### Prérequis
+- Lua 5.1+ ou LuaJIT
 - LuaRocks >= 3.9
 
-### Option 1: From LuaRocks (Recommended)
+### Option 1 : Depuis LuaRocks (Recommandé)
 ```bash
 luarocks install --local lumos
-
-# Add to PATH if needed
 echo 'export PATH="$HOME/.luarocks/bin:$PATH"' >> ~/.bashrc
 source ~/.bashrc
 ```
 
-### Option 2: System-wide Installation
+### Option 2 : Installation système
 ```bash
 sudo luarocks install lumos
 ```
 
-### Option 3: Development Installation
+### Option 3 : Installation développement
 ```bash
 git clone https://github.com/benoitpetit/lumos.git
 cd lumos
 luarocks make --local lumos-dev-1.rockspec
 ```
 
-### Verify Installation
+### Vérifier l'installation
 ```bash
 lumos version
-# Should output: Lumos CLI Framework v0.3.1
+# Devrait afficher : Lumos CLI Framework v0.3.1
 ```
 
-## Key Features
+## Fonctionnalités clés
 
-### Commands & Flags
+### Commandes & Flags
 ```lua
 local deploy = app:command("deploy", "Deploy application")
 deploy:arg("environment", "Target environment")
@@ -179,7 +177,7 @@ deploy:flag("-f --force", "Force deployment")
 deploy:option("--timeout", "Deployment timeout")
 ```
 
-### Advanced Typed Flags
+### Flags typés avancés
 ```lua
 cmd:flag_int("-p --port", "Port number", { min = 1, max = 65535 })
 cmd:flag_float("-r --rate", "Rate", { min = 0.0, max = 1.0, precision = 2 })
@@ -190,7 +188,7 @@ cmd:flag_url("--endpoint", "API endpoint", { schemes = {"https"} })
 cmd:flag_email("--notify", "Notification email")
 ```
 
-### Mutually Exclusive Flags
+### Groupes mutuellement exclusifs
 ```lua
 cmd:mutex_group("input", {
     cmd:flag_string("-f --file", "Input file"),
@@ -198,7 +196,7 @@ cmd:mutex_group("input", {
 }, { required = true })
 ```
 
-### Typed Errors
+### Erreurs typées
 ```lua
 cmd:action(function(ctx)
     if not file_exists(ctx.flags.config) then
@@ -223,7 +221,7 @@ app:command("deploy", "Deploy")
     :action(function(ctx) ... end)
 ```
 
-### Rich UI Components
+### Composants UI riches
 ```lua
 local color = require('lumos.color')
 local progress = require('lumos.progress')
@@ -236,61 +234,61 @@ local confirmed = prompt.confirm("Continue?", true)
 local choice = prompt.select("Choose", {"apple", "banana"})
 ```
 
-### Cross-Platform Detection
+### Détection multiplateforme
 ```lua
 local platform = require('lumos.platform')
 print(platform.name())        -- "linux", "macos", "windows"
 print(platform.arch())        -- "amd64", "arm64"
-platform.supports_colors()    -- boolean
-platform.is_interactive()     -- boolean
-platform.is_piped()           -- boolean (auto-disables colors)
+platform.supports_colors()    -- booléen
+platform.is_interactive()     -- booléen
+platform.is_piped()           -- booléen (désactive auto couleurs)
 ```
 
-### Configuration Management
+### Gestion de configuration
 ```lua
 local config = require('lumos.config')
 local core = require('lumos.core')
 
 local settings = config.merge_configs(
     {timeout = 30},                   -- defaults
-    core.load_config("config.json"),  -- file (JSON or key=value)
-    config.load_env("MYAPP"),         -- environment variables
-    ctx.flags                         -- command line
+    core.load_config("config.json"),  -- fichier JSON/key=value
+    config.load_env("MYAPP"),         -- variables d'environnement
+    ctx.flags                         -- ligne de commande
 )
 
--- With in-memory cache
+-- Avec cache en mémoire
 local cached = config.load_file_cached("config.json")
 ```
 
-### Integrated Profiling
+### Profiling intégré
 ```lua
 local profiler = require('lumos.profiler')
 profiler.enable()
-profiler.start("heavy_task")
+profiler.start(" heavy_task")
 -- ... code ...
 profiler.stop("heavy_task")
 profiler.report()
 ```
 
-### Minimal Bundles (Tree-Shaking)
+### Bundles minimaux (tree-shaking)
 ```lua
 local bundle = require('lumos.bundle')
 bundle.minimal("src/main.lua", "dist/myapp.lua", { minify = true })
 ```
 
-### Shell Integration
+### Intégration shell
 ```lua
--- Generate completions
+-- Générer auto-complétions
 local completion = app:generate_completion("bash")
 
--- Generate man pages
+-- Générer pages man
 local manpage = app:generate_manpage()
 
--- Generate markdown documentation
+-- Générer documentation Markdown
 local docs = app:generate_docs("markdown", "./docs")
 ```
 
-### Security & Logging
+### Sécurité & Logging
 ```lua
 local security = require('lumos.security')
 local logger = require('lumos.logger')
@@ -302,17 +300,17 @@ local ok, err = security.safe_mkdir("./data")
 logger.info("Action performed", {user = "john", id = 42})
 ```
 
-### Advanced Prompts
+### Prompts avancés
 ```lua
 local prompt = require('lumos.prompt')
 
--- Numeric input with constraints
+-- Saisie numérique contrainte
 local age = prompt.number("Age", 0, 120)
 
--- Multi-line editor ($EDITOR or notepad.exe on Windows)
+-- Éditeur multi-lignes ($EDITOR ou notepad.exe sur Windows)
 local notes = prompt.editor("Notes", "Default text...")
 
--- Form builder
+-- Constructeur de formulaire
 local profile = prompt.form("Profile", {
     {name = "name", type = "input", required = true},
     {name = "email", type = "input", validate = prompt.validators.email},
@@ -332,18 +330,18 @@ local result = prompt.wizard("Setup", {
 
 ### Plugins & Hooks
 ```lua
--- Register a plugin globally
+-- Plugin global
 lumos.use("command", function(cmd, opts)
     cmd:flag("--dry-run", "Simulate without side effects")
 end)
 
--- Or attach to a single command
+-- Ou attacher à une seule commande
 app:command("deploy", "Deploy app")
     :use(function(cmd, opts)
         cmd:flag("--region", "Target region")
     end)
 
--- Hooks for setup / teardown
+-- Hooks setup / teardown
 app:command("migrate", "Run migrations")
     :pre_run(function(ctx)
         print("Connecting to database...")
@@ -352,7 +350,7 @@ app:command("migrate", "Run migrations")
         print("Migration complete!")
     end)
 
--- Global hooks
+-- Hooks globaux
 app:persistent_pre_run(function(ctx)
     logger.info("Starting command", {cmd = ctx.command.name})
 end)
@@ -360,61 +358,61 @@ end)
 
 ## Documentation
 
-Complete documentation is available in the `docs/` directory:
+La documentation complète est disponible dans le dossier `docs/` :
 
-- **[Quick Start Guide](docs/qs.md)** - Get running in 5 minutes
-- **[CLI Tool Usage](docs/cli.md)** - How to use `lumos new` to create projects
-- **[API Reference](docs/api.md)** - Complete framework API documentation
-- **[Usage Examples](docs/use.md)** - Real-world CLI examples and patterns
-- **[Security Guide](docs/security.md)** - Security features and best practices
-- **[Bundling Guide](docs/bundle.md)** - Creating portable single-file executables
+- **[Guide de démarrage rapide](docs/qs.md)** - Être opérationnel en 5 minutes
+- **[Utilisation du CLI](docs/cli.md)** - Comment utiliser `lumos new`
+- **[Référence API](docs/api.md)** - Documentation complète du framework
+- **[Exemples d'utilisation](docs/use.md)** - Exemples CLI du monde réel
+- **[Guide sécurité](docs/security.md)** - Fonctionnalités de sécurité et bonnes pratiques
+- **[Guide bundling](docs/bundle.md)** - Création d'exécutables portables
 
-## Examples
+## Exemples
 
-Explore real CLI applications built with Lumos in our [Usage Examples](docs/use.md).
+Explorez de vraies applications CLI construites avec Lumos dans nos [Exemples d'utilisation](docs/use.md).
 
-## Contributing
+## Contribuer
 
-We welcome contributions!
+Les contributions sont les bienvenues !
 
-### Development Setup
+### Configuration développement
 ```bash
 git clone https://github.com/benoitpetit/lumos.git
 cd lumos
 
-# Install for development
+# Installer pour le développement
 luarocks make --local lumos-dev-1.rockspec
 
-# Run tests
+# Lancer les tests
 busted
 
-# Test CLI generation
+# Tester la génération CLI
 ./bin/lumos new test-project
 cd test-project
 make install && make test
 ```
 
-## Project Status
+## Statut du projet
 
-- **Version:** 0.3.1
-- **License:** MIT
-- **Lua Versions:** 5.1, 5.2, 5.3, 5.4, LuaJIT
-- **Platforms:** Linux, macOS, Windows (native)
-- **Tests:** 411 passing tests
-- **Dependencies:** luafilesystem
+- **Version :** 0.3.1
+- **Licence :** MIT
+- **Versions Lua :** 5.1, 5.2, 5.3, 5.4, LuaJIT
+- **Plateformes :** Linux, macOS, Windows natif
+- **Tests :** 411 tests passants
+- **Dépendances :** luafilesystem
 
-## Acknowledgments
+## Remerciements
 
-- Inspired by [Cobra](https://cobra.dev/) CLI framework for Go
-- Follows [POSIX Utility Syntax Guidelines](https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap12.html)
-- Built with care for the Lua community
+- Inspiré par le framework CLI [Cobra](https://cobra.dev/) pour Go
+- Suit les [POSIX Utility Syntax Guidelines](https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap12.html)
+- Construit avec soin pour la communauté Lua
 
-## License
+## Licence
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+Ce projet est sous licence MIT — voir le fichier [LICENSE](LICENSE) pour les détails.
 
 ---
 
 <p align="center">
-    <strong>Lumos</strong> - <em>Bringing light to CLI development in Lua</em>
+    <strong>Lumos</strong> - <em>Apportant la lumière au développement CLI en Lua</em>
 </p>

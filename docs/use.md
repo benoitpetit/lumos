@@ -577,6 +577,69 @@ end)
 app:run(arg)
 ```
 
+## Modern CLI with Middleware and Typed Flags
+
+An example showcasing Lumos 0.3.x features: middleware chains, typed flags, mutex groups, and typed errors.
+
+```lua
+local lumos = require('lumos')
+local color = require('lumos.color')
+local platform = require('lumos.platform')
+
+local app = lumos.new_app({
+    name = "deployctl",
+    version = "0.3.1",
+    description = "Modern deployment controller"
+})
+
+-- Global middleware
+app:use(lumos.middleware.logger())
+app:use(lumos.middleware.dry_run())
+
+-- Command with advanced flags and middleware
+local deploy = app:command("deploy", "Deploy an application")
+
+deploy:arg("app", "Application name", { required = true })
+
+-- Typed flags
+deploy:flag_enum("-e --env", "Environment", {"dev", "staging", "prod"})
+deploy:flag_int("--workers", "Number of workers", { min = 1, max = 64 })
+deploy:flag_float("-r --rate", "Deployment rate", { min = 0.0, max = 1.0, precision = 2 })
+deploy:flag_array("-t --tags", "Deployment tags", { separator = ",", unique = true })
+deploy:flag_path("-c --config", "Config file", { must_exist = true, extensions = {".json"} })
+deploy:flag_url("--endpoint", "API endpoint", { schemes = {"https"} })
+
+-- Mutually exclusive input flags
+deploy:mutex_group("target", {
+    deploy:flag_string("--image", "Container image"),
+    deploy:flag_string("--git", "Git repository URL")
+}, { required = true })
+
+-- Per-command middleware
+deploy:use(lumos.middleware.auth({ env_var = "DEPLOY_API_KEY" }))
+deploy:use(lumos.middleware.confirm({ message = "Deploy to production?", default = false }))
+
+deploy:action(function(ctx)
+    if ctx.dry_run then
+        print(color.yellow("[DRY-RUN] Would deploy " .. ctx.args[1]))
+        return lumos.success({ dry_run = true })
+    end
+
+    if not platform.is_interactive() and not ctx.flags.force then
+        return lumos.error("EXECUTION_FAILED", "Non-interactive mode requires --force")
+    end
+
+    print(color.green("Deploying " .. ctx.args[1] .. " to " .. ctx.flags.env))
+    print("Workers: " .. tostring(ctx.flags.workers))
+    print("Rate: " .. tostring(ctx.flags.rate))
+    print("Tags: " .. table.concat(ctx.flags.tags or {}, ", "))
+
+    return lumos.success({ deployed = true, app = ctx.args[1] })
+end)
+
+app:run(arg)
+```
+
 ## Usage Examples Summary
 
 These examples show different patterns:
@@ -586,13 +649,15 @@ These examples show different patterns:
 3. **Interactive CLI**: Menu-driven interface with persistent data
 4. **Configuration CLI**: External configuration with environment variables
 5. **Secure CLI**: Input sanitization, safe file operations, and structured logging
+6. **Modern CLI**: Middleware, typed flags, mutex groups, and typed errors (0.3.x)
 
 Each example demonstrates key Lumos features:
 - Command and subcommand definition
-- Flag parsing and validation
+- Flag parsing and validation (including advanced types)
 - Interactive prompts and progress bars
 - Configuration management
-- Error handling and colored output
+- Typed error handling and colored output
 - JSON data handling
 - Table formatting
 - Security features and logging
+- Middleware chains and cross-platform detection

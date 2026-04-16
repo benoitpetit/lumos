@@ -48,6 +48,12 @@ Lumos exports the following modules:
 - `lumos.bundle` - Programmatic bundling API
 - `lumos.native_build` - Native binary compilation API
 - `lumos.package` - Standalone executable packaging API (stub-based)
+- `lumos.error` / `lumos.error_codes` - Typed error system
+- `lumos.middleware` - Middleware chain
+- `lumos.platform` - Cross-platform detection
+- `lumos.terminal` - Terminal control and capabilities
+- `lumos.profiler` - Performance profiling
+- `lumos.config_cache` - In-memory configuration cache
 
 ## Application Methods
 
@@ -170,12 +176,117 @@ String flag (equivalent to `:option()`).
 cmd:flag_string("--name", "Resource name")
 ```
 
-### `cmd:flag_email(spec, description)`
+### `cmd:flag_email(spec, description, options)`
 
 Email flag with validation.
 
 ```lua
 cmd:flag_email("--email", "Email address")
+cmd:flag_email("--contact", "Contact email", { pattern = "^[A-Z0-9._%%+-]+@[A-Z0-9.-]+%.[A-Z]$" })
+```
+
+### `cmd:flag_float(spec, description, options)`
+
+Float flag with range and precision.
+
+```lua
+cmd:flag_float("-r --rate", "Sampling rate", { min = 0.0, max = 1.0, precision = 2 })
+```
+
+### `cmd:flag_array(spec, description, options)`
+
+Array flag that splits a string by separator.
+
+```lua
+cmd:flag_array("-t --tags", "Tags", { separator = ",", item_type = "string", unique = true })
+cmd:flag_array("-p --ports", "Ports", { separator = ",", item_type = "int", min_items = 1, max_items = 5 })
+```
+
+### `cmd:flag_enum(spec, description, choices, options)`
+
+Enum flag restricted to a set of choices.
+
+```lua
+cmd:flag_enum("-l --level", "Log level", {"debug", "info", "warn", "error"})
+cmd:flag_enum("--env", "Environment", {"dev", "staging", "prod"}, { case_sensitive = true })
+```
+
+### `cmd:flag_path(spec, description, options)`
+
+Path flag with filesystem validation.
+
+```lua
+cmd:flag_path("-c --config", "Config file", { must_exist = true, allow_file = true, extensions = {".json", ".toml"} })
+cmd:flag_path("-o --output", "Output directory", { must_exist = false, allow_dir = true, absolute = true })
+```
+
+### `cmd:flag_url(spec, description, options)`
+
+URL flag with scheme and host validation.
+
+```lua
+cmd:flag_url("--endpoint", "API endpoint", { schemes = {"https"}, require_path = true, allow_localhost = false })
+```
+
+### `cmd:mutex_group(name, flags, options)`
+
+Defines mutually exclusive flags. If `options.required` is true, at least one must be provided.
+
+```lua
+cmd:mutex_group("input", {
+    cmd:flag_string("-f --file", "Input file"),
+    cmd:flag_string("-u --url", "Input URL")
+}, { required = true })
+```
+
+### `cmd:use(middleware_fn, priority)`
+
+Attaches middleware to a command.
+
+```lua
+local lumos = require('lumos')
+cmd:use(lumos.middleware.auth({ env_var = "API_KEY" }), 100)
+```
+
+### `app:use(middleware_fn, priority)`
+
+Attaches global middleware to the app.
+
+```lua
+app:use(lumos.middleware.logger())
+```
+
+## Error Module (`lumos.error`)
+
+### `lumos.error(error_type, message, context)`
+
+Creates a typed error object.
+
+```lua
+local err = lumos.error("CONFIG_ERROR", "Config file not found", {
+    path = "/etc/app.json",
+    suggestion = "Run 'app init' to create one"
+})
+```
+
+### `lumos.success(data)`
+
+Creates a standardized success result.
+
+```lua
+return lumos.success({ deployed = true, url = "https://example.com" })
+```
+
+### `Error.is_error(value)`
+
+Checks if a value is a Lumos error.
+
+```lua
+local Error = require('lumos.error')
+if Error.is_error(result) then
+    print(result:format_user())
+    os.exit(result.exit_code)
+end
 ```
 
 ## Color Module (`lumos.color`)
@@ -822,17 +933,18 @@ app:generate_docs("markdown", "./docs")
 
 ## Error Handling
 
-Commands should return boolean values:
+Commands can return legacy booleans, typed errors, or success objects:
 
 ```lua
 cmd:action(function(ctx)
     if not ctx.args[1] then
-        print("Error: argument required")
-        return false  -- indicates failure
+        return lumos.error("INVALID_ARGUMENT", "Argument required", {
+            suggestion = "Run with --help for usage"
+        })
     end
     
     -- do work
-    return true  -- indicates success
+    return lumos.success({ result = "ok" })
 end)
 ```
 
@@ -854,9 +966,14 @@ The action function receives a context object:
 Lumos supports several flag types:
 
 - `boolean`: True/false flags
-- `string`: String values
+- `string`: String values with optional pattern, min/max length, choices
 - `int`: Integer values with optional min/max
+- `float`: Float values with optional min/max and precision
+- `array`: Comma-separated (or custom separator) arrays with item type validation
+- `enum`: Values restricted to a set of choices
 - `email`: Email addresses with validation
+- `path`: File system paths with existence and type validation
+- `url`: URLs with scheme and host validation
 
 ## Persistent Flags
 
@@ -867,4 +984,114 @@ app:persistent_flag("--verbose", "Enable verbose output")
 local cmd = app:command("deploy", "Deploy app")
 local subcmd = cmd:subcommand("start", "Start deployment")
 -- Both cmd and subcmd inherit --verbose flag
+```
+
+## Middleware Module (`lumos.middleware`)
+
+```lua
+local lumos = require('lumos')
+
+-- Builtin middlewares
+app:use(lumos.middleware.logger())
+app:use(lumos.middleware.dry_run())
+app:use(lumos.middleware.auth({ env_var = "API_KEY" }))
+app:use(lumos.middleware.confirm({ message = "Continue?", default = false }))
+app:use(lumos.middleware.rate_limit({ max_requests = 100, window_seconds = 60 }))
+
+-- Custom middleware
+app:use(function(ctx, next)
+    local start_time = os.clock()
+    local result, err = next()
+    print(string.format("Took %.2f ms", (os.clock() - start_time) * 1000))
+    return result, err
+end, 100)
+```
+
+## Platform Module (`lumos.platform`)
+
+```lua
+local platform = require('lumos.platform')
+
+platform.name()               -- "linux", "macos", "windows", ...
+platform.arch()               -- "amd64", "arm64", "armv7", "386"
+platform.is_windows()
+platform.is_macos()
+platform.is_linux()
+platform.is_unix()
+platform.supports_colors()    -- boolean
+platform.is_interactive()     -- boolean
+platform.is_piped()           -- boolean
+platform.path_separator()     -- "/" or "\\"
+platform.path_list_separator()-- ":" or ";"
+platform.absolute_path("foo") -- absolute path
+platform.normalize_path("./foo/../bar") -- cleaned path
+```
+
+## Terminal Module (`lumos.terminal`)
+
+```lua
+local terminal = require('lumos.terminal')
+
+terminal.should_use_colors()      -- boolean (pipe-aware)
+terminal.should_use_animations()  -- boolean
+terminal.width()                  -- columns
+terminal.height()                 -- rows
+terminal.clear()
+terminal.save_cursor()
+terminal.restore_cursor()
+terminal.move_cursor(row, col)
+terminal.hide_cursor()
+terminal.show_cursor()
+terminal.clear_to_end()
+terminal.clear_to_bottom()
+```
+
+## Profiler Module (`lumos.profiler`)
+
+```lua
+local profiler = require('lumos.profiler')
+
+profiler.enable()
+profiler.start("task_name")
+-- ... code ...
+profiler.stop("task_name")
+profiler.report()
+
+-- Or wrap a function
+local fn = profiler.wrap("my_fn", function(a, b) return a + b end)
+fn(2, 3)
+
+profiler.reset()
+```
+
+## Config Cache Module (`lumos.config_cache`)
+
+```lua
+local config_cache = require('lumos.config_cache')
+
+-- Load with automatic in-memory caching and mtime invalidation
+local data = config_cache.load("config.json")
+
+-- Force reload
+local data = config_cache.load("config.json", { reload = true })
+
+-- Invalidate cache
+config_cache.invalidate("config.json")  -- single entry
+config_cache.invalidate()                -- all entries
+```
+
+## Bundle Minimal (Tree-Shaking)
+
+```lua
+local bundle = require('lumos.bundle')
+
+-- Create a minimal bundle containing only used Lumos modules
+bundle.minimal("src/main.lua", "dist/myapp.lua", { minify = true })
+
+-- Analyze dependencies
+local deps = bundle.analyze_dependencies("src/main.lua")
+local mods = bundle.get_required_lumos_modules(deps)
+
+-- Simple minification
+local minified = bundle.minify(code)
 ```
