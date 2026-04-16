@@ -52,5 +52,6 @@ jobs:
       - name: Lint rockspecs
         run: |
           eval "$(luarocks path)"
+          VERSION=$(cat VERSION)
           luarocks lint lumos-dev-1.rockspec
-          luarocks lint lumos-0.3.1-1.rockspec
+          luarocks lint lumos-${VERSION}-1.rockspec

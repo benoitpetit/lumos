@@ -86,4 +86,4 @@ test-cli:
 check-rockspec:
 	@echo "Checking rockspec syntax..."
 	@luarocks lint lumos-dev-1.rockspec
-	@luarocks lint lumos-0.3.2-1.rockspec
+	@luarocks lint lumos-$(shell cat VERSION)-1.rockspec
