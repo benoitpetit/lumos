@@ -20,7 +20,7 @@
 
 **Lumos** (Latin for "light") brings clarity to CLI development in Lua. Inspired by Cobra for Go, it provides everything you need to build professional command-line applications with minimal code and maximum functionality.
 
-## ✨ What Makes Lumos Special
+## What Makes Lumos Special
 
 - **Project Generator** - `lumos new` creates complete CLI projects in seconds
 - **Intuitive API** - Fluent, chainable methods for defining commands and flags
