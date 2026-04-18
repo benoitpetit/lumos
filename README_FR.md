@@ -10,38 +10,38 @@
 </p>
 
 <p align="center">
-    <a href="docs/qs.md">🚀 Démarrage rapide</a> •
-    <a href="docs/api.md">📚 API</a> •
-    <a href="docs/use.md">💡 Exemples</a> •
-    <a href="#installation">⚡ Installation</a>
+    <a href="docs/qs.md">Démarrage rapide</a> •
+    <a href="docs/api.md">API</a> •
+    <a href="docs/use.md">Exemples</a> •
+    <a href="#installation">Installation</a>
 </p>
 
 ---
 
 **Lumos** (latin pour "lumière") apporte de la clarté au développement CLI en Lua. Inspiré par Cobra pour Go, il fournit tout le nécessaire pour construire des applications en ligne de commande professionnelles avec un minimum de code et un maximum de fonctionnalités.
 
-## ✨ Ce qui rend Lumos spécial
+## Ce qui rend Lumos spécial
 
-- **🚀 Générateur de projets** - `lumos new` crée des projets CLI complets en quelques secondes
-- **🎯 API intuitive** - Méthodes chaînables et fluides pour définir commandes et flags
-- **🎨 Composants UI riches** - Couleurs, barres de progression, prompts et tableaux natifs
-- **🔗 Middleware** - Chaîne de middleware Express-like avec auth, dry-run, rate-limiting, etc.
-- **⚔️ Flags avancés** - int, float, array, enum, path, url, email avec validation intégrée
-- **🔧 Intégration shell** - Auto-complétion, pages de manuel et génération de documentation
-- **⚙️ Gestion de configuration** - Fichiers JSON et key=value, variables d'environnement, cache intégré
-- **🧪 Prêt pour les tests** - Les projets générés incluent Busted et un fichier de test de démarrage
-- **📦 Dépendances minimales** - Seulement `luafilesystem`, architecture modulaire
-- **🌍 Multiplateforme** - Linux, macOS et Windows natif avec détection automatique
-- **🚀 Bundles portables** - Scripts Lua autonomes avec `lumos bundle`
-- **📦 Packages autonomes** - Exécutables sans dépendance avec `lumos package`
-- **🔨 Builds natives** - Compilation en binaire natif avec `lumos build`
-- **🔒 Sécurité intégrée** - Sanitization, opérations fichier sécurisées, rate limiting
-- **📝 Logging structuré** - Logger 5 niveaux avec loggers enfants et configuration environnementale
-- **⚡ Lazy loading** - Chargement à la demande des modules pour un démarrage rapide (< 30ms)
+- **Générateur de projets** - `lumos new` crée des projets CLI complets en quelques secondes
+- **API intuitive** - Méthodes chaînables et fluides pour définir commandes et flags
+- **Composants UI riches** - Couleurs, barres de progression, prompts et tableaux natifs
+- **Middleware** - Chaîne de middleware Express-like avec auth, dry-run, rate-limiting, etc.
+- **Flags avancés** - int, float, array, enum, path, url, email avec validation intégrée
+- **Intégration shell** - Auto-complétion, pages de manuel et génération de documentation
+- **Gestion de configuration** - Fichiers JSON et key=value, variables d'environnement, cache intégré
+- **Prêt pour les tests** - Les projets générés incluent Busted et un fichier de test de démarrage
+- **Dépendances minimales** - Seulement `luafilesystem`, architecture modulaire
+- **Multiplateforme** - Linux, macOS et Windows natif avec détection automatique
+- **Bundles portables** - Scripts Lua autonomes avec `lumos bundle`
+- **Packages autonomes** - Exécutables sans dépendance avec `lumos package`
+- **Builds natives** - Compilation en binaire natif avec `lumos build`
+- **Sécurité intégrée** - Sanitization, opérations fichier sécurisées, rate limiting
+- **Logging structuré** - Logger 5 niveaux avec loggers enfants et configuration environnementale
+- **Lazy loading** - Chargement à la demande des modules pour un démarrage rapide (< 30ms)
 
-## 🚀 Démarrage rapide en 5 minutes
+## Démarrage rapide en 5 minutes
 
-### 📎 TL;DR
+### TL;DR
 
 ```bash
 # Installer Lumos depuis LuaRocks
@@ -55,7 +55,7 @@ lua src/main.lua greet "Maître CLI"
 # Sortie : Hello, Maître CLI !
 ```
 
-### 🔍 Guide étape par étape
+### Guide étape par étape
 
 **Étape 1 : Installer Lumos**
 ```bash
@@ -136,7 +136,7 @@ end)
 app:run(arg)
 ```
 
-## ⚡ Installation
+## Installation
 
 ### Prérequis
 - Lua 5.1+ ou LuaJIT
