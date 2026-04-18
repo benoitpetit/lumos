@@ -10,10 +10,10 @@
 </p>
 
 <p align="center">
-    <a href="docs/qs.md">🚀 Quick Start</a> •
-    <a href="docs/api.md">📚 API Docs</a> •
-    <a href="docs/use.md">💡 Examples</a> •
-    <a href="#installation">⚡ Install</a>
+    <a href="docs/qs.md">Quick Start</a> •
+    <a href="docs/api.md">API Docs</a> •
+    <a href="docs/use.md">Examples</a> •
+    <a href="#installation">Install</a>
 </p>
 
 ---
@@ -22,26 +22,26 @@
 
 ## ✨ What Makes Lumos Special
 
-- **🚀 Project Generator** - `lumos new` creates complete CLI projects in seconds
-- **🎯 Intuitive API** - Fluent, chainable methods for defining commands and flags
-- **🎨 Rich UI Components** - Colors, progress bars, prompts, and tables out of the box
-- **🔗 Middleware Chain** - Express-like middleware with auth, dry-run, rate-limiting, and more
-- **⚔️ Advanced Flags** - int, float, array, enum, path, url, email with built-in validation
-- **🔧 Shell Integration** - Auto-completion, man pages, and documentation generation
-- **⚙️ Configuration Management** - JSON and key=value files, environment variables, built-in cache
-- **🧪 Test-Ready** - Generated projects include a Busted configuration and a starter test file
-- **📦 Minimal Dependencies** - Only requires `luafilesystem`, modular architecture
-- **🌍 Cross-Platform** - Linux, macOS, and native Windows with automatic detection
-- **🚀 Portable Bundles** - Create self-contained single-file Lua scripts with `lumos bundle`
-- **📦 Standalone Packages** - Create zero-dependency executables with `lumos package`
-- **🔨 Native Builds** - Compile to native binaries with `lumos build` (embeds Lua VM)
-- **🔒 Security Built-in** - Input sanitization, safe file operations, rate limiting
-- **📝 Structured Logging** - 5-level logger with child loggers and environment configuration
-- **⚡ Lazy Loading** - On-demand module loading for fast startup (< 30ms)
+- **Project Generator** - `lumos new` creates complete CLI projects in seconds
+- **Intuitive API** - Fluent, chainable methods for defining commands and flags
+- **Rich UI Components** - Colors, progress bars, prompts, and tables out of the box
+- **Middleware Chain** - Express-like middleware with auth, dry-run, rate-limiting, and more
+- **Advanced Flags** - int, float, array, enum, path, url, email with built-in validation
+- **Shell Integration** - Auto-completion, man pages, and documentation generation
+- **Configuration Management** - JSON and key=value files, environment variables, built-in cache
+- **Test-Ready** - Generated projects include a Busted configuration and a starter test file
+- **Minimal Dependencies** - Only requires `luafilesystem`, modular architecture
+- **Cross-Platform** - Linux, macOS, and native Windows with automatic detection
+- **Portable Bundles** - Create self-contained single-file Lua scripts with `lumos bundle`
+- **Standalone Packages** - Create zero-dependency executables with `lumos package`
+- **Native Builds** - Compile to native binaries with `lumos build` (embeds Lua VM)
+- **Security Built-in** - Input sanitization, safe file operations, rate limiting
+- **Structured Logging** - 5-level logger with child loggers and environment configuration
+- **Lazy Loading** - On-demand module loading for fast startup (< 30ms)
 
-## 🚀 5-Minute Quick Start
+## 5-Minute Quick Start
 
-### 📎 TL;DR
+### TL;DR
 
 ```bash
 # Install Lumos from LuaRocks
@@ -55,7 +55,7 @@ lua src/main.lua greet "CLI Master"
 # Output: Hello, CLI Master!
 ```
 
-### 🔍 Step-by-Step Guide
+### Step-by-Step Guide
 
 **Step 1: Install Lumos**
 ```bash
@@ -136,7 +136,7 @@ end)
 app:run(arg)
 ```
 
-## ⚡ Installation
+## Installation
 
 ### Prerequisites
 - Lua 5.1+ or LuaJIT
