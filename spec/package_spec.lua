@@ -18,9 +18,9 @@ describe('Package Module', function()
             assert.is_table(targets)
         end)
 
-        it('includes linux-x86_64 if stub present', function()
+        it('includes linux-x86_64 if launcher present', function()
             local targets = pkg.list_targets()
-            if pkg.find_stub('linux-x86_64') then
+            if pkg.find_launcher('linux-x86_64') then
                 assert.is_not_nil(targets)
                 local found = false
                 for _, t in ipairs(targets) do
@@ -30,9 +30,9 @@ describe('Package Module', function()
             end
         end)
 
-        it('includes windows-x86_64 if stub present', function()
+        it('includes windows-x86_64 if launcher present', function()
             local targets = pkg.list_targets()
-            if pkg.find_stub('windows-x86_64') then
+            if pkg.find_launcher('windows-x86_64') then
                 local found = false
                 for _, t in ipairs(targets) do
                     if t == 'windows-x86_64' then found = true end
@@ -42,15 +42,15 @@ describe('Package Module', function()
         end)
     end)
 
-    describe('find_stub()', function()
+    describe('find_launcher()', function()
         it('returns nil for unknown target', function()
-            local path = pkg.find_stub('nonexistent-target-12345')
+            local path = pkg.find_launcher('nonexistent-target-12345')
             assert.is_nil(path)
         end)
 
         it('returns a path for linux-x86_64', function()
-            local path = pkg.find_stub('linux-x86_64')
-            -- The stub may or may not be present depending on build environment
+            local path = pkg.find_launcher('linux-x86_64')
+            -- The launcher may or may not be present depending on build environment
             if path then
                 assert.is_string(path)
                 assert.is_true(#path > 0)
@@ -58,7 +58,7 @@ describe('Package Module', function()
         end)
 
         it('returns a path for windows-x86_64', function()
-            local path = pkg.find_stub('windows-x86_64')
+            local path = pkg.find_launcher('windows-x86_64')
             if path then
                 assert.is_string(path)
                 assert.is_true(#path > 0)
@@ -100,9 +100,9 @@ describe('Package Module', function()
             assert.is_not_nil(err:find("Stub not found"))
         end)
 
-        it('creates a package for linux-x86_64 when stub is available', function()
-            if not pkg.find_stub('linux-x86_64') then
-                print('Package create test skipped: linux-x86_64 stub not available')
+        it('creates a package for linux-x86_64 when launcher is available', function()
+            if not pkg.find_launcher('linux-x86_64') then
+                print('Package create test skipped: linux-x86_64 launcher not available')
                 return
             end
 
@@ -123,7 +123,7 @@ describe('Package Module', function()
             assert.is_not_nil(info)
             assert.are.equal(out, info.output)
             assert.is_true(info.size > 0)
-            assert.is_true(info.stub_size > 0)
+            assert.is_true(info.launcher_size > 0)
 
             local f = io.open(out, "rb")
             assert.is_not_nil(f, "Output package should exist")
@@ -143,9 +143,9 @@ describe('Package Module', function()
             end
         end)
 
-        it('creates a package for windows-x86_64 when stub is available', function()
-            if not pkg.find_stub('windows-x86_64') then
-                print('Package create test skipped: windows-x86_64 stub not available')
+        it('creates a package for windows-x86_64 when launcher is available', function()
+            if not pkg.find_launcher('windows-x86_64') then
+                print('Package create test skipped: windows-x86_64 launcher not available')
                 return
             end
 
@@ -167,7 +167,7 @@ describe('Package Module', function()
             -- Output should have .exe appended
             assert.are.equal(out .. ".exe", info.output)
             assert.is_true(info.size > 0)
-            assert.is_true(info.stub_size > 0)
+            assert.is_true(info.launcher_size > 0)
 
             local f = io.open(out .. ".exe", "rb")
             assert.is_not_nil(f, "Output package should exist")
@@ -178,8 +178,8 @@ describe('Package Module', function()
 
         it('defaults to host target when none is specified', function()
             local host = pkg.detect_host_target()
-            if not pkg.find_stub(host) then
-                print('Package create test skipped: host stub ' .. host .. ' not available')
+            if not pkg.find_launcher(host) then
+                print('Package create test skipped: host launcher ' .. host .. ' not available')
                 return
             end
 

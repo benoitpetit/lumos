@@ -77,7 +77,7 @@ Lumos uses [Semantic Versioning](https://semver.org/).
 - `lumos/native_build.lua` — `detect_luac` now validates that the `luac` version matches the target VM.
 - `lumos/package.lua` — Added host platform auto-detection (`uname` / `PROCESSOR_ARCHITECTURE`) instead of hardcoding `linux-x86_64`.
 - `lumos/package.lua` — Stub search now works inside LuaRocks install trees (supports `copy_directories`).
-- `lumos/package.lua` — Enforces the 100 MiB stub payload limit and adds `.exe` extension on Windows targets.
+- `lumos/package.lua` — Enforces the 100 MiB launcher payload limit and adds `.exe` extension on Windows targets.
 - `lumos/security.lua` — `safe_mkdir` now uses `lfs` recursively instead of POSIX-only `mkdir -p`.
 - `lumos/security.lua` — `shell_escape` is now Windows-aware (PowerShell/cmd double-quote escaping).
 - `lumos/prompt.lua` — `prompt.editor` uses platform-safe quoting and falls back to `notepad.exe` on Windows.
@@ -92,7 +92,7 @@ Lumos uses [Semantic Versioning](https://semver.org/).
 - `lumos/core.lua` — Replaced `goto continue` with `repeat … until true` loops to restore Lua 5.1 compatibility.
 - `lumos/core.lua` — Wrapped `xpcall` arguments in closures to work around Lua 5.1's inability to pass extra arguments to `xpcall`.
 - CI workflow — Added `luarocks make lumos-dev-1.rockspec` so GitHub Actions runners correctly resolve `require('lumos')`.
-- `spec/package_spec.lua` — Skipped Linux stub binary execution on macOS to prevent `cannot execute binary file` failures on `macos-latest` runners.
+- `spec/package_spec.lua` — Skipped Linux launcher binary execution on macOS to prevent `cannot execute binary file` failures on `macos-latest` runners.
 
 ## [0.2.0] — 2026-04-15
 

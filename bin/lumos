@@ -673,12 +673,12 @@ build_cmd:action(function(ctx)
 end)
 
 -- Package command for creating standalone executables without a C compiler
-local package_cmd = app:command("package", "Package a Lumos CLI project into a standalone executable using a precompiled stub")
+local package_cmd = app:command("package", "Package a Lumos CLI project into a standalone executable using a precompiled launcher")
 package_cmd:arg("entry", "Entry point file (e.g., src/main.lua)")
 package_cmd:flag_string("-o --output", "Output file path (default: dist/<name>)")
 package_cmd:flag_string("-d --dir", "Project directory (default: current directory)")
-package_cmd:flag_string("-t --target", "Target platform stub (default: linux-x86_64)")
-package_cmd:flag("--list-targets", "List available stub targets and exit")
+package_cmd:flag_string("-t --target", "Target platform launcher (default: linux-x86_64)")
+package_cmd:flag("--list-targets", "List available launcher targets and exit")
 package_cmd:flag("--no-lumos", "Do not bundle Lumos framework")
 package_cmd:flag("--strip-comments", "Remove comments to reduce payload size")
 package_cmd:flag("--analyze", "Analyze dependencies without building")
@@ -692,9 +692,9 @@ package_cmd:action(function(ctx)
     
     if ctx.flags["list_targets"] then
         local targets = pkg.list_targets()
-        print(color.cyan("Available stub targets:"))
+        print(color.cyan("Available launcher targets:"))
         if #targets == 0 then
-            print(color.yellow("  No runtime stubs found."))
+            print(color.yellow("  No runtime launchers found."))
         else
             for _, t in ipairs(targets) do
                 print("  - " .. t)
@@ -777,7 +777,7 @@ package_cmd:action(function(ctx)
         print(color.white("  Target: " .. info.target))
         print(color.white("  Modules bundled: " .. info.modules_count))
         print(color.white("  Total size: " .. string.format("%.2f KB", info.size / 1024)))
-        print(color.white("  Stub size: " .. string.format("%.2f KB", info.stub_size / 1024)))
+        print(color.white("  Launcher size: " .. string.format("%.2f KB", info.launcher_size / 1024)))
         print(color.yellow("\nYour standalone CLI is ready!"))
         print(color.yellow("Run it with: ./" .. info.output:match("([^/\\]+)$") .. " --help"))
     end

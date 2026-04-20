@@ -304,7 +304,7 @@ Shows the Lumos CLI version and information.
 lumos doctor
 ```
 
-Checks your environment for common issues: Lua version, LuaRocks installation, lfs availability, C compiler presence, and stub binary status. Useful for troubleshooting build or packaging problems.
+Checks your environment for common issues: Lua version, LuaRocks installation, lfs availability, C compiler presence, and launcher binary status. Useful for troubleshooting build or packaging problems.
 
 ### Bundle Applications
 
@@ -338,7 +338,7 @@ lumos package src/main.lua -t linux-x86_64 -o dist/myapp
 lumos package src/main.lua -t windows-x86_64 -o dist/myapp.exe
 ```
 
-Creates a standalone executable by combining a precompiled stub binary (which already contains a Lua interpreter) with your amalgamated Lua code. **No C compiler is required** on your machine. See [Bundling Guide](bundle.md) for details.
+Creates a standalone executable by combining a precompiled launcher binary (which already contains a Lua interpreter) with your amalgamated Lua code. **No C compiler is required** on your machine. See [Bundling Guide](bundle.md) for details.
 
 ## Development Tips
 

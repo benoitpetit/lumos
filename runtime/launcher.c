@@ -1,8 +1,8 @@
 /*
- * Lumos Package Stub
+ * Lumos Package Launcher
  * A minimal statically-linked Lua interpreter that loads an appended Lua payload.
  *
- * Build with: musl-gcc -static -O2 stub.c -o lumos-stub-linux-x86_64 \
+ * Build with: musl-gcc -static -O2 launcher.c -o lumos-launcher-linux-x86_64 \
  *             /usr/lib/x86_64-linux-gnu/liblua5.3.a -lm -I/usr/include/lua5.3
  */
 

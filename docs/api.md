@@ -50,7 +50,7 @@ Lumos exports the following modules:
 - `lumos.logger` - Structured logging
 - `lumos.bundle` - Programmatic bundling API
 - `lumos.native_build` - Native binary compilation API
-- `lumos.package` - Standalone executable packaging API (stub-based)
+- `lumos.package` - Standalone executable packaging API (launcher-based)
 - `lumos.error` / `lumos.error_codes` - Typed error system
 - `lumos.middleware` - Middleware chain
 - `lumos.platform` - Cross-platform detection
@@ -1063,7 +1063,7 @@ end
 ```lua
 local pkg = require('lumos.package')
 
--- List available stub targets
+-- List available launcher targets
 local targets = pkg.list_targets()
 for _, t in ipairs(targets) do
     print("Target: " .. t)
@@ -1082,7 +1082,7 @@ if ok then
     print("Package created: " .. info.output)
     print("Target: " .. info.target)
     print("Total size: " .. info.size .. " bytes")
-    print("Stub size: " .. info.stub_size .. " bytes")
+    print("Launcher size: " .. info.launcher_size .. " bytes")
 else
     print("Error: " .. err)
 end

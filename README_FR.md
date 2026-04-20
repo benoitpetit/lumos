@@ -93,7 +93,7 @@ make test     # Lancer la suite de tests
 # Rapide : script Lua bundlé (nécessite Lua sur la cible)
 lumos bundle src/main.lua -o dist/myapp
 
-# Zéro dépendance : package autonome utilisant un stub précompilé
+# Zéro dépendance : package autonome utilisant un launcher précompilé
 lumos package src/main.lua -o dist/myapp
 
 # Cibler un OS différent (ex: Windows depuis Linux)

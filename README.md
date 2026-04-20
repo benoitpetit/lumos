@@ -93,7 +93,7 @@ make test     # Run the test suite
 # Fast: bundled Lua script (requires Lua on target)
 lumos bundle src/main.lua -o dist/myapp
 
-# Zero dependencies: standalone package using a precompiled stub
+# Zero dependencies: standalone package using a precompiled launcher
 lumos package src/main.lua -o dist/myapp
 
 # Target a different OS (e.g. Windows from Linux)

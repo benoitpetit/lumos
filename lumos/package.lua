@@ -1,6 +1,6 @@
 -- lumos/package.lua
--- Package a Lumos CLI application into a standalone executable using a precompiled stub.
--- The stub embeds a Lua interpreter; we append the amalgamated Lua payload and a size footer.
+-- Package a Lumos CLI application into a standalone executable using a precompiled launcher.
+-- The launcher embeds a Lua interpreter; we append the amalgamated Lua payload and a size footer.
 
 local package = {}
 
@@ -43,7 +43,7 @@ local function get_module_dir()
     return "lumos"
 end
 
---- List available stub targets
+--- List available launcher targets
 ---@return table targets
 function package.list_targets()
     local roots = {}
@@ -63,8 +63,8 @@ function package.list_targets()
         local runtime_dir = root .. PATH_SEP .. "runtime"
         if path_exists(runtime_dir) then
             for file in lfs.dir(runtime_dir) do
-                if file:match("^lumos%-stub%-") then
-                    local target = file:match("^lumos%-stub%-(.+)$")
+                if file:match("^lumos%-launcher%-") then
+                    local target = file:match("^lumos%-launcher%-(.+)$")
                     if target and not targets[target] then
                         targets[target] = true
                     end
@@ -80,10 +80,10 @@ function package.list_targets()
     return list
 end
 
---- Find the stub binary path for a given target
+--- Find the launcher binary path for a given target
 ---@param target string
 ---@return string|nil
-function package.find_stub(target)
+function package.find_launcher(target)
     local roots = {}
     local dev_root = get_module_dir():match("^(.+)[/\\]lumos$")
     if dev_root then
@@ -95,9 +95,9 @@ function package.find_stub(target)
         table.insert(roots, rock_root)
     end
     for _, root in ipairs(roots) do
-        local stub_path = root .. PATH_SEP .. "runtime" .. PATH_SEP .. "lumos-stub-" .. target
-        if path_exists(stub_path) then
-            return stub_path
+        local launcher_path = root .. PATH_SEP .. "runtime" .. PATH_SEP .. "lumos-launcher-" .. target
+        if path_exists(launcher_path) then
+            return launcher_path
         end
     end
     return nil
@@ -161,8 +161,8 @@ function package.create(options)
     end
 
     local target = options.target or package.detect_host_target()
-    local stub_path = package.find_stub(target)
-    if not stub_path then
+    local launcher_path = package.find_launcher(target)
+    if not launcher_path then
         local available = table.concat(package.list_targets(), ", ")
         if available == "" then
             available = "none"
@@ -176,21 +176,21 @@ function package.create(options)
         return false, err
     end
 
-    -- Remove shebang if present (the stub interpreter loads via luaL_loadbuffer)
+    -- Remove shebang if present (the launcher interpreter loads via luaL_loadbuffer)
     lua_code = lua_code:gsub("^#![^\n]*\n?", "")
 
-    local stub_data = read_file(stub_path)
-    if not stub_data then
-        return false, "Cannot read stub binary: " .. stub_path
+    local launcher_data = read_file(launcher_path)
+    if not launcher_data then
+        return false, "Cannot read launcher binary: " .. launcher_path
     end
 
-    -- 100 MiB limit enforced by stub.c
+    -- 100 MiB limit enforced by launcher.c
     local MAX_PAYLOAD = 100 * 1024 * 1024
     if #lua_code > MAX_PAYLOAD then
         return false, "Payload exceeds maximum size of 100 MiB (" .. tostring(#lua_code) .. " bytes)"
     end
 
-    local payload = stub_data .. lua_code .. u64_le(#lua_code)
+    local payload = launcher_data .. lua_code .. u64_le(#lua_code)
 
     local output_file = options.output
     if not output_file then
@@ -231,7 +231,7 @@ function package.create(options)
         target = target,
         modules_count = modules_count,
         size = #payload,
-        stub_size = #stub_data,
+        launcher_size = #launcher_data,
     }
 end
 

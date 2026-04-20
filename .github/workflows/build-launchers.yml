@@ -1,0 +1,95 @@
+name: Build Launchers
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - 'runtime/launcher.c'
+      - 'scripts/build-launchers.sh'
+      - '.github/workflows/build-launchers.yml'
+  pull_request:
+    paths:
+      - 'runtime/launcher.c'
+      - 'scripts/build-launchers.sh'
+      - '.github/workflows/build-launchers.yml'
+  workflow_dispatch:
+
+jobs:
+  build-linux-windows:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-mingw-w64-x86-64 binutils-mingw-w64-x86-64 liblua5.3-dev
+
+      - name: Build Linux launcher
+        run: |
+          gcc -static -O2 runtime/launcher.c -o runtime/lumos-launcher-linux-x86_64 \
+              /usr/lib/x86_64-linux-gnu/liblua5.3.a -lm -I/usr/include/lua5.3
+
+      - name: Build Windows launcher
+        run: |
+          bash scripts/build-launchers.sh windows
+
+      - name: Upload Linux/Windows launchers
+        uses: actions/upload-artifact@v4
+        with:
+          name: launchers-linux-windows
+          path: runtime/lumos-launcher-*
+
+  build-macos:
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        arch: [x86_64, arm64]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Lua
+        run: |
+          brew install lua@5.4
+
+      - name: Build macOS launcher (${{ matrix.arch }})
+        run: |
+          LUA_PREFIX=$(brew --prefix lua@5.4)
+          LUA_INC="$LUA_PREFIX/include/lua5.4"
+          # Prefer static lib if available
+          if [ -f "$LUA_PREFIX/lib/liblua5.4.a" ]; then
+            LUA_LIB="$LUA_PREFIX/lib/liblua5.4.a"
+          elif [ -f "$LUA_PREFIX/lib/liblua.a" ]; then
+            LUA_LIB="$LUA_PREFIX/lib/liblua.a"
+          else
+            LUA_LIB="$LUA_PREFIX/lib/liblua.5.4.dylib"
+          fi
+          if [ "${{ matrix.arch }}" = "arm64" ]; then
+            cc -O2 -arch arm64 runtime/launcher.c -o runtime/lumos-launcher-darwin-aarch64 "$LUA_LIB" -I"$LUA_INC"
+          else
+            cc -O2 -arch x86_64 runtime/launcher.c -o runtime/lumos-launcher-darwin-x86_64 "$LUA_LIB" -I"$LUA_INC"
+          fi
+
+      - name: Upload macOS launcher
+        uses: actions/upload-artifact@v4
+        with:
+          name: launcher-darwin-${{ matrix.arch }}
+          path: runtime/lumos-launcher-darwin-*
+
+  collect-launchers:
+    needs: [build-linux-windows, build-macos]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Show launchers
+        run: |
+          mkdir -p runtime
+          cp artifacts/lumos-launcher-* runtime/ || true
+          ls -la runtime/lumos-launcher-*

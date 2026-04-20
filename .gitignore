@@ -42,7 +42,7 @@ dist/
 
 # Cross-compilation stubs and libraries
 runtime/lib/
-runtime/lumos-stub-windows-x86_64
+runtime/lumos-launcher-windows-x86_64
 
 # Editor backups
 *~

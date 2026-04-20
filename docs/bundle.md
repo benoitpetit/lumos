@@ -8,13 +8,13 @@ The `lumos bundle` command creates a single, portable Lua file containing your C
 
 The `lumos build` command compiles your application into a **native binary** (ELF/PE/Mach-O) that embeds the Lua VM, your code, and any available static native modules. When built with `--static` (automatic with `musl-gcc`), the resulting binary has **zero runtime dependencies** and works even on machines without Lua installed. This command requires a C toolchain on the build machine.
 
-The `lumos package` command provides the best of both worlds: it creates a standalone executable by combining a precompiled stub binary (which already contains a Lua interpreter) with your amalgamated Lua code. **No C compiler is required** on your machine — just the appropriate stub for your target platform.
+The `lumos package` command provides the best of both worlds: it creates a standalone executable by combining a precompiled launcher binary (which already contains a Lua interpreter) with your amalgamated Lua code. **No C compiler is required** on your machine — just the appropriate launcher for your target platform.
 
 ## Requirements
 
 - `lumos bundle`: **Lua runtime** must be installed on the target machine (Lua 5.1+). The output is a Lua script, not a native binary. Native C modules (e.g. `luafilesystem`) are *not* bundled and must be installed separately.
 - `lumos build`: Produces a native binary. No Lua runtime is required on the target. By default the binary is dynamically linked to `libc`; use `--static` for a fully standalone executable. Requires a C compiler + Lua headers. Static native C modules can be linked in if their `.a` archives are available on the build machine.
-- `lumos package`: Produces a standalone executable with **no C compiler required** on the build machine. The output is a precompiled stub + your Lua payload. Native C modules cannot be included in the package.
+- `lumos package`: Produces a standalone executable with **no C compiler required** on the build machine. The output is a precompiled launcher + your Lua payload. Native C modules cannot be included in the package.
 - On **Windows**, run a bundle with `lua myapp` instead of `./myapp`. Native binaries built with `lumos build` or `lumos package` can run directly as `myapp.exe`.
 
 ## Quick Start
@@ -128,33 +128,33 @@ lumos package <entry_file> [options]
 |--------|-------------|
 | `-o, --output <path>` | Output file path (default: `dist/<name>`) |
 | `-d, --dir <path>` | Project directory (default: current directory) |
-| `-t, --target <name>` | Target platform stub (default: host platform, e.g. `linux-x86_64`) |
-| `--list-targets` | List available stub targets and exit |
+| `-t, --target <name>` | Target platform launcher (default: host platform, e.g. `linux-x86_64`) |
+| `--list-targets` | List available launcher targets and exit |
 | `--no-lumos` | Do not bundle Lumos framework |
 | `--strip-comments` | Remove comments to reduce payload size |
 
 ### How It Works
 
 1. **Amalgamation**: `lumos package` first amalgamates your Lua code and dependencies exactly like `lumos bundle`.
-2. **Stub Selection**: It loads a precompiled stub binary for the requested target platform. The stub already contains a statically linked Lua interpreter.
-3. **Concatenation**: The stub binary, the Lua payload, and an 8-byte size footer are concatenated into a single file.
-4. **Execution**: At runtime, the stub opens its own executable file, reads the size footer, extracts the Lua payload, and executes it via `luaL_loadbuffer`.
+2. **Launcher Selection**: It loads a precompiled launcher binary for the requested target platform. The launcher already contains a statically linked Lua interpreter.
+3. **Concatenation**: The launcher binary, the Lua payload, and an 8-byte size footer are concatenated into a single file.
+4. **Execution**: At runtime, the launcher opens its own executable file, reads the size footer, extracts the Lua payload, and executes it via `luaL_loadbuffer`.
 
 ### Stubs
 
-Stubs are precompiled static binaries stored in the `runtime/` directory of the Lumos installation. The following stubs are currently available:
+Launchers are precompiled static binaries stored in the `runtime/` directory of the Lumos installation. The following launchers are currently available:
 
-- `lumos-stub-linux-x86_64` -- Linux x86_64 (statically linked)
-- `lumos-stub-windows-x86_64` -- Windows x86_64 (cross-compiled from Linux)
-- `lumos-stub-darwin-x86_64` -- macOS Intel (build from source on macOS or via CI)
-- `lumos-stub-darwin-aarch64` -- macOS Apple Silicon (build from source on macOS or via CI)
+- `lumos-launcher-linux-x86_64` -- Linux x86_64 (statically linked)
+- `lumos-launcher-windows-x86_64` -- Windows x86_64 (cross-compiled from Linux)
+- `lumos-launcher-darwin-x86_64` -- macOS Intel (build from source on macOS or via CI)
+- `lumos-launcher-darwin-aarch64` -- macOS Apple Silicon (build from source on macOS or via CI)
 
-You can build additional stubs from `runtime/stub.c` using your platform's C compiler and `liblua.a`. Use `make build-stub-linux`, `make build-stub-windows`, or the CI workflow `.github/workflows/build-stubs.yml` for macOS.
+You can build additional launchers from `runtime/launcher.c` using your platform's C compiler and `liblua.a`. Use `make build-launcher-linux`, `make build-launcher-windows`, or the CI workflow `.github/workflows/build-launchers.yml` for macOS.
 
 ### When to Use `package` vs `build`
 
 - Use `lumos package` when you want a standalone executable **quickly** and don't have a C toolchain installed. Ideal for CI/CD pipelines and rapid distribution.
-- Use `lumos build` when you need maximum control, want to embed static native C modules, or need to target a platform for which no stub is available.
+- Use `lumos build` when you need maximum control, want to embed static native C modules, or need to target a platform for which no launcher is available.
 
 ## Examples
 
@@ -223,7 +223,7 @@ lumos package src/main.lua -o dist/myapp -t windows-x86_64
 ### Package Build (No Compiler Required)
 
 ```bash
-# List available stub targets
+# List available launcher targets
 lumos package --list-targets
 
 # Package for the default target (host platform)
@@ -384,7 +384,7 @@ If a static archive is not found, `lumos build` will emit a warning but still pr
 
 ### `lumos package` and Native C Modules
 
-`lumos package` uses a precompiled stub that only contains the Lua interpreter. It cannot include native C modules. If your app uses `lfs`, `socket`, or any other C module, you must use `lumos build` instead.
+`lumos package` uses a precompiled launcher that only contains the Lua interpreter. It cannot include native C modules. If your app uses `lfs`, `socket`, or any other C module, you must use `lumos build` instead.
 
 ### Recommendations
 
@@ -460,7 +460,7 @@ if ok then
     print("Package created: " .. info.output)
     print("Target: " .. info.target)
     print("Total size: " .. info.size .. " bytes")
-    print("Stub size: " .. info.stub_size .. " bytes")
+    print("Launcher size: " .. info.launcher_size .. " bytes")
 else
     print("Error: " .. err)
 end
@@ -507,7 +507,7 @@ local minified = bundle.minify(code)
 |----------|-----------|---------------|
 | **lumos bundle** | Simple, integrated | Requires Lua runtime on target |
 | **lumos build** | True native binary, zero dependencies, static C modules | Requires a C toolchain at build time |
-| **lumos package** | Standalone binary, no C compiler needed | Requires a precompiled stub for target platform |
+| **lumos package** | Standalone binary, no C compiler needed | Requires a precompiled launcher for target platform |
 | **luastatic** | Native binary executable | Complex to configure |
 | **squish** | Very flexible | External tool required |
 | **LuaRocks** | Standard distribution | Requires LuaRocks on target |
