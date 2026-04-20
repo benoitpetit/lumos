@@ -13,7 +13,6 @@ on:
       - 'scripts/build-launchers.sh'
       - '.github/workflows/build-launchers.yml'
   workflow_dispatch:
-  workflow_call:
 
 jobs:
   build-linux-windows:
@@ -34,12 +33,6 @@ jobs:
       - name: Build Windows launcher
         run: |
           bash scripts/build-launchers.sh windows
-
-      - name: Upload Linux/Windows launchers
-        uses: actions/upload-artifact@v4
-        with:
-          name: launchers-linux-windows
-          path: runtime/lumos-launcher-*
 
   build-macos:
     runs-on: macos-latest
@@ -64,27 +57,3 @@ jobs:
           else
             cc -O2 -arch x86_64 runtime/launcher.c -o runtime/lumos-launcher-darwin-x86_64 lua-5.4.7/src/liblua.a -lm -Ilua-5.4.7/src
           fi
-
-      - name: Upload macOS launcher
-        uses: actions/upload-artifact@v4
-        with:
-          name: launcher-darwin-${{ matrix.arch }}
-          path: runtime/lumos-launcher-darwin-*
-
-  collect-launchers:
-    needs: [build-linux-windows, build-macos]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-          merge-multiple: true
-
-      - name: Show launchers
-        run: |
-          mkdir -p runtime
-          cp artifacts/lumos-launcher-* runtime/ || true
-          ls -la runtime/lumos-launcher-*
