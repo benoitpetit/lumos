@@ -97,7 +97,7 @@ describe('Package Module', function()
                 target = "unknown-target",
             })
             assert.is_false(ok)
-            assert.is_not_nil(err:find("Stub not found"))
+            assert.is_not_nil(err:find("Launcher not found"))
         end)
 
         it('creates a package for linux-x86_64 when launcher is available', function()

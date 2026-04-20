@@ -167,7 +167,7 @@ function package.create(options)
         if available == "" then
             available = "none"
         end
-        return false, "Stub not found for target: " .. target .. ". Available: " .. available
+        return false, "Launcher not found for target: " .. target .. ". Available: " .. available
     end
 
     -- Amalgamate Lua code

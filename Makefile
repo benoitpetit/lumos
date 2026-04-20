@@ -85,14 +85,18 @@ test-coverage:
 # Show available targets
 help:
 	@echo "Available targets:"
-	@echo "  test          - Run all tests"
-	@echo "  test-coverage - Run tests with coverage (requires luacov)"
-	@echo "  install       - Install locally for development"
-	@echo "  install-prod  - Install from rockspec"
-	@echo "  doc           - Generate documentation"
-	@echo "  examples      - Run example applications"
-	@echo "  clean         - Clean build artifacts"
-	@echo "  help          - Show this help message"
+	@echo "  test             - Run all tests"
+	@echo "  test-coverage    - Run tests with coverage (requires luacov)"
+	@echo "  install          - Install locally for development"
+	@echo "  install-prod     - Install from rockspec"
+	@echo "  runtime-launchers - Build all native launchers"
+	@echo "  build-launcher-linux   - Build Linux launcher"
+	@echo "  build-launcher-windows - Build Windows launcher"
+	@echo "  build-launcher-macos   - Show macOS build instructions"
+	@echo "  doc              - Generate documentation"
+	@echo "  examples         - Run example applications"
+	@echo "  clean            - Clean build artifacts"
+	@echo "  help             - Show this help message"
 
 # Test the lumos command locally (before installation)
 test-cli:
