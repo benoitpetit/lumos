@@ -41,37 +41,27 @@ jobs:
           path: runtime/lumos-launcher-*
 
   build-macos:
+    runs-on: macos-latest
     strategy:
       matrix:
-        include:
-          - arch: x86_64
-            os: macos-13
-          - arch: arm64
-            os: macos-latest
-    runs-on: ${{ matrix.os }}
+        arch: [x86_64, arm64]
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Lua
+      - name: Build Lua from source (${{ matrix.arch }})
         run: |
-          brew install lua@5.4
+          curl -L -R -O https://www.lua.org/ftp/lua-5.4.7.tar.gz
+          tar zxf lua-5.4.7.tar.gz
+          cd lua-5.4.7
+          make clean
+          make macosx CC="cc -arch ${{ matrix.arch }}"
 
       - name: Build macOS launcher (${{ matrix.arch }})
         run: |
-          LUA_PREFIX=$(brew --prefix lua@5.4)
-          LUA_INC="$LUA_PREFIX/include/lua5.4"
-          # Prefer static lib if available
-          if [ -f "$LUA_PREFIX/lib/liblua5.4.a" ]; then
-            LUA_LIB="$LUA_PREFIX/lib/liblua5.4.a"
-          elif [ -f "$LUA_PREFIX/lib/liblua.a" ]; then
-            LUA_LIB="$LUA_PREFIX/lib/liblua.a"
-          else
-            LUA_LIB="$LUA_PREFIX/lib/liblua.5.4.dylib"
-          fi
           if [ "${{ matrix.arch }}" = "arm64" ]; then
-            cc -O2 -arch arm64 runtime/launcher.c -o runtime/lumos-launcher-darwin-aarch64 "$LUA_LIB" -I"$LUA_INC"
+            cc -O2 -arch arm64 runtime/launcher.c -o runtime/lumos-launcher-darwin-aarch64 lua-5.4.7/src/liblua.a -lm -Ilua-5.4.7/src
           else
-            cc -O2 -arch x86_64 runtime/launcher.c -o runtime/lumos-launcher-darwin-x86_64 "$LUA_LIB" -I"$LUA_INC"
+            cc -O2 -arch x86_64 runtime/launcher.c -o runtime/lumos-launcher-darwin-x86_64 lua-5.4.7/src/liblua.a -lm -Ilua-5.4.7/src
           fi
 
       - name: Upload macOS launcher
