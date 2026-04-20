@@ -41,10 +41,14 @@ jobs:
           path: runtime/lumos-launcher-*
 
   build-macos:
-    runs-on: macos-latest
     strategy:
       matrix:
-        arch: [x86_64, arm64]
+        include:
+          - arch: x86_64
+            os: macos-13
+          - arch: arm64
+            os: macos-latest
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 
