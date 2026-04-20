@@ -7,7 +7,7 @@ local logger = require('lumos.logger')
 function completion.generate_bash(app)
     local commands = {}
     local flags = {}
-    
+
     -- Extract commands
     for _, cmd in ipairs(app.commands) do
         table.insert(commands, cmd.name)
@@ -18,7 +18,7 @@ function completion.generate_bash(app)
             end
         end
     end
-    
+
     -- Extract global flags
     if app.persistent_flags then
         for flag_name, flag_def in pairs(app.persistent_flags) do
@@ -28,13 +28,13 @@ function completion.generate_bash(app)
             end
         end
     end
-    
+
     -- Add default flags
     table.insert(flags, "--help")
     table.insert(flags, "-h")
     table.insert(flags, "--version")
     table.insert(flags, "-v")
-    
+
     -- Derive a safe function name from the app name (replace non-alphanumeric chars with _)
     local safe_name = (app.name or "app"):gsub("[^%w]", "_")
 
@@ -44,44 +44,44 @@ _%s_completions() {
     COMPREPLY=()
     cur="${COMP_WORDS[COMP_CWORD]}"
     prev="${COMP_WORDS[COMP_CWORD-1]}"
-    
+
     # Available commands
     local commands="%s"
-    
+
     # Available flags
     local flags="%s"
-    
+
     # Complete flags
     if [[ ${cur} == -* ]]; then
         COMPREPLY=( $(compgen -W "${flags}" -- ${cur}) )
         return 0
     fi
-    
+
     # Complete commands
     if [[ ${COMP_CWORD} -eq 1 ]]; then
         COMPREPLY=( $(compgen -W "${commands}" -- ${cur}) )
         return 0
     fi
-    
+
     # Command-specific completions can be added here
     return 0
 }
 
 complete -F _%s_completions %s
 ]==], safe_name, table.concat(commands, " "), table.concat(flags, " "), safe_name, app.name)
-    
+
     return bash_script
 end
 
 -- Generate Zsh completion script
 function completion.generate_zsh(app)
     local commands = {}
-    
+
     -- Extract commands with descriptions
     for _, cmd in ipairs(app.commands) do
         local desc = cmd.description or "No description"
         table.insert(commands, string.format("'%s:%s'", cmd.name, desc))
-        
+
         -- Add aliases
         if cmd.aliases then
             for _, alias in ipairs(cmd.aliases) do
@@ -89,20 +89,20 @@ function completion.generate_zsh(app)
             end
         end
     end
-    
+
     local zsh_script = string.format([[
 #compdef %s
 
 _%s() {
     typeset -A opt_args
     local curcontext="$curcontext" state line
-    
+
     _arguments -C \
         '(- 1 *)'{-h,--help}'[show help information]' \
         '(- 1 *)'{-v,--version}'[show version information]' \
         '1: :->command' \
         '*: :->args' && return 0
-    
+
     case $state in
         command)
             local commands
@@ -122,7 +122,7 @@ _%s() {
 
 _%s "$@"
 ]], app.name, app.name, table.concat(commands, "\n        "), app.name, app.name)
-    
+
     return zsh_script
 end
 
@@ -182,7 +182,7 @@ end
 function completion.generate_all(app, output_dir, verbose)
     output_dir = output_dir or "./completion"
     if verbose == nil then verbose = true end
-    
+
     -- Create output directory securely
     local success, err = security.safe_mkdir(output_dir)
     if not success then
@@ -192,7 +192,7 @@ function completion.generate_all(app, output_dir, verbose)
         end
         return false
     end
-    
+
     -- Generate Bash completion
     local bash_script = completion.generate_bash(app)
     local bash_file, bash_err = security.safe_open(output_dir .. "/" .. app.name .. "_bash.sh", "w")
@@ -205,7 +205,7 @@ function completion.generate_all(app, output_dir, verbose)
     else
         logger.error("Failed to create Bash completion file", {error = bash_err})
     end
-    
+
     -- Generate Zsh completion
     local zsh_script = completion.generate_zsh(app)
     local zsh_file, zsh_err = security.safe_open(output_dir .. "/" .. app.name .. "_zsh.zsh", "w")
@@ -218,7 +218,7 @@ function completion.generate_all(app, output_dir, verbose)
     else
         logger.error("Failed to create Zsh completion file", {error = zsh_err})
     end
-    
+
     -- Generate Fish completion
     local fish_script = completion.generate_fish(app)
     local fish_file, fish_err = security.safe_open(output_dir .. "/" .. app.name .. ".fish", "w")
@@ -231,7 +231,7 @@ function completion.generate_all(app, output_dir, verbose)
     else
         logger.error("Failed to create Fish completion file", {error = fish_err})
     end
-    
+
     return true
 end
 

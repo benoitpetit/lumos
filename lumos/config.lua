@@ -35,19 +35,77 @@ function config.parse_key_value(content)
     return result
 end
 
+-- Minimal TOML parser supporting flat tables, basic arrays, strings, numbers, booleans
+function config.parse_toml(content)
+    local result = {}
+    local section = nil
+    for line in content:gmatch("[^\r\n]+") do
+        line = line:match("^%s*(.-)%s*$")
+        if line ~= "" and not line:match("^#") then
+            -- Section header [section] or [section.subsection]
+            local sec = line:match("^%[([^%]]+)%]$")
+            if sec then
+                section = sec:gsub("%s+", "")
+            else
+                local key, value = line:match("^([%w_%-]+)%s*=%s*(.*)$")
+                if key and value then
+                    local full_key = section and (section .. "." .. key) or key
+                    -- Trim trailing comment (naive: everything after unquoted #)
+                    local val = value:match("^(.-)%s*#.*$") or value
+                    val = val:match("^%s*(.-)%s*$")
+                    -- String
+                    local str = val:match('^"(.*)"$') or val:match("^'(.*)'$")
+                    if str then
+                        result[full_key] = str
+                    elseif val:lower() == "true" then
+                        result[full_key] = true
+                    elseif val:lower() == "false" then
+                        result[full_key] = false
+                    elseif tonumber(val) then
+                        result[full_key] = tonumber(val)
+                    elseif val:match("^%[") then
+                        -- Basic array [1, 2, "three"]
+                        local arr = {}
+                        local arr_content = val:match("^%[(.*)%]$") or ""
+                        for item in arr_content:gmatch("([^,]+)") do
+                            item = item:match("^%s*(.-)%s*$")
+                            local item_str = item:match('^"(.*)"$') or item:match("^'(.*)'$")
+                            if item_str then
+                                table.insert(arr, item_str)
+                            elseif item:lower() == "true" then
+                                table.insert(arr, true)
+                            elseif item:lower() == "false" then
+                                table.insert(arr, false)
+                            elseif tonumber(item) then
+                                table.insert(arr, tonumber(item))
+                            else
+                                table.insert(arr, item)
+                            end
+                        end
+                        result[full_key] = arr
+                    else
+                        result[full_key] = val
+                    end
+                end
+            end
+        end
+    end
+    return result
+end
+
 -- Load configuration from a file
 function config.load_file(file_path)
     logger.debug("Loading configuration file", {path = file_path})
-    
+
     local file, err = security.safe_open(file_path, "r")
     if not file then
         logger.error("Could not open configuration file", {path = file_path, error = err})
         return nil, "Could not open configuration file: " .. (err or file_path)
     end
-    
+
     local content = file:read("*all")
     file:close()
-    
+
     -- Try to parse as JSON first
     if file_path:match("%.json$") then
         local success, result = pcall(function()
@@ -61,7 +119,21 @@ function config.load_file(file_path)
             return nil, "Invalid JSON in config file: " .. file_path
         end
     end
-    
+
+    -- Try TOML
+    if file_path:match("%.toml$") then
+        local success, result = pcall(function()
+            return config.parse_toml(content)
+        end)
+        if success then
+            logger.info("Loaded TOML configuration", {path = file_path})
+            return result
+        else
+            logger.error("Invalid TOML in config file", {path = file_path, error = tostring(result)})
+            return nil, "Invalid TOML in config file: " .. file_path
+        end
+    end
+
     -- Simple key=value parser for other files
     local result = config.parse_key_value(content)
     logger.info("Loaded key-value configuration", {path = file_path})
@@ -152,35 +224,35 @@ end
 -- Merge configurations with priority: flags > env > config_file > defaults
 function config.merge_configs(defaults, config_file, env_config, flags)
     local merged = {}
-    
+
     -- Start with defaults
     if defaults then
         for k, v in pairs(defaults) do
             merged[k] = v
         end
     end
-    
+
     -- Override with config file
     if config_file then
         for k, v in pairs(config_file) do
             merged[k] = v
         end
     end
-    
+
     -- Override with environment
     if env_config then
         for k, v in pairs(env_config) do
             merged[k] = v
         end
     end
-    
+
     -- Override with flags (highest priority)
     if flags then
         for k, v in pairs(flags) do
             merged[k] = v
         end
     end
-    
+
     return merged
 end
 

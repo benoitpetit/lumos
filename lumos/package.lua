@@ -52,7 +52,7 @@ function package.list_targets()
     if dev_root then
         table.insert(roots, dev_root)
     end
-    -- Installed rock tree (module dir parent might contain stubs if copy_directories worked)
+    -- Installed rock tree (module dir parent might contain runtime if copy_directories worked)
     local mod_dir = get_module_dir()
     if mod_dir and mod_dir ~= "lumos" then
         local rock_root = mod_dir .. PATH_SEP .. ".." .. PATH_SEP .. ".."
@@ -60,9 +60,9 @@ function package.list_targets()
     end
     local targets = {}
     for _, root in ipairs(roots) do
-        local stubs_dir = root .. PATH_SEP .. "stubs"
-        if path_exists(stubs_dir) then
-            for file in lfs.dir(stubs_dir) do
+        local runtime_dir = root .. PATH_SEP .. "runtime"
+        if path_exists(runtime_dir) then
+            for file in lfs.dir(runtime_dir) do
                 if file:match("^lumos%-stub%-") then
                     local target = file:match("^lumos%-stub%-(.+)$")
                     if target and not targets[target] then
@@ -95,7 +95,7 @@ function package.find_stub(target)
         table.insert(roots, rock_root)
     end
     for _, root in ipairs(roots) do
-        local stub_path = root .. PATH_SEP .. "stubs" .. PATH_SEP .. "lumos-stub-" .. target
+        local stub_path = root .. PATH_SEP .. "runtime" .. PATH_SEP .. "lumos-stub-" .. target
         if path_exists(stub_path) then
             return stub_path
         end
@@ -105,7 +105,7 @@ end
 
 --- Detect the host platform target
 ---@return string
-local function detect_host_target()
+function package.detect_host_target()
     if IS_WINDOWS then
         local arch = os.getenv("PROCESSOR_ARCHITECTURE") or "x86_64"
         if arch:match("AMD64") or arch:match("x86_64") then
@@ -160,7 +160,7 @@ function package.create(options)
         return false, "Entry file not found: " .. entry_file
     end
 
-    local target = options.target or detect_host_target()
+    local target = options.target or package.detect_host_target()
     local stub_path = package.find_stub(target)
     if not stub_path then
         local available = table.concat(package.list_targets(), ", ")

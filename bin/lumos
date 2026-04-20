@@ -4,13 +4,15 @@
 -- This script creates new CLI projects using the Lumos framework
 
 -- Configure LuaRocks paths automatically
+local PATH_SEP = package.config:sub(1, 1)
 local function setup_luarocks_paths()
-    local home = os.getenv("HOME")
+    local home = os.getenv("HOME") or os.getenv("USERPROFILE")
     if home then
         local version = _VERSION:match("%d+%.%d+") or "5.1"
-        local lua_path = home .. "/.luarocks/share/lua/" .. version .. "/?.lua"
-        local lua_cpath = home .. "/.luarocks/share/lua/" .. version .. "/?/init.lua"
-        local lua_clib = home .. "/.luarocks/lib/lua/" .. version .. "/?.so"
+        local lua_path = home .. PATH_SEP .. ".luarocks" .. PATH_SEP .. "share" .. PATH_SEP .. "lua" .. PATH_SEP .. version .. PATH_SEP .. "?.lua"
+        local lua_cpath = home .. PATH_SEP .. ".luarocks" .. PATH_SEP .. "share" .. PATH_SEP .. "lua" .. PATH_SEP .. version .. PATH_SEP .. "?" .. PATH_SEP .. "init.lua"
+        local ext = (PATH_SEP == "\\") and ".dll" or ".so"
+        local lua_clib = home .. PATH_SEP .. ".luarocks" .. PATH_SEP .. "lib" .. PATH_SEP .. "lua" .. PATH_SEP .. version .. PATH_SEP .. "?" .. ext
         
         if not package.path:find(lua_path, 1, true) then
             package.path = lua_path .. ";" .. lua_cpath .. ";" .. package.path
@@ -32,7 +34,7 @@ local function safe_require(module_name, fallback)
 end
 
 -- Try to load from development path first (for local development)
-local script_dir = debug.getinfo(1, 'S').source:match('^@(.+/)') or './'
+local script_dir = debug.getinfo(1, 'S').source:match('^@(.+[/\\])') or './'
 local dev_path = script_dir .. '../?.lua;' .. script_dir .. '../?/init.lua;'
 
 -- Add development path temporarily for local development
@@ -85,6 +87,8 @@ end
 -- Cross-platform recursive directory creation
 local function mkdir_p(path)
     local sep = package.config:sub(1,1)
+    -- Normalize mixed separators to native separator
+    path = path:gsub("[/\\]", sep)
     local p = ''
     for dir in string.gmatch(path, "[^" .. sep .. "]+") do
         p = p == '' and dir or (p .. sep .. dir)
@@ -115,7 +119,7 @@ local function get_main_template(name, description)
 -- Main entry point for your CLI application
 
 -- Configure module path to find app.lua in src directory
-local script_dir = debug.getinfo(1, 'S').source:match("^@(.+/)")
+local script_dir = debug.getinfo(1, 'S').source:match("^@(.+[/\\])")
 if script_dir then
     package.path = script_dir .. "?.lua;" .. script_dir .. "?/init.lua;" .. package.path
 end
@@ -124,7 +128,8 @@ end
 local ok, app = pcall(require, 'app')
 if not ok then
     print("Error: module 'app' not found. Ensure you're running from the correct directory.")
-    print("Current directory: " .. (os.getenv("PWD") or "unknown"))
+    local lfs = require('lfs')
+    print("Current directory: " .. (lfs and lfs.currentdir() or "."))
     os.exit(1)
 end
 
@@ -419,7 +424,8 @@ app:command("doctor", "Check the Lumos environment for common issues")
         if not lumos then issues = issues + 1 end
         
         -- LuaRocks
-        local lr_handle = io.popen("luarocks --version 2>/dev/null")
+        local null_dev = (package.config:sub(1,1) == "\\") and " 2>nul" or " 2>/dev/null"
+        local lr_handle = io.popen("luarocks --version" .. null_dev)
         local lr_out = lr_handle and lr_handle:read("*l") or nil
         if lr_handle then lr_handle:close() end
         if lr_out and lr_out ~= "" then
@@ -430,7 +436,7 @@ app:command("doctor", "Check the Lumos environment for common issues")
         end
         
         -- Busted (optional)
-        local b_handle = io.popen("busted --version 2>/dev/null")
+        local b_handle = io.popen("busted --version" .. null_dev)
         local b_out = b_handle and b_handle:read("*l") or nil
         if b_handle then b_handle:close() end
         if b_out and b_out ~= "" then
@@ -440,7 +446,7 @@ app:command("doctor", "Check the Lumos environment for common issues")
         end
         
         -- Current directory
-        table.insert(checks, {"Working directory", os.getenv("PWD") or "."})
+        table.insert(checks, {"Working directory", lfs.currentdir() or "."})
         
         for _, check in ipairs(checks) do
             print(string.format("  %-18s %s", check[1] .. ":", check[2]))
@@ -544,7 +550,7 @@ bundle_cmd:action(function(ctx)
         print(color.white("  Size: " .. string.format("%.2f KB", info.size / 1024)))
         print(color.yellow("\nYour bundled Lua script is ready!"))
         print(color.yellow("Note: the target machine needs a Lua interpreter installed."))
-        print(color.yellow("Run it with: ./" .. info.output:match("([^/]+)$") .. " --help"))
+        print(color.yellow("Run it with: ./" .. info.output:match("([^/\\]+)$") .. " --help"))
     end
     
     return true
@@ -561,6 +567,7 @@ build_cmd:flag_string("--cc", "Force a specific C compiler")
 build_cmd:flag("--static", "Produce a fully statically linked binary")
 build_cmd:flag("--bytecode", "Compile Lua payload to bytecode before embedding")
 build_cmd:flag("--debug-build", "Keep temporary C source file for debugging")
+build_cmd:flag_string("-t --target", "Target platform for cross-compilation (e.g. windows-x86_64)")
 
 build_cmd:flag("--analyze", "Analyze dependencies without building")
 
@@ -630,6 +637,7 @@ build_cmd:action(function(ctx)
         static = ctx.flags.static,
         bytecode = ctx.flags.bytecode,
         debug_build = ctx.flags["debug_build"],
+        target = ctx.flags.target,
     }
     
     local success, err, info = native_build.create(options)
@@ -658,7 +666,7 @@ build_cmd:action(function(ctx)
             print(color.yellow("  Warning: binary is dynamically linked to libc. Use --static for full portability."))
         end
         print(color.yellow("\nYour standalone CLI is ready!"))
-        print(color.yellow("Run it with: ./" .. info.output:match("([^/]+)$") .. " --help"))
+        print(color.yellow("Run it with: ./" .. info.output:match("([^/\\]+)$") .. " --help"))
     end
     
     return true
@@ -686,7 +694,7 @@ package_cmd:action(function(ctx)
         local targets = pkg.list_targets()
         print(color.cyan("Available stub targets:"))
         if #targets == 0 then
-            print(color.yellow("  No stubs found."))
+            print(color.yellow("  No runtime stubs found."))
         else
             for _, t in ipairs(targets) do
                 print("  - " .. t)
@@ -741,7 +749,7 @@ package_cmd:action(function(ctx)
         return true
     end
 
-    local target = ctx.flags.target or "linux-x86_64"
+    local target = ctx.flags.target or pkg.detect_host_target()
     
     print(color.cyan("Packaging standalone executable..."))
     print(color.white("  Entry: " .. entry_file))
@@ -771,7 +779,7 @@ package_cmd:action(function(ctx)
         print(color.white("  Total size: " .. string.format("%.2f KB", info.size / 1024)))
         print(color.white("  Stub size: " .. string.format("%.2f KB", info.stub_size / 1024)))
         print(color.yellow("\nYour standalone CLI is ready!"))
-        print(color.yellow("Run it with: ./" .. info.output:match("([^/]+)$") .. " --help"))
+        print(color.yellow("Run it with: ./" .. info.output:match("([^/\\]+)$") .. " --help"))
     end
     
     return true

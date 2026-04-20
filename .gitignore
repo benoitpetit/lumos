@@ -40,6 +40,19 @@ dist/
 # Lumos cache
 .lumos/
 
+# Cross-compilation stubs and libraries
+runtime/lib/
+runtime/lumos-stub-windows-x86_64
+
+# Editor backups
+*~
+
+# Environment / secret files
+.env*
+
+# Common build output directory
+build/
+
 # Added by Prompt My Project (PMP) - https://github.com/benoitpetit/prompt-my-project
 pmp_output
 whitepaper.md

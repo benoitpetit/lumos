@@ -100,6 +100,10 @@ function validator.validate_and_merge_flags(app, cmd, parsed_flags)
             end
             local value = parsed_flags[flag_name] or parsed_flags[flag_def.short] or env_value or flag_def.default
             if value ~= nil then
+                if flag_def.deprecated then
+                    local color = require('lumos.color')
+                    io.stderr:write(color.yellow("Warning: Flag --" .. flag_name .. " is deprecated. " .. (flag_def.deprecation_message or "") .. "\n"))
+                end
                 validate_single_flag(flag_name, value, flag_def)
             elseif flag_def.required then
                 table.insert(errors, "Flag --" .. flag_name .. " is required")

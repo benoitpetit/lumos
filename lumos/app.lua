@@ -10,25 +10,25 @@ local function parse_flag_spec(spec)
     if short and long then
         return short, long
     end
-    
+
     -- Try --long -s format
     long, short = spec:match("^%-%-([a-zA-Z%-]+)%s+%-([a-zA-Z])$")
     if long and short then
         return short, long
     end
-    
+
     -- Try --long only
     long = spec:match("^%-%-([a-zA-Z%-]+)$")
     if long then
         return nil, long
     end
-    
+
     -- Try -s only
     short = spec:match("^%-([a-zA-Z])$")
     if short then
         return short, nil
     end
-    
+
     return nil, nil
 end
 
@@ -84,7 +84,7 @@ function Command:subcommand(name, description)
         args = {},
         parent = self
     }, Command)
-    
+
     table.insert(self.subcommands, subcmd)
     return subcmd
 end
@@ -120,6 +120,11 @@ end
 -- Add category support
 function Command:category(name)
     self._category = name
+    return self
+end
+
+function Command:hidden(value)
+    self._hidden = value ~= false
     return self
 end
 
@@ -160,6 +165,19 @@ end
 
 function Command:validate(fn)
     if self._last_flag then self._last_flag.custom_validator = fn end
+    return self
+end
+
+function Command:hidden_flag(value)
+    if self._last_flag then self._last_flag.hidden = value ~= false end
+    return self
+end
+
+function Command:deprecated(message)
+    if self._last_flag then
+        self._last_flag.deprecated = true
+        self._last_flag.deprecation_message = message or "This flag is deprecated"
+    end
     return self
 end
 
@@ -216,9 +234,76 @@ function Command:persistent_flag_int(spec, description, min, max)
     return self
 end
 
-function Command:persistent_flag_email(spec, description)
+function Command:persistent_flag_email(spec, description, options)
     self.persistent_flags = self.persistent_flags or {}
-    self._last_flag = add_flag_to(self.persistent_flags, spec, description, "email", {persistent = true})
+    options = options or {}
+    self._last_flag = add_flag_to(self.persistent_flags, spec, description, "email", {
+        persistent = true,
+        pattern = options.pattern
+    })
+    return self
+end
+
+function Command:persistent_flag_url(spec, description, options)
+    self.persistent_flags = self.persistent_flags or {}
+    options = options or {}
+    self._last_flag = add_flag_to(self.persistent_flags, spec, description, "url", {
+        persistent = true,
+        schemes = options.schemes,
+        require_host = options.require_host,
+        require_path = options.require_path,
+        allow_localhost = options.allow_localhost
+    })
+    return self
+end
+
+function Command:persistent_flag_path(spec, description, options)
+    self.persistent_flags = self.persistent_flags or {}
+    options = options or {}
+    self._last_flag = add_flag_to(self.persistent_flags, spec, description, "path", {
+        persistent = true,
+        must_exist = options.must_exist,
+        allow_file = options.allow_file,
+        allow_dir = options.allow_dir,
+        extensions = options.extensions,
+        resolve = options.resolve,
+        absolute = options.absolute
+    })
+    return self
+end
+
+function Command:persistent_flag_float(spec, description, options)
+    self.persistent_flags = self.persistent_flags or {}
+    options = options or {}
+    self._last_flag = add_flag_to(self.persistent_flags, spec, description, "float", {
+        persistent = true,
+        min = options.min, max = options.max, precision = options.precision
+    })
+    return self
+end
+
+function Command:persistent_flag_array(spec, description, options)
+    self.persistent_flags = self.persistent_flags or {}
+    options = options or {}
+    self._last_flag = add_flag_to(self.persistent_flags, spec, description, "array", {
+        persistent = true,
+        separator = options.separator,
+        item_type = options.item_type,
+        min_items = options.min_items,
+        max_items = options.max_items,
+        unique = options.unique
+    })
+    return self
+end
+
+function Command:persistent_flag_enum(spec, description, choices, options)
+    self.persistent_flags = self.persistent_flags or {}
+    options = options or {}
+    self._last_flag = add_flag_to(self.persistent_flags, spec, description, "enum", {
+        persistent = true,
+        choices = choices,
+        case_sensitive = options.case_sensitive
+    })
     return self
 end
 
@@ -299,6 +384,10 @@ function Command:mutex_group(name, flags_list, options)
                 self.flags[item.long] = item
             end
             table.insert(resolved_flags, item)
+        elseif type(item) == "table" and item._last_flag then
+            -- item is likely the command itself returned by fluent API
+            -- Use the most recently added flag at the time of call
+            table.insert(resolved_flags, item._last_flag)
         end
     end
     self.mutex_groups[name] = {
@@ -331,7 +420,8 @@ function lumos.new_app(config)
         global_flags = {},
         persistent_flags = {},
         config_file = config.config_file,
-        env_prefix = config.env_prefix
+        env_prefix = config.env_prefix,
+        no_args_is_help = config.no_args_is_help
     }
 
     function app:command(name, description)
@@ -343,11 +433,11 @@ function lumos.new_app(config)
             aliases = {},
             persistent_flags = {}
         }, Command)
-        
+
         table.insert(self.commands, cmd)
         return cmd
     end
-    
+
     -- Add persistent flag support at app level
     function app:persistent_flag(spec, description)
         self.persistent_flags = self.persistent_flags or {}
@@ -448,14 +538,14 @@ function lumos.new_app(config)
         end)
         return self
     end
-    
+
     -- App-level hooks
     function app:persistent_pre_run(fn)
         self.persistent_pre_runs = self.persistent_pre_runs or {}
         table.insert(self.persistent_pre_runs, fn)
         return self
     end
-    
+
     function app:persistent_post_run(fn)
         self.persistent_post_runs = self.persistent_post_runs or {}
         table.insert(self.persistent_post_runs, fn)
@@ -475,7 +565,7 @@ function lumos.new_app(config)
 
     function app:run(args)
         args = args or {}
-        
+
         -- Auto-load configuration file if configured
         if self.config_file then
             local file_cfg, _ = config_module.load_file(self.config_file)
@@ -491,11 +581,18 @@ function lumos.new_app(config)
 
         -- Handle global flags first
         local parsed = core.parse_arguments(args, self)
-        
-        -- Check for global JSON output flag
-        if parsed.flags.json then
-            parsed.output_json = true
+
+        -- Check for global output format
+        parsed.output_format = "table"
+        if parsed.flags.format then
+            local fmt = tostring(parsed.flags.format):lower()
+            if fmt == "json" or fmt == "table" or fmt == "yaml" then
+                parsed.output_format = fmt
+            end
+        elseif parsed.flags.json then
+            parsed.output_format = "json"
         end
+        parsed.output_json = (parsed.output_format == "json")
 
         -- Check for version flag.
         -- Only treat bare -v as --version if the user has NOT already defined a
@@ -519,7 +616,7 @@ function lumos.new_app(config)
             end
             return core.EXIT_OK
         end
-        
+
         -- Check for global help
         if parsed.flags.help or parsed.flags.h then
             if parsed.output_json then
@@ -530,13 +627,13 @@ function lumos.new_app(config)
                 end
                 print(json.encode({commands = cmd_names, flags = parsed.flags}))
             else
-                if not parsed.command then 
+                if not parsed.command then
                     core.show_help(self)
                     return core.EXIT_OK
                 end
             end
         end
-        
+
         -- Execute command
         return core.execute_command(self, parsed)
     end
@@ -555,7 +652,7 @@ function lumos.new_app(config)
             error("Unsupported shell: " .. (shell or "nil") .. ". Supported: bash, zsh, fish, all")
         end
     end
-    
+
     function app:generate_manpage(command, output_dir)
         if command then
             local cmd = core.find_command(self, command)
@@ -572,7 +669,7 @@ function lumos.new_app(config)
             end
         end
     end
-    
+
     function app:generate_docs(format, output_dir, verbose)
         format = format or "markdown"
         if format == "markdown" then

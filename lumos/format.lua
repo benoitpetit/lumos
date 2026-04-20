@@ -1,4 +1,4 @@
--- Lumos Format Module  
+-- Lumos Format Module
 -- Provides text formatting capabilities (bold, italic, etc.) independent of colors
 
 local format = {}
@@ -7,7 +7,7 @@ local format = {}
 local formats = {
     reset = "\27[0m",
     bold = "\27[1m",
-    dim = "\27[2m", 
+    dim = "\27[2m",
     italic = "\27[3m",
     underline = "\27[4m",
     strikethrough = "\27[9m",
@@ -44,13 +44,13 @@ local function supports_formatting()
     if os.getenv("LUMOS_NO_COLOR") or os.getenv("NO_COLOR") then
         return false
     end
-    
+
     -- Check for TERM environment variable
     local term = os.getenv("TERM")
     if term and (term:match("color") or term:match("xterm") or term:match("screen")) then
         return true
     end
-    
+
     -- Check if output is a TTY (cross-platform)
     return is_tty()
 end
@@ -71,7 +71,7 @@ function format.format(template)
         -- Strip format tags from template
         return template:gsub("{[^}]+}", "")
     end
-    
+
     return template:gsub("{([^}]+)}", function(format_name)
         return formats[format_name] or ""
     end)
@@ -119,7 +119,7 @@ end
 function format.wrap(text, width)
     local lines = {}
     local line = ""
-    
+
     for word in text:gmatch("%S+") do
         if #line + #word + 1 <= width then
             if #line > 0 then
@@ -134,11 +134,11 @@ function format.wrap(text, width)
             line = word
         end
     end
-    
+
     if #line > 0 then
         table.insert(lines, line)
     end
-    
+
     return lines
 end
 
@@ -208,7 +208,7 @@ end
 function format.combine(text, ...)
     local formats_to_apply = {...}
     local result = text
-    
+
     for _, fmt in ipairs(formats_to_apply) do
         if type(fmt) == "string" and formats[fmt] then
             result = format.apply(result, fmt)
@@ -216,7 +216,7 @@ function format.combine(text, ...)
             result = fmt(result)
         end
     end
-    
+
     return result
 end
 

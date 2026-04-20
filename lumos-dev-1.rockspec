@@ -75,7 +75,7 @@ build = {
       ["lumos.help_renderer"] = "lumos/help_renderer.lua"
    },
    copy_directories = {
-      "stubs"
+      "runtime"
    },
    install = {
       bin = {

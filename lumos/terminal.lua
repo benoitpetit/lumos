@@ -114,39 +114,46 @@ function terminal.clear()
     end
 end
 
+local function ansi_write(seq)
+    local p = get_platform()
+    if not p.is_windows() or (p.supports_colors and p.supports_colors()) then
+        io.write(seq)
+    end
+end
+
 --- Moves cursor to row, col (1-based)
 function terminal.move_cursor(row, col)
-    io.write(string.format("\27[%d;%dH", row, col))
+    ansi_write(string.format("\27[%d;%dH", row, col))
 end
 
 --- Saves cursor position
 function terminal.save_cursor()
-    io.write("\27[s")
+    ansi_write("\27[s")
 end
 
 --- Restores cursor position
 function terminal.restore_cursor()
-    io.write("\27[u")
+    ansi_write("\27[u")
 end
 
 --- Clears from cursor to end of line
 function terminal.clear_to_end()
-    io.write("\27[K")
+    ansi_write("\27[K")
 end
 
 --- Clears from cursor to end of screen
 function terminal.clear_to_bottom()
-    io.write("\27[J")
+    ansi_write("\27[J")
 end
 
 --- Hides the cursor
 function terminal.hide_cursor()
-    io.write("\27[?25l")
+    ansi_write("\27[?25l")
 end
 
 --- Shows the cursor
 function terminal.show_cursor()
-    io.write("\27[?25h")
+    ansi_write("\27[?25h")
 end
 
 return terminal

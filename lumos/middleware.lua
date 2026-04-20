@@ -145,4 +145,56 @@ function Middleware.builtin.rate_limit(options)
     end
 end
 
+--- Retry middleware: retries the action on retryable errors
+function Middleware.builtin.retry(options)
+    options = options or {}
+    local max_attempts = options.max_attempts or 3
+    local backoff = options.backoff or "fixed" -- "fixed" or "exponential"
+    local base_delay = options.base_delay or 1
+    local logger = require("lumos.logger")
+    return function(ctx, next)
+        local last_err
+        for attempt = 1, max_attempts do
+            local result, err = next()
+            if not err then
+                return result, err
+            end
+            last_err = err
+            if type(err) == "table" and err.is_retryable and not err:is_retryable() then
+                return result, err
+            end
+            if attempt < max_attempts then
+                local delay = (backoff == "exponential") and (base_delay * math.pow(2, attempt - 1)) or base_delay
+                logger.warn("Retrying after error", {attempt = attempt, delay = delay, error = err.message or tostring(err)})
+                -- Use os.execute sleep for portability, or busy-wait if unavailable
+                if package.config:sub(1,1) ~= "\\" then
+                    os.execute("sleep " .. tostring(delay) .. " 2>/dev/null")
+                end
+            end
+        end
+        return nil, last_err
+    end
+end
+
+--- Verbosity middleware: standardises -v / -vv / -vvv into log levels
+function Middleware.builtin.verbosity(options)
+    options = options or {}
+    local logger = require("lumos.logger")
+    return function(ctx, next)
+        local v = ctx.flags.v or ctx.flags.verbose
+        if type(v) == "number" then
+            if v >= 3 then
+                logger.set_level("TRACE")
+            elseif v >= 2 then
+                logger.set_level("DEBUG")
+            elseif v >= 1 then
+                logger.set_level("INFO")
+            end
+        elseif v == true then
+            logger.set_level("INFO")
+        end
+        return next()
+    end
+end
+
 return Middleware

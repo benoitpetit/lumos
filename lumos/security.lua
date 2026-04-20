@@ -68,16 +68,16 @@ function security.safe_mkdir(path)
 
     local lfs = require("lfs")
     local parts = {}
-    local sep = IS_WINDOWS and "\\" or "/"
-    local sep_escaped = IS_WINDOWS and "\\\\" or "/"
-    for part in sanitized:gmatch("[^" .. sep_escaped .. "]+") do
+    -- sanitize_path always normalizes to "/", so we split on "/"
+    for part in sanitized:gmatch("[^/]+") do
         table.insert(parts, part)
     end
 
+    local sep = IS_WINDOWS and "\\" or "/"
     local current = ""
     if not IS_WINDOWS then
-        if sanitized:sub(1, 1) == sep then
-            current = sep
+        if sanitized:sub(1, 1) == "/" then
+            current = "/"
         end
     else
         if sanitized:match("^%a:") then
@@ -245,8 +245,19 @@ end
 
 -- Check if running with elevated privileges (security warning)
 function security.is_elevated()
+    if IS_WINDOWS then
+        -- Try Windows elevated check via whoami /groups (looks for S-1-16-12288 = high integrity)
+        local handle = io.popen("whoami /groups 2>nul")
+        if handle then
+            local result = handle:read("*a")
+            handle:close()
+            if result and result:find("S%-1%-16%-12288") then
+                return true
+            end
+        end
+        return false
+    end
     -- Use `id -u` as the authoritative source — works on all POSIX systems.
-    -- os.getenv("UID") is a bash shell variable and is unreliable here.
     local handle = io.popen("id -u 2>/dev/null")
     if handle then
         local result = handle:read("*a")

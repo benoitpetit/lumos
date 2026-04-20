@@ -22,7 +22,7 @@ This installs the `lumos` binary in `~/.luarocks/bin/`, making it available as a
 luarocks make --local lumos-dev-1.rockspec
 
 # For production
-luarocks make --local lumos-dev-1.rockspec
+luarocks install --local lumos
 ```
 
 ---
@@ -90,7 +90,7 @@ Project name [myapp]: todo-cli
 Project description [A CLI app built with Lumos]: Simple task management CLI
 Creating project structure for todo-cli ...
 
-✅ Lumos CLI project 'todo-cli' created successfully!
+Lumos CLI project 'todo-cli' created successfully!
 
 Next steps:
   cd todo-cli
@@ -126,7 +126,7 @@ The entry point that loads and runs your CLI application:
 -- Main entry point for your CLI application
 
 -- Configure module path to find app.lua in src directory
-local script_dir = debug.getinfo(1, 'S').source:match("^@(.+/)")
+local script_dir = debug.getinfo(1, 'S').source:match("^@(.+[/\\])")
 if script_dir then
     package.path = script_dir .. "?.lua;" .. script_dir .. "?/init.lua;" .. package.path
 end
@@ -135,12 +135,13 @@ end
 local ok, app = pcall(require, 'app')
 if not ok then
     print("Error: module 'app' not found. Ensure you're running from the correct directory.")
-    print("Current directory: " .. (os.getenv("PWD") or "unknown"))
+    local lfs = require('lfs')
+    print("Current directory: " .. (lfs and lfs.currentdir() or "."))
     os.exit(1)
 end
 
 -- Run the application with command-line arguments
-app:run(arg)
+os.exit(app.run(arg))
 ```
 
 ### `src/app.lua`
@@ -159,7 +160,7 @@ function M.run(args)
     -- Create the main application
     local app = lumos.new_app({
         name = "todo-cli",
-        version = "0.3.4",
+        version = lumos.version,
         description = "Simple task management CLI"
     })
 
@@ -198,7 +199,7 @@ function M.run(args)
     -- Version handling is automatic via app:run() when version is set in new_app()
 
     -- Run the application
-    app:run(args)
+    return app:run(args)
 end
 
 return M
@@ -297,6 +298,14 @@ lumos version
 
 Shows the Lumos CLI version and information.
 
+### Doctor / Diagnostics
+
+```bash
+lumos doctor
+```
+
+Checks your environment for common issues: Lua version, LuaRocks installation, lfs availability, C compiler presence, and stub binary status. Useful for troubleshooting build or packaging problems.
+
 ### Bundle Applications
 
 ```bash
@@ -311,6 +320,9 @@ Creates a self-contained single-file Lua script. See [Bundling Guide](bundle.md)
 lumos build src/main.lua -o dist/myapp
 lumos build src/main.lua -o dist/myapp --static
 lumos build src/main.lua -o dist/myapp --bytecode --debug-build
+
+# Cross-compile to Windows from Linux
+lumos build src/main.lua -o dist/myapp.exe -t windows-x86_64
 ```
 
 Compiles your application into a native binary that embeds the Lua VM. Requires a C compiler and Lua development headers on the build machine. See [Bundling Guide](bundle.md) for details.
@@ -321,6 +333,9 @@ Compiles your application into a native binary that embeds the Lua VM. Requires 
 lumos package --list-targets
 lumos package src/main.lua -o dist/myapp
 lumos package src/main.lua -t linux-x86_64 -o dist/myapp
+
+# Package for Windows from Linux
+lumos package src/main.lua -t windows-x86_64 -o dist/myapp.exe
 ```
 
 Creates a standalone executable by combining a precompiled stub binary (which already contains a Lua interpreter) with your amalgamated Lua code. **No C compiler is required** on your machine. See [Bundling Guide](bundle.md) for details.
@@ -345,7 +360,7 @@ Creates a standalone executable by combining a precompiled stub binary (which al
 - Install Busted: `luarocks install busted`
 - Or run `make install` in your project
 
-**Permission denied when running**
+**"Permission denied when running"**
 - Make sure the main script is executable: `chmod +x src/main.lua`
 - Or run with lua: `lua src/main.lua`
 

@@ -9,7 +9,7 @@ Lumos uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-## [0.3.4] — 2026-04-16
+## [0.3.5] — 2026-04-16
 
 ### Fixed
 
@@ -82,7 +82,7 @@ Lumos uses [Semantic Versioning](https://semver.org/).
 - `lumos/security.lua` — `shell_escape` is now Windows-aware (PowerShell/cmd double-quote escaping).
 - `lumos/prompt.lua` — `prompt.editor` uses platform-safe quoting and falls back to `notepad.exe` on Windows.
 - `bin/lumos` — Synced CLI and project-template versions; added `--analyze` to `package` command.
-- Rockspecs — Added `copy_directories = {"stubs"}` so `lumos package` works after `luarocks install`.
+- Rockspecs — Added `copy_directories = {"runtime"}` so `lumos package` works after `luarocks install`.
 - README / docs — Corrected false shell-integration examples, added Prompts/Plugins/Hooks sections, removed Lua 5.1-incompatible `goto` snippets.
 
 ## [0.2.1] — 2026-04-15

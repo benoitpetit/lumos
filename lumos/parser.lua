@@ -43,6 +43,23 @@ function parser.suggest_command(app, input_name)
     return best_match
 end
 
+-- Suggest a similar subcommand name when input is unknown
+function parser.suggest_subcommand(command, input_name)
+    if not command.subcommands then
+        return nil
+    end
+    local best_match = nil
+    local best_distance = math.huge
+    for _, subcmd in ipairs(command.subcommands) do
+        local dist = levenshtein(input_name, subcmd.name)
+        if dist < best_distance and dist <= 2 then
+            best_distance = dist
+            best_match = subcmd.name
+        end
+    end
+    return best_match
+end
+
 -- Parse command line arguments into structured data with subcommand support
 function parser.parse_arguments(args, app)
     local parsed = {
@@ -59,12 +76,26 @@ function parser.parse_arguments(args, app)
     
     local i = 1
     local command_count = 0
+    local end_of_options = false
     
     while i <= #args do
         local arg = args[i]
         
+        -- End-of-options delimiter: treat all remaining tokens as positional args
+        if arg == "--" and not end_of_options then
+            end_of_options = true
+            i = i + 1
+        -- Handle combined short boolean flags: -abc → -a -b -c
+        -- Heuristic: up to 4 chars total (- + 3 letters) to avoid splitting glued values like -ofile
+        elseif not end_of_options and arg:match('^%-[a-zA-Z][a-zA-Z][a-zA-Z]?$') then
+            -- Expand combined flags in-place: -abc becomes -a, -b, -c
+            for j = 2, #arg do
+                table.insert(args, i + (j - 2), "-" .. arg:sub(j, j))
+            end
+            -- Remove original token and reprocess
+            table.remove(args, i + (#arg - 1))
         -- Handle flags (starting with - or --)
-        if arg:match('^%-%-?') then
+        elseif not end_of_options and arg:match('^%-%-?') then
             local flag_result = flags.parse_single_flag(arg, args, i)
             parsed.flags[flag_result.name] = flag_result.value
             i = flag_result.next_index

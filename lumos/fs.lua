@@ -82,7 +82,7 @@ function fs.mkdir_p(path)
         end
     else
         -- Windows drive letter handling (e.g., C:\)
-        if path:match("^%a:") then
+        if path:match("^%a:[/\\]") then
             current = parts[1] .. PATH_SEP
             table.remove(parts, 1)
         end

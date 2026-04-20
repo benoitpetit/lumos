@@ -15,7 +15,7 @@ local colors = {
     magenta = "\27[35m",
     cyan = "\27[36m",
     white = "\27[37m",
-    
+
     -- Bright colors
     bright_black = "\27[90m",
     bright_red = "\27[91m",
@@ -25,7 +25,7 @@ local colors = {
     bright_magenta = "\27[95m",
     bright_cyan = "\27[96m",
     bright_white = "\27[97m",
-    
+
     -- Background colors
     bg_black = "\27[40m",
     bg_red = "\27[41m",
@@ -43,13 +43,13 @@ local function supports_color()
     if os.getenv("LUMOS_NO_COLOR") or os.getenv("NO_COLOR") then
         return false
     end
-    
+
     -- Check for TERM environment variable
     local term = os.getenv("TERM")
     if term and (term:match("color") or term:match("xterm") or term:match("screen")) then
         return true
     end
-    
+
     -- Fallback to terminal detection (pipe-aware, platform-aware)
     local ok, term = pcall(require, "lumos.terminal")
     if ok and term then
@@ -74,7 +74,7 @@ function color.format(template)
         -- Strip color tags from template
         return template:gsub("{[^}]+}", "")
     end
-    
+
     return template:gsub("{([^}]+)}", function(color_name)
         return colors[color_name] or ""
     end)

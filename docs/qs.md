@@ -1,8 +1,8 @@
-# 🚀 Lumos Quick Start Guide
+# Lumos Quick Start Guide
 
 Get your first CLI application running with Lumos in under 5 minutes.
 
-## 📎 Prerequisites Check
+## Prerequisites Check
 
 Before starting, make sure you have:
 
@@ -18,7 +18,7 @@ If any are missing:
 - **macOS**: `brew install lua luarocks git`
 - **Windows**: Use WSL with one of the above
 
-## ⚡ Installation
+## Installation
 
 ### Option 1: From LuaRocks (Recommended)
 
@@ -280,8 +280,8 @@ deploy:examples({
 app:use(lumos.middleware.builtin.logger())
 app:use(lumos.middleware.builtin.dry_run())
 
-cmd:use(lumos.middleware.auth({ env_var = "API_KEY" }))
-cmd:use(lumos.middleware.confirm({ message = "Continue?" }))
+cmd:use(lumos.middleware.builtin.auth({ env_var = "API_KEY" }))
+cmd:use(lumos.middleware.builtin.confirm({ message = "Continue?" }))
 ```
 
 ### Cross-Platform Detection
@@ -311,6 +311,61 @@ lumos build src/main.lua -o dist/myapp
 
 # Test it
 ./dist/myapp --help
+```
+
+### POSIX Shell Conventions
+
+Lumos follows POSIX guidelines for argument parsing:
+
+```bash
+# Combined short flags
+myapp deploy -fvt production
+# Equivalent to: myapp deploy -f -v -t production
+
+# End-of-options delimiter
+myapp rm -- -file-starting-with-dash
+```
+
+### Output Format Control
+
+Get structured JSON output for scripting:
+
+```bash
+myapp info --format=json
+# or
+myapp info --json
+```
+
+### Hidden & Deprecated Flags
+
+Evolve your CLI gracefully:
+
+```lua
+cmd:flag("--legacy", "Old behavior")
+    :deprecated("Use --modern instead")
+
+cmd:hidden(true)  -- Hide from help (visible with LUMOS_DEBUG=1)
+```
+
+### Retry Middleware
+
+Automatically retry on retryable errors:
+
+```lua
+app:use(lumos.middleware.builtin.retry({
+    max_attempts = 3,
+    backoff = "exponential",
+    base_delay = 1
+}))
+```
+
+### TOML Configuration
+
+Lumos supports JSON, TOML, and key=value config files:
+
+```lua
+local config = require('lumos.config')
+local settings = config.load_file("config.toml")
 ```
 
 ## Next Steps

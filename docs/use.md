@@ -234,7 +234,7 @@ add_cmd:action(function(ctx)
         return false
     end
     
-    local priority = ctx.flags.priority or 
+    local _, priority = ctx.flags.priority or 
         prompt.select("Priority:", {"Low", "Medium", "High"}, 2)
     
     local tasks = load_tasks()
@@ -358,7 +358,7 @@ interactive_cmd:action(function(ctx)
             -- Add task
             local title = prompt.input("Task title:")
             if title and title ~= "" then
-                local priority = prompt.select("Priority:", {"Low", "Medium", "High"}, 2)
+                local _, priority = prompt.select("Priority:", {"Low", "Medium", "High"}, 2)
                 local tasks = load_tasks()
                 table.insert(tasks, {
                     id = #tasks + 1,
@@ -588,7 +588,7 @@ local platform = require('lumos.platform')
 
 local app = lumos.new_app({
     name = "deployctl",
-    version = "0.3.4",
+    version = "0.3.5",
     description = "Modern deployment controller"
 })
 
@@ -602,6 +602,7 @@ local deploy = app:command("deploy", "Deploy an application")
 deploy:arg("app", "Application name", { required = true })
 
 -- Typed flags
+deploy:flag("-f --force", "Force deployment")
 deploy:flag_enum("-e --env", "Environment", {"dev", "staging", "prod"})
 deploy:flag_int("--workers", "Number of workers", 1, 64)
 deploy:flag_float("-r --rate", "Deployment rate", { min = 0.0, max = 1.0, precision = 2 })
@@ -610,10 +611,9 @@ deploy:flag_path("-c --config", "Config file", { must_exist = true, extensions =
 deploy:flag_url("--endpoint", "API endpoint", { schemes = {"https"} })
 
 -- Mutually exclusive input flags
-deploy:mutex_group("target", {
-    deploy:flag_string("--image", "Container image"),
-    deploy:flag_string("--git", "Git repository URL")
-}, { required = true })
+deploy:flag_string("--image", "Container image")
+deploy:flag_string("--git", "Git repository URL")
+deploy:mutex_group("target", {"image", "git"}, { required = true })
 
 -- Per-command middleware
 deploy:use(lumos.middleware.builtin.auth({ env_var = "DEPLOY_API_KEY" }))
@@ -636,6 +636,115 @@ deploy:action(function(ctx)
 
     return lumos.success({ deployed = true, app = ctx.args[1] })
 end)
+
+app:run(arg)
+```
+
+## Evolving CLI with Hidden, Deprecated, and POSIX Features
+
+An example showing how to evolve a CLI gracefully with deprecation warnings, hidden commands, POSIX combined flags, and output format control.
+
+```lua
+local lumos = require('lumos')
+local color = require('lumos.color')
+local json = require('lumos.json')
+
+local app = lumos.new_app({
+    name = "myctl",
+    version = "1.0.0",
+    description = "Example of CLI evolution",
+    no_args_is_help = true
+})
+
+-- Standard verbosity middleware
+app:use(lumos.middleware.builtin.verbosity())
+
+-- Hidden command (only visible with LUMOS_DEBUG=1)
+local debug_cmd = app:command("debug", "Internal debug tools")
+debug_cmd:hidden(true)
+debug_cmd:action(function(ctx)
+    print("Debug mode active")
+    return true
+end)
+
+-- Public command with deprecated flag
+local run = app:command("run", "Run a task")
+run:arg("task", "Task name")
+
+-- New modern flag
+run:flag("--modern", "Use modern engine"):default(true)
+
+-- Old deprecated flag
+run:flag("--legacy", "Use legacy engine")
+    :deprecated("Use --modern instead (legacy will be removed in v2.0)")
+
+run:action(function(ctx)
+    local task = ctx.args[1]
+    local result = {
+        task = task,
+        engine = ctx.flags.legacy and "legacy" or "modern",
+        status = "ok"
+    }
+
+    if ctx.flags.format == "json" or ctx.flags.json then
+        print(json.encode(result))
+    else
+        print(color.green("✓") .. " Task " .. task .. " completed with " .. result.engine .. " engine")
+    end
+
+    return lumos.success(result)
+end)
+
+app:run(arg)
+```
+
+Usage with POSIX conventions:
+
+```bash
+# Combined short flags
+myctl run deploy -fvt production
+
+# End-of-options delimiter
+myctl run -- --task-with-dash
+
+# JSON output
+myctl run deploy --format=json
+
+# Deprecated flag (prints warning but still works)
+myctl run deploy --legacy
+```
+
+## Configuration with TOML
+
+Loading TOML configuration files:
+
+```lua
+local lumos = require('lumos')
+local config = require('lumos.config')
+
+local app = lumos.new_app({
+    name = "app",
+    config_file = "config.toml"
+})
+
+-- config.toml:
+-- host = "localhost"
+-- port = 8080
+-- tags = ["dev", "ops"]
+--
+-- [database]
+-- url = "postgres://localhost/mydb"
+
+app:command("info", "Show config")
+    :action(function(ctx)
+        local cfg = config.load_file("config.toml")
+        print("Host: " .. (cfg.host or "default"))
+        print("Port: " .. tostring(cfg.port or 3000))
+        if cfg["database.url"] then
+            print("DB: " .. cfg["database.url"])
+        end
+        return true
+    end)
 
 app:run(arg)
 ```

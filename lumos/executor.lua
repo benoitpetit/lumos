@@ -50,7 +50,7 @@ end
 -- Execute the appropriate command with parsed arguments
 function executor.execute_command(app, parsed_args)
     local cmd = parser.find_command(app, parsed_args.command)
-    
+
     if not cmd then
         if parsed_args.command then
             logger.warn("Unknown command", {command = parsed_args.command})
@@ -66,9 +66,9 @@ function executor.execute_command(app, parsed_args)
             return executor.EXIT_OK
         end
     end
-    
+
     logger.debug("Executing command", {command = cmd.name, args = parsed_args.args})
-    
+
     -- Handle subcommands if present
     if parsed_args.subcommand and cmd.subcommands then
         local subcmd = parser.find_subcommand(cmd, parsed_args.subcommand)
@@ -78,7 +78,7 @@ function executor.execute_command(app, parsed_args)
                 help_renderer.show_command_help(app, subcmd)
                 return executor.EXIT_OK
             end
-            
+
             -- Validate args and flags for subcommand
             if rawget(subcmd, 'action') then
                 local validated_args, arg_errors = validator.validate_args(subcmd, parsed_args)
@@ -106,10 +106,12 @@ function executor.execute_command(app, parsed_args)
                     command = subcmd,
                     parent = cmd,
                     config = app.loaded_config,
-                    env = app.loaded_env
+                    env = app.loaded_env,
+                    output_format = parsed_args.output_format or "table"
                 }
-                
+
                 if not run_hooks(app.persistent_pre_runs, context) then return executor.EXIT_ERROR end
+                if not run_hooks(cmd.persistent_pre_runs, context) then return executor.EXIT_ERROR end
                 if not run_hooks(subcmd.pre_runs, context) then return executor.EXIT_ERROR end
                 local success, result = xpcall(function()
                     return executor.execute_action(app, subcmd, context, function()
@@ -122,6 +124,7 @@ function executor.execute_command(app, parsed_args)
                     return err
                 end)
                 run_hooks(subcmd.post_runs, {success = success, result = result, config = context.config, env = context.env, command = subcmd, parent = cmd, args = context.args, flags = context.flags})
+                run_hooks(cmd.persistent_post_runs, {success = success, result = result, config = context.config, env = context.env, command = subcmd, parent = cmd, args = context.args, flags = context.flags})
                 run_hooks(app.persistent_post_runs, {success = success, result = result, config = context.config, env = context.env, command = subcmd, parent = cmd, args = context.args, flags = context.flags})
                 if not success then
                     logger.error("Command action failed", {command = subcmd.name, error = tostring(result)})
@@ -149,16 +152,34 @@ function executor.execute_command(app, parsed_args)
             end
         else
             io.stderr:write("Error: Unknown subcommand '" .. parsed_args.subcommand .. "' for command '" .. cmd.name .. "'\n")
+            local sub_suggestion = parser.suggest_subcommand(cmd, parsed_args.subcommand)
+            if sub_suggestion then
+                io.stderr:write("Did you mean '" .. sub_suggestion .. "'?\n")
+            end
             return executor.EXIT_USAGE
         end
     end
-    
+
+    -- If command has subcommands but no subcommand was matched,
+    -- check if the first positional arg looks like a typo of a subcommand
+    if not parsed_args.subcommand and cmd.subcommands and #cmd.subcommands > 0 then
+        local possible = parsed_args.args[1]
+        if possible then
+            local suggestion = parser.suggest_subcommand(cmd, possible)
+            if suggestion then
+                io.stderr:write("Error: Unknown subcommand '" .. possible .. "' for command '" .. cmd.name .. "'\n")
+                io.stderr:write("Did you mean '" .. suggestion .. "'?\n")
+                return executor.EXIT_USAGE
+            end
+        end
+    end
+
     -- Check for help flag
     if parsed_args.flags.help or parsed_args.flags.h then
         help_renderer.show_command_help(app, cmd)
         return executor.EXIT_OK
     end
-    
+
     -- Validate args and flags
     local validated_args, arg_errors = validator.validate_args(cmd, parsed_args)
     if #arg_errors > 0 then
@@ -177,7 +198,7 @@ function executor.execute_command(app, parsed_args)
         end
         return executor.EXIT_USAGE
     end
-    
+
     -- Execute the command action if it exists
     if rawget(cmd, 'action') then
         local context = {
@@ -185,9 +206,10 @@ function executor.execute_command(app, parsed_args)
             flags = validated_flags,
             command = cmd,
             config = app.loaded_config,
-            env = app.loaded_env
+            env = app.loaded_env,
+            output_format = parsed_args.output_format or "table"
         }
-        
+
         -- Execute with error handling.
         -- xpcall captures the traceback at the point of the actual error,
         -- not at the recovery site.  Guard against sandboxed Lua without debug lib.
@@ -197,8 +219,9 @@ function executor.execute_command(app, parsed_args)
             end
             return err
         end
-        
+
         if not run_hooks(app.persistent_pre_runs, context) then return executor.EXIT_ERROR end
+        if not run_hooks(cmd.persistent_pre_runs, context) then return executor.EXIT_ERROR end
         if not run_hooks(cmd.pre_runs, context) then return executor.EXIT_ERROR end
         local success, result = xpcall(function()
             return executor.execute_action(app, cmd, context, function()
@@ -206,6 +229,7 @@ function executor.execute_command(app, parsed_args)
             end)
         end, error_handler)
         run_hooks(cmd.post_runs, {success = success, result = result, config = context.config, env = context.env, command = cmd, args = context.args, flags = context.flags})
+        run_hooks(cmd.persistent_post_runs, {success = success, result = result, config = context.config, env = context.env, command = cmd, args = context.args, flags = context.flags})
         run_hooks(app.persistent_post_runs, {success = success, result = result, config = context.config, env = context.env, command = cmd, args = context.args, flags = context.flags})
         if not success then
             logger.error("Command action failed", {command = cmd.name, error = tostring(result)})
@@ -231,6 +255,9 @@ function executor.execute_command(app, parsed_args)
     else
         -- If no action but has subcommands, show help
         if cmd.subcommands and #cmd.subcommands > 0 then
+            help_renderer.show_command_help(app, cmd)
+            return executor.EXIT_OK
+        elseif app.no_args_is_help then
             help_renderer.show_command_help(app, cmd)
             return executor.EXIT_OK
         else

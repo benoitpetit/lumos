@@ -43,10 +43,28 @@ function prompt.password(message)
         end)
         os.execute("stty echo 2>/dev/null")
         if not ok then error(err, 2) end
+    elseif platform.is_windows() then
+        -- Windows: try PowerShell for secure input
+        local tmpfile = os.tmpname()
+        local ps_cmd = string.format(
+            'powershell -Command "$p = Read-Host -AsSecureString -Prompt \'%s\'; [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($p)) | Out-File -FilePath %s -Encoding utf8 -NoNewline" 2>nul',
+            message, tmpfile
+        )
+        local ok_ps = os.execute(ps_cmd)
+        if ok_ps == 0 or ok_ps == true then
+            local f = io.open(tmpfile, "r")
+            if f then
+                input = f:read("*l")
+                f:close()
+            end
+        end
+        os.remove(tmpfile)
+        if not input then
+            -- Fallback: plain text
+            input = io.read("*l")
+        end
     else
-        -- Fallback: read normally (Windows or no stty)
-        -- On Windows we could use powershell for secure input, but
-        -- to keep zero dependencies we read plain text.
+        -- Fallback: read normally
         input = io.read("*l")
     end
     
@@ -377,7 +395,7 @@ function prompt.editor(message, default)
         f:write(default)
     end
     f:close()
-    local cmd = editor .. " " .. security.shell_escape(tmpfile)
+    local cmd = security.shell_escape(editor) .. " " .. security.shell_escape(tmpfile)
     local ok = os.execute(cmd)
     if ok ~= 0 and ok ~= true then
         os.remove(tmpfile)

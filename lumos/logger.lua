@@ -51,12 +51,19 @@ local function init_colors()
     if os.getenv("LUMOS_NO_COLOR") or os.getenv("NO_COLOR") then
         return false
     end
-    
+    if os.getenv("FORCE_COLOR") or os.getenv("CLICOLOR_FORCE") then
+        return true
+    end
+    -- Use platform detection for better Windows support
+    local ok, platform = pcall(require, "lumos.platform")
+    if ok and platform and platform.supports_colors then
+        return platform.supports_colors()
+    end
+    -- Fallback for non-Windows terminals
     local term = os.getenv("TERM")
     if term and (term:match("color") or term:match("xterm")) then
         return true
     end
-    
     return false
 end
 

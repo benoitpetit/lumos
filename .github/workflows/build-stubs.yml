@@ -1,0 +1,95 @@
+name: Build Stubs
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - 'runtime/stub.c'
+      - 'scripts/build-stubs.sh'
+      - '.github/workflows/build-stubs.yml'
+  pull_request:
+    paths:
+      - 'runtime/stub.c'
+      - 'scripts/build-stubs.sh'
+      - '.github/workflows/build-stubs.yml'
+  workflow_dispatch:
+
+jobs:
+  build-linux-windows:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-mingw-w64-x86-64 binutils-mingw-w64-x86-64 liblua5.3-dev
+
+      - name: Build Linux stub
+        run: |
+          gcc -static -O2 runtime/stub.c -o runtime/lumos-stub-linux-x86_64 \
+              /usr/lib/x86_64-linux-gnu/liblua5.3.a -lm -I/usr/include/lua5.3
+
+      - name: Build Windows stub
+        run: |
+          bash scripts/build-stubs.sh windows
+
+      - name: Upload Linux/Windows stubs
+        uses: actions/upload-artifact@v4
+        with:
+          name: stubs-linux-windows
+          path: runtime/lumos-stub-*
+
+  build-macos:
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        arch: [x86_64, arm64]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Lua
+        run: |
+          brew install lua@5.3
+
+      - name: Build macOS stub (${{ matrix.arch }})
+        run: |
+          LUA_PREFIX=$(brew --prefix lua@5.3)
+          LUA_INC="$LUA_PREFIX/include/lua5.3"
+          # Prefer static lib if available
+          if [ -f "$LUA_PREFIX/lib/liblua5.3.a" ]; then
+            LUA_LIB="$LUA_PREFIX/lib/liblua5.3.a"
+          elif [ -f "$LUA_PREFIX/lib/liblua.a" ]; then
+            LUA_LIB="$LUA_PREFIX/lib/liblua.a"
+          else
+            LUA_LIB="$LUA_PREFIX/lib/liblua.5.3.dylib"
+          fi
+          if [ "${{ matrix.arch }}" = "arm64" ]; then
+            cc -O2 -arch arm64 runtime/stub.c -o runtime/lumos-stub-darwin-aarch64 "$LUA_LIB" -I"$LUA_INC"
+          else
+            cc -O2 -arch x86_64 runtime/stub.c -o runtime/lumos-stub-darwin-x86_64 "$LUA_LIB" -I"$LUA_INC"
+          fi
+
+      - name: Upload macOS stub
+        uses: actions/upload-artifact@v4
+        with:
+          name: stub-darwin-${{ matrix.arch }}
+          path: runtime/lumos-stub-darwin-*
+
+  collect-stubs:
+    needs: [build-linux-windows, build-macos]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Show stubs
+        run: |
+          mkdir -p runtime
+          cp artifacts/lumos-stub-* runtime/ || true
+          ls -la runtime/lumos-stub-*

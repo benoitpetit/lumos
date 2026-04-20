@@ -206,6 +206,34 @@ function tbl.create(data, options)
         end
     end
     
+    -- Auto-fit to terminal width
+    if options.fit_terminal ~= false then
+        local term_width = get_terminal_width()
+        local total_width = 1  -- left border
+        for i, w in ipairs(col_widths) do
+            total_width = total_width + w + 2 + (i < #col_widths and 1 or 0)
+        end
+        total_width = total_width + 1  -- right border
+        
+        if total_width > term_width and term_width > 20 then
+            local excess = total_width - term_width
+            local num_cols = #col_widths
+            -- Reduce widest columns first
+            while excess > 0 do
+                local max_i, max_w = 1, col_widths[1]
+                for i = 2, num_cols do
+                    if col_widths[i] > max_w then
+                        max_i, max_w = i, col_widths[i]
+                    end
+                end
+                if max_w <= 3 then break end
+                local reduction = math.min(excess, math.max(1, math.floor(max_w * 0.2)))
+                col_widths[max_i] = max_w - reduction
+                excess = excess - reduction
+            end
+        end
+    end
+    
     -- Format table
     local border_chars = options.border or {
         top_left = "┌", top_right = "┐", bottom_left = "└", bottom_right = "┘",

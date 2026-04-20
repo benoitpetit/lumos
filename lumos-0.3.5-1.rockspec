@@ -1,10 +1,10 @@
 rockspec_format = "3.0"
 package = "lumos"
-version = "0.3.4-1"
+version = "0.3.5-1"
 
 source = {
    url = "git+https://github.com/benoitpetit/lumos.git",
-   tag = "v0.3.4"
+   tag = "v0.3.5"
 }
 
 description = {
@@ -77,7 +77,7 @@ build = {
       ["lumos.help_renderer"] = "lumos/help_renderer.lua"
    },
    copy_directories = {
-      "stubs"
+      "runtime"
    },
    install = {
       bin = {

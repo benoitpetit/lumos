@@ -1,8 +1,8 @@
-# 🔒 Lumos Security Guide
+#  Lumos Security Guide
 
 Security guide and best practices for using Lumos in production.
 
-## 📋 Table of Contents
+## Table of Contents
 
 - [Overview](#overview)
 - [Security Features](#security-features)
@@ -12,7 +12,7 @@ Security guide and best practices for using Lumos in production.
 - [Audit and Monitoring](#audit-and-monitoring)
 - [Deployment Checklist](#deployment-checklist)
 
-## 🎯 Overview
+## Overview
 
 Lumos includes robust security features to protect your CLI applications against common vulnerabilities.
 
@@ -21,7 +21,7 @@ Lumos includes robust security features to protect your CLI applications against
 - **`lumos.security`** - Input sanitization, validation, and safe operations
 - **`lumos.logger`** - Structured logging for audit trails
 
-## 🆕 Security Features
+## Security Features
 
 ### security.lua Module
 
@@ -121,11 +121,11 @@ logger.auto("Debug trace here")          -- Logs as DEBUG
 logger.auto("Server started")            -- Logs as INFO
 ```
 
-## 🛡️ Best Practices
+## Best Practices
 
 ### 1. User Input Validation
 
-**❌ BAD:**
+**BAD:**
 ```lua
 local cmd = app:command("delete", "Delete file")
 cmd:arg("file", "File to delete")
@@ -134,7 +134,7 @@ cmd:action(function(ctx)
 end)
 ```
 
-**✅ GOOD:**
+**GOOD:**
 ```lua
 local security = require('lumos.security')
 local logger = require('lumos.logger')
@@ -164,14 +164,14 @@ end)
 
 ### 2. Secure File Handling
 
-**❌ BAD:**
+**BAD:**
 ```lua
 local file = io.open(user_provided_path, "w")
 file:write(data)
 file:close()
 ```
 
-**✅ GOOD:**
+**GOOD:**
 ```lua
 local security = require('lumos.security')
 local logger = require('lumos.logger')
@@ -227,7 +227,7 @@ if security.is_elevated() then
         uid = security.is_elevated() and 0 or nil
     })
     
-    print("⚠️  Warning: Running as root/administrator")
+    print("  Warning: Running as root/administrator")
     print("This is not recommended for this command.")
     
     -- Ask for confirmation
@@ -238,7 +238,7 @@ if security.is_elevated() then
 end
 ```
 
-## 🔐 Protection Against Vulnerabilities
+## Protection Against Vulnerabilities
 
 ### Shell Command Injection
 
@@ -320,7 +320,7 @@ cmd:action(function(ctx)
 end)
 ```
 
-## ⚙️ Secure Configuration
+## Secure Configuration
 
 ### Environment Variables
 
@@ -377,7 +377,7 @@ end
 logger.info("Configuration loaded", {path = validated_path})
 ```
 
-## 📊 Audit and Monitoring
+## Audit and Monitoring
 
 ### Logging Security Events
 
@@ -422,7 +422,7 @@ Logs are formatted as:
 
 Easily parseable with tools like `jq`, `grep`, or centralized logging systems (ELK, Splunk, etc.).
 
-## ✅ Deployment Checklist
+## Deployment Checklist
 
 ### Before Deploying to Production
 
@@ -446,7 +446,7 @@ Easily parseable with tools like `jq`, `grep`, or centralized logging systems (E
 - [ ] Intrusion attempts are detected
 - [ ] Security updates are applied promptly
 
-## 🚨 In Case of Security Incident
+## In Case of Security Incident
 
 1. **Isolate**: Stop the application if necessary
 2. **Analyze**: Examine logs with `logger`
@@ -471,13 +471,13 @@ grep "Rate limit exceeded" /var/log/myapp.log
 grep "Access denied" /var/log/myapp.log
 ```
 
-## 📚 Additional Resources
+## Additional Resources
 
 - [OWASP Top 10](https://owasp.org/www-project-top-ten/)
 - [CWE - Common Weakness Enumeration](https://cwe.mitre.org/)
 - [Lua Security Considerations](https://www.lua.org/pil/8.1.html)
 
-## 🔄 Updates
+## Updates
 
 This security guide is updated regularly. Review it before each major deployment.
 
@@ -485,4 +485,4 @@ This security guide is updated regularly. Review it before each major deployment
 
 **Guide Version:** 1.0  
 **Last Updated:** April 2026  
-**Lumos Framework:** v0.3.4+
+**Lumos Framework:** v0.3.5+

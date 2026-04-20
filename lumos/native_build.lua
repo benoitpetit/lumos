@@ -13,6 +13,23 @@ local lfs = require("lfs")
 local PATH_SEP = _G.package.config:sub(1, 1)
 local IS_WINDOWS = PATH_SEP == "\\"
 
+-- Locate the runtime directory relative to this module (for cross-compiled libs)
+local function get_runtime_dir()
+    local source = debug.getinfo(1, "S").source
+    if source:sub(1, 1) == "@" then
+        local path = source:sub(2)
+        local dir = path:match("^(.+)[/\\]native_build%.lua$")
+        if dir then
+            -- native_build.lua is inside lumos/, runtime is at project root
+            local dev_root = dir:match("^(.+)[/\\]lumos$")
+            if dev_root then
+                return dev_root .. PATH_SEP .. "runtime"
+            end
+        end
+    end
+    return nil
+end
+
 local BUILD_CACHE_DIR = ".lumos" .. PATH_SEP .. "cache"
 
 local function ensure_build_cache_dir()
@@ -49,6 +66,24 @@ end
 
 
 
+-- Cross-platform command lookup (which / where)
+local function find_command(name)
+    if IS_WINDOWS then
+        local out, _, code = shell_exec("where " .. security.shell_escape(name) .. " 2>nul")
+        if code == 0 then
+            local path = out:gsub("%s+$", "")
+            if path ~= "" then return path end
+        end
+    else
+        local out, _, code = shell_exec("which " .. security.shell_escape(name) .. " 2>/dev/null")
+        if code == 0 then
+            local path = out:gsub("%s+$", "")
+            if path ~= "" then return path end
+        end
+    end
+    return nil
+end
+
 -- Preferred compiler candidates
 local COMPILER_CANDIDATES = {
     "cc", "gcc", "clang", "musl-gcc", "x86_64-w64-mingw32-gcc"
@@ -63,19 +98,11 @@ local LUAC_CANDIDATES = {
 -- @return string|nil compiler path
 function native_build.detect_compiler(preferred)
     if preferred then
-        local out, _, code = shell_exec("which " .. security.shell_escape(preferred) .. " 2>/dev/null")
-        if code == 0 then
-            local path = out:gsub("%s+$", "")
-            if path ~= "" then return path end
-        end
-        return nil
+        return find_command(preferred)
     end
     for _, name in ipairs(COMPILER_CANDIDATES) do
-        local out, _, code = shell_exec("which " .. security.shell_escape(name) .. " 2>/dev/null")
-        if code == 0 then
-            local path = out:gsub("%s+$", "")
-            if path ~= "" then return path end
-        end
+        local path = find_command(name)
+        if path then return path end
     end
     return nil
 end
@@ -105,17 +132,14 @@ function native_build.detect_luac(preferred)
     end
 
     for _, name in ipairs(candidates) do
-        local out, _, code = shell_exec("which " .. security.shell_escape(name) .. " 2>/dev/null")
-        if code == 0 then
-            local path = out:gsub("%s+$", "")
-            if path ~= "" then
-                -- Verify version match
-                local vout, _, vcode = shell_exec(security.shell_escape(path) .. " -v 2>&1")
-                if vcode == 0 then
-                    local luac_ver = vout:match("(%d+%.%d+)")
-                    if luac_ver == target_ver then
-                        return path
-                    end
+        local path = find_command(name)
+        if path then
+            -- Verify version match
+            local vout, _, vcode = shell_exec(security.shell_escape(path) .. " -v 2>&1")
+            if vcode == 0 then
+                local luac_ver = vout:match("(%d+%.%d+)")
+                if luac_ver == target_ver then
+                    return path
                 end
             end
         end
@@ -173,7 +197,17 @@ end
 -- @return table|nil toolchain { compiler, cflags, ldflags, liblua_path, lua_include_dir, static }
 function native_build.detect_toolchain(options)
     options = options or {}
-    local compiler = native_build.detect_compiler(options.cc)
+    local target = options.target
+    local preferred_compiler = options.cc
+
+    -- Target-aware compiler selection
+    if target and not preferred_compiler then
+        if target:match("^windows") then
+            preferred_compiler = "x86_64-w64-mingw32-gcc"
+        end
+    end
+
+    local compiler = native_build.detect_compiler(preferred_compiler)
     if not compiler then
         return nil, "No C compiler found. Please install gcc, clang, or musl-gcc."
     end
@@ -226,10 +260,24 @@ function native_build.detect_toolchain(options)
             "/usr/local/lib",
             "/opt/homebrew/lib",
         }
+        -- Add MinGW sysroot paths when cross-compiling for Windows
+        if compiler:find("mingw") then
+            table.insert(common, "/usr/x86_64-w64-mingw32/lib")
+            table.insert(common, "/usr/i686-w64-mingw32/lib")
+        end
         for _, p in ipairs(common) do table.insert(search_paths, p) end
 
         local env_lib = os.getenv("LUA_LIB") or os.getenv("LUA_LIBDIR")
         if env_lib then table.insert(search_paths, 1, env_lib) end
+
+        -- Add bundled cross-compiled libraries from runtime/lib/<target>
+        local runtime_dir = get_runtime_dir()
+        if runtime_dir and target then
+            local cross_lib_dir = runtime_dir .. PATH_SEP .. "lib" .. PATH_SEP .. target
+            if fs.path_exists(cross_lib_dir) then
+                table.insert(search_paths, 1, cross_lib_dir)
+            end
+        end
 
         local candidates = {}
         if is_luajit() then
@@ -278,6 +326,18 @@ function native_build.detect_toolchain(options)
                 "/usr/include/lua" .. major,
                 "/usr/include",
             }
+            if compiler:find("mingw") then
+                table.insert(inc_candidates, "/usr/x86_64-w64-mingw32/include")
+                table.insert(inc_candidates, "/usr/i686-w64-mingw32/include")
+            end
+            -- Add bundled cross-compiled headers from runtime/lib/<target>/include
+            local runtime_dir = get_runtime_dir()
+            if runtime_dir and target then
+                local cross_inc_dir = runtime_dir .. PATH_SEP .. "lib" .. PATH_SEP .. target .. PATH_SEP .. "include"
+                if fs.path_exists(cross_inc_dir) then
+                    table.insert(inc_candidates, 1, cross_inc_dir)
+                end
+            end
         end
         local env_inc = os.getenv("LUA_INCDIR")
         if env_inc then table.insert(inc_candidates, 1, env_inc) end
@@ -330,6 +390,11 @@ function native_build.find_static_native_module(name)
         "/usr/local/lib",
         "/opt/homebrew/lib",
     }
+    -- Add MinGW sysroot paths for cross-compilation
+    if IS_WINDOWS or (package.config:sub(1,1) == "/" and find_command("x86_64-w64-mingw32-gcc")) then
+        table.insert(common, "/usr/x86_64-w64-mingw32/lib")
+        table.insert(common, "/usr/i686-w64-mingw32/lib")
+    end
     for _, p in ipairs(common) do table.insert(search_paths, p) end
 
     local candidates = {
@@ -338,7 +403,7 @@ function native_build.find_static_native_module(name)
     }
     for _, dir in ipairs(search_paths) do
         for _, cand in ipairs(candidates) do
-            local p = dir .. "/" .. cand
+            local p = dir .. PATH_SEP .. cand
             if fs.path_exists(p) then return p end
         end
     end
@@ -684,6 +749,8 @@ function native_build.create(options)
         return false, terr
     end
 
+    local target = options.target or (IS_WINDOWS and "windows-x86_64" or "linux-x86_64")
+
     -- Step 4: Determine output path (before writing any temp file so failures are cheap)
     local output_path = options.output
     local entry_file = options.entry
@@ -704,7 +771,8 @@ function native_build.create(options)
     end
 
     -- Append .exe on Windows targets if missing
-    if IS_WINDOWS and not output_path:match("%.exe$") then
+    local is_windows_target = (options.target and options.target:match("^windows")) or (not options.target and IS_WINDOWS)
+    if is_windows_target and not output_path:match("%.exe$") then
         output_path = output_path .. ".exe"
     end
 
@@ -712,10 +780,12 @@ function native_build.create(options)
     local native_modules = detect_native_modules(lua_code)
     local native_module_paths = {}
     local missing_native = {}
+    local linked_native_modules = {}
     for _, mod in ipairs(native_modules) do
         local path = native_build.find_static_native_module(mod)
         if path then
             table.insert(native_module_paths, path)
+            table.insert(linked_native_modules, mod)
         else
             table.insert(missing_native, mod)
         end
@@ -723,7 +793,7 @@ function native_build.create(options)
 
     -- Step 6: Generate C wrapper
     local main_c = native_build.generate_c_wrapper(payload, {
-        native_modules = native_modules,
+        native_modules = linked_native_modules,
     })
 
     local main_c_path = random_tmp_name(".c")

@@ -15,6 +15,7 @@ Creates a new CLI application.
   - `description` (string): Description (optional)
   - `config_file` (string): Path to a configuration file auto-loaded at run time (optional)
   - `env_prefix` (string): Prefix for environment variables auto-loaded at run time (optional)
+  - `no_args_is_help` (boolean): If true, shows help instead of error when a command with subcommands receives no arguments (optional, default: false)
 
 **Returns:** Application instance
 
@@ -214,6 +215,14 @@ cmd:persistent_pre_run(function(ctx)
 end)
 ```
 
+### `cmd:hidden(value)`
+
+Hides the command from help output. Hidden commands are only visible when `LUMOS_DEBUG=1` is set.
+
+```lua
+cmd:hidden(true)
+```
+
 ## Typed Flags
 
 ### `cmd:flag_int(spec, description, min, max)`
@@ -238,7 +247,7 @@ Email flag with validation.
 
 ```lua
 cmd:flag_email("--email", "Email address")
-cmd:flag_email("--contact", "Contact email", { pattern = "^[A-Z0-9._%%+-]+@[A-Z0-9.-]+%.[A-Z]$" })
+cmd:flag_email("--contact", "Contact email", { pattern = "^[A-Za-z0-9._%%+-]+@[A-Za-z0-9.-]+%.[A-Za-z]+$" })
 ```
 
 ### `cmd:flag_float(spec, description, options)`
@@ -288,11 +297,30 @@ cmd:flag_url("--endpoint", "API endpoint", { schemes = {"https"}, require_path =
 
 Defines mutually exclusive flags. If `options.required` is true, at least one must be provided.
 
+Flags must be defined before calling `mutex_group`, and passed as a list of their long names.
+
 ```lua
-cmd:mutex_group("input", {
-    cmd:flag_string("-f --file", "Input file"),
-    cmd:flag_string("-u --url", "Input URL")
-}, { required = true })
+cmd:flag_string("-f --file", "Input file")
+cmd:flag_string("-u --url", "Input URL")
+cmd:mutex_group("input", {"file", "url"}, { required = true })
+```
+
+### `cmd:deprecated(message)`
+
+Marks the most recently added flag as deprecated. A warning is printed when the flag is used.
+
+```lua
+cmd:flag("--legacy-mode", "Old behavior")
+    :deprecated("Use --modern-mode instead")
+```
+
+### `cmd:hidden_flag(value)`
+
+Hides the most recently added flag from help output.
+
+```lua
+cmd:flag("--internal", "Internal use only")
+    :hidden_flag(true)
 ```
 
 ### `cmd:use(middleware_fn, priority)`
@@ -320,7 +348,7 @@ Both `app` and `Command` support persistent variants of all typed flags. Persist
 
 ### `app:persistent_flag_int(spec, description, min, max)` / `cmd:persistent_flag_int(spec, description, min, max)`
 
-### `app:persistent_flag_email(spec, description, options)` / `cmd:persistent_flag_email(spec, description, options)`
+### `app:persistent_flag_email(spec, description)` / `cmd:persistent_flag_email(spec, description)`
 
 ### `app:persistent_flag_url(spec, description, options)` / `cmd:persistent_flag_url(spec, description, options)`
 
@@ -837,6 +865,24 @@ local cfg, err = config.load_validated("config.json", {
 })
 ```
 
+### `config.parse_toml(content)`
+
+Parses a TOML-formatted string into a Lua table. Supports basic tables, strings, numbers, booleans, and arrays.
+
+```lua
+local toml = [[
+host = "localhost"
+port = 8080
+enable = true
+
+tags = ["dev", "ops"]
+]]
+local cfg = config.parse_toml(toml)
+-- cfg.host == "localhost", cfg.port == 8080, cfg.tags == {"dev", "ops"}
+```
+
+TOML files (`.toml` extension) are automatically parsed by `config.load_file`.
+
 ## Security Module (`lumos.security`)
 
 ### Input Sanitization
@@ -1088,10 +1134,13 @@ The action function receives a context object:
 
 ```lua
 {
-    args = {...},      -- Positional arguments array
-    flags = {...},     -- Flag values table
-    command = cmd,     -- Command reference
-    parent = cmd       -- Parent command reference (for subcommands)
+    args = {...},       -- Positional arguments array
+    flags = {...},      -- Flag values table
+    command = cmd,      -- Command reference
+    parent = cmd,       -- Parent command reference (only for subcommands)
+    config = {...},     -- Loaded config file content (if config_file was set)
+    env = {...},        -- Loaded environment variables (if env_prefix was set)
+    output_format = "table" | "json" | "yaml"  -- Output format flag value
 }
 ```
 
@@ -1108,6 +1157,27 @@ Lumos supports several flag types:
 - `email`: Email addresses with validation
 - `path`: File system paths with existence and type validation
 - `url`: URLs with scheme and host validation
+
+## POSIX Compliance
+
+Lumos supports standard POSIX shell conventions:
+
+### Combined Short Flags
+
+Boolean short flags can be combined:
+
+```bash
+myapp deploy -fvt production
+# Equivalent to: myapp deploy -f -v -t production
+```
+
+### End-of-Options Delimiter
+
+Everything after `--` is treated as a positional argument, even if it looks like a flag:
+
+```bash
+myapp rm -- -file-starting-with-dash
+```
 
 ## Persistent Flags
 
@@ -1131,6 +1201,8 @@ app:use(lumos.middleware.builtin.dry_run())
 app:use(lumos.middleware.builtin.auth({ env_var = "API_KEY" }))
 app:use(lumos.middleware.builtin.confirm({ message = "Continue?", default = false }))
 app:use(lumos.middleware.builtin.rate_limit({ max_requests = 100, window_seconds = 60 }))
+app:use(lumos.middleware.builtin.retry({ max_attempts = 3, backoff = "exponential", base_delay = 1 }))
+app:use(lumos.middleware.builtin.verbosity())  -- Maps -v / -vv / -vvv to log levels
 
 -- Custom middleware
 app:use(function(ctx, next)
@@ -1190,6 +1262,7 @@ profiler.start("task_name")
 -- ... code ...
 profiler.stop("task_name")
 profiler.report()
+profiler.disable()
 
 -- Or wrap a function
 local fn = profiler.wrap("my_fn", function(a, b) return a + b end)

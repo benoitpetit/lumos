@@ -13,7 +13,16 @@ local function get_mtime(path)
         if attr then return attr end
     end
     -- Fallback for POSIX systems without lfs
-    local handle = io.popen("stat -c %Y " .. path .. " 2>/dev/null")
+    local IS_WINDOWS = package.config:sub(1, 1) == "\\"
+    local cmd
+    if IS_WINDOWS then
+        -- No reliable built-in stat; try PowerShell as last resort
+        cmd = "powershell -NoProfile -Command \"(Get-Item '" .. path:gsub("'", "''") .. "').LastWriteTimeUtc.ToUnixTimeSeconds()\" 2>nul"
+    else
+        -- Try BSD stat first (macOS), then GNU stat (Linux)
+        cmd = "stat -f %m " .. path .. " 2>/dev/null || stat -c %Y " .. path .. " 2>/dev/null"
+    end
+    local handle = io.popen(cmd)
     if handle then
         local mtime = handle:read("*n")
         handle:close()

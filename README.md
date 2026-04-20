@@ -10,9 +10,9 @@
 </p>
 
 <p align="center">
-    <a href="docs/qs.md">Quick Start</a> •
-    <a href="docs/api.md">API Docs</a> •
-    <a href="docs/use.md">Examples</a> •
+    <a href="docs/qs.md">Quick Start</a> &bull;
+    <a href="docs/api.md">API Docs</a> &bull;
+    <a href="docs/use.md">Examples</a> &bull;
     <a href="#installation">Install</a>
 </p>
 
@@ -24,11 +24,13 @@
 
 - **Project Generator** - `lumos new` creates complete CLI projects in seconds
 - **Intuitive API** - Fluent, chainable methods for defining commands and flags
-- **Rich UI Components** - Colors, progress bars, prompts, and tables out of the box
-- **Middleware Chain** - Express-like middleware with auth, dry-run, rate-limiting, and more
+- **POSIX Compliance** - Supports `--` end-of-options and `-abc` combined short flags
+- **Rich UI Components** - Colors, progress bars, prompts, tables out of the box
+- **Middleware Chain** - Express-like middleware with auth, dry-run, retry, rate-limiting, and more
 - **Advanced Flags** - int, float, array, enum, path, url, email with built-in validation
+- **Hidden & Deprecated Flags** - Evolve your CLI without breaking users
 - **Shell Integration** - Auto-completion, man pages, and documentation generation
-- **Configuration Management** - JSON and key=value files, environment variables, built-in cache
+- **Configuration Management** - JSON, TOML, and key=value files, environment variables, built-in cache
 - **Test-Ready** - Generated projects include a Busted configuration and a starter test file
 - **Minimal Dependencies** - Only requires `luafilesystem`, modular architecture
 - **Cross-Platform** - Linux, macOS, and native Windows with automatic detection
@@ -94,8 +96,14 @@ lumos bundle src/main.lua -o dist/myapp
 # Zero dependencies: standalone package using a precompiled stub
 lumos package src/main.lua -o dist/myapp
 
+# Target a different OS (e.g. Windows from Linux)
+lumos package src/main.lua -o dist/myapp -t windows-x86_64
+
 # Maximum control: native binary with embedded Lua VM
 lumos build src/main.lua -o dist/myapp
+
+# Cross-compile to Windows from Linux
+lumos build src/main.lua -o dist/myapp -t windows-x86_64
 
 ./dist/myapp --help
 ```
@@ -108,7 +116,7 @@ local color = require('lumos.color')
 
 local app = lumos.new_app({
     name = "my-awesome-cli",
-    version = "0.3.4",
+    version = "0.3.5",
     description = "My awesome CLI application"
 })
 
@@ -166,7 +174,7 @@ luarocks make --local lumos-dev-1.rockspec
 ### Verify Installation
 ```bash
 lumos version
-# Should output: Lumos CLI Framework v0.3.4
+# Should output: Lumos CLI Framework v0.3.5
 ```
 
 ## Key Features
@@ -185,17 +193,38 @@ cmd:flag_int("-p --port", "Port number", 1, 65535)
 cmd:flag_float("-r --rate", "Rate", { min = 0.0, max = 1.0, precision = 2 })
 cmd:flag_array("-t --tags", "Tags", { separator = ",", unique = true })
 cmd:flag_enum("-l --level", "Log level", {"debug", "info", "warn", "error"})
-cmd:flag_path("-c --config", "Config file", { must_exist = true, extensions = {".json"} })
+cmd:flag_path("-c --config", "Config file", { must_exist = true, extensions = {".json", ".toml"} })
 cmd:flag_url("--endpoint", "API endpoint", { schemes = {"https"} })
 cmd:flag_email("--notify", "Notification email")
 ```
 
+### Combined Short Flags (POSIX)
+```bash
+myapp deploy -fvt production
+# Equivalent to: myapp deploy -f -v -t production
+```
+
+### End-of-Options Delimiter
+```bash
+myapp rm -- -file-starting-with-dash
+# Treats -file-starting-with-dash as a positional argument, not a flag
+```
+
 ### Mutually Exclusive Flags
 ```lua
-cmd:mutex_group("input", {
-    cmd:flag_string("-f --file", "Input file"),
-    cmd:flag_string("-u --url", "Input URL")
-}, { required = true })
+cmd:flag_string("-f --file", "Input file")
+cmd:flag_string("-u --url", "Input URL")
+cmd:mutex_group("input", {"file", "url"}, { required = true })
+```
+
+### Hidden & Deprecated Flags
+```lua
+-- Hide a command from help (visible only with LUMOS_DEBUG=1)
+cmd:hidden(true)
+
+-- Mark a flag as deprecated
+cmd:flag("--legacy-mode", "Old mode")
+    :deprecated("Use --modern-mode instead")
 ```
 
 ### Typed Errors
@@ -215,11 +244,13 @@ end)
 ```lua
 app:use(lumos.middleware.builtin.logger())
 app:use(lumos.middleware.builtin.dry_run())
+app:use(lumos.middleware.builtin.verbosity())  -- Standard -v / -vv / -vvv
 
 app:command("deploy", "Deploy")
     :use(lumos.middleware.builtin.auth({ env_var = "API_KEY" }))
     :use(lumos.middleware.builtin.confirm({ message = "Deploy to production?" }))
     :use(lumos.middleware.builtin.rate_limit({ max_requests = 10, window_seconds = 60 }))
+    :use(lumos.middleware.builtin.retry({ max_attempts = 3, backoff = "exponential" }))
     :action(function(ctx) ... end)
 ```
 
@@ -251,9 +282,10 @@ platform.is_piped()           -- boolean (auto-disables colors)
 local config = require('lumos.config')
 local core = require('lumos.core')
 
+-- Supports JSON, TOML, and key=value files
 local settings = config.merge_configs(
     {timeout = 30},                   -- defaults
-    core.load_config("config.json"),  -- file (JSON or key=value)
+    core.load_config("config.toml"),  -- file (JSON, TOML, or key=value)
     config.load_env("MYAPP"),         -- environment variables
     ctx.flags                         -- command line
 )
@@ -330,9 +362,16 @@ local result = prompt.wizard("Setup", {
 })
 ```
 
+### Output Format Control
+```bash
+# Get structured JSON output
+myapp info --format=json
+# or
+myapp info --json
+```
+
 ### Plugins & Hooks
 ```lua
--- Register a plugin globally
 -- Register a plugin globally on the app
 lumos.use(app, function(app, opts)
     app:flag("--dry-run", "Simulate without side effects")
@@ -357,6 +396,14 @@ app:command("migrate", "Run migrations")
 app:persistent_pre_run(function(ctx)
     logger.info("Starting command", {cmd = ctx.command.name})
 end)
+```
+
+### No-Args-Is-Help
+```lua
+local app = lumos.new_app({
+    name = "myapp",
+    no_args_is_help = true  -- Shows help instead of error when no subcommand given
+})
 ```
 
 ## Documentation
@@ -397,11 +444,11 @@ make install && make test
 
 ## Project Status
 
-- **Version:** 0.3.4
+- **Version:** 0.3.5
 - **License:** MIT
 - **Lua Versions:** 5.1, 5.2, 5.3, 5.4, LuaJIT
 - **Platforms:** Linux, macOS, Windows (native)
-- **Tests:** 411 passing tests
+- **Tests:** 434 passing tests
 - **Dependencies:** luafilesystem
 
 ## Acknowledgments

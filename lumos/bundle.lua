@@ -133,6 +133,10 @@ local function extract_requires(code)
     for module in code:gmatch("require%s*%(?%s*['\"]([^'\"]+)['\"]%s*%)?") do
         requires[module] = true
     end
+    -- Match pcall(require, 'module') and similar patterns
+    for module in code:gmatch("require%s*,%s*['\"]([^'\"]+)['\"]") do
+        requires[module] = true
+    end
 
     return requires
 end

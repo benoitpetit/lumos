@@ -54,6 +54,23 @@ examples:
 # Build placeholder (delegates to install-prod)
 build: install-prod
 
+# Build precompiled runtime stubs for lumos package
+runtime-stubs:
+	@echo "Building runtime stubs..."
+	@bash scripts/build-stubs.sh all
+
+build-stub-linux:
+	@echo "Building Linux runtime stub..."
+	@bash scripts/build-stubs.sh linux
+
+build-stub-windows:
+	@echo "Building Windows runtime stub..."
+	@bash scripts/build-stubs.sh windows
+
+build-stub-macos:
+	@echo "macOS runtime stubs must be built on a Mac or via CI."
+	@bash scripts/build-stubs.sh macos
+
 # Clean build artifacts
 clean:
 	@echo "Cleaning build artifacts..."
