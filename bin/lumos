@@ -118,18 +118,39 @@ local function get_main_template(name, description)
     return [[#!/usr/bin/env lua
 -- Main entry point for your CLI application
 
+-- Configure LuaRocks paths automatically
+local PATH_SEP = package.config:sub(1, 1)
+local function setup_luarocks_paths()
+    local home = os.getenv("HOME") or os.getenv("USERPROFILE")
+    if home then
+        local version = _VERSION:match("%d+%.%d+") or "5.1"
+        local lua_path = home .. PATH_SEP .. ".luarocks" .. PATH_SEP .. "share" .. PATH_SEP .. "lua" .. PATH_SEP .. version .. PATH_SEP .. "?.lua"
+        local lua_init = home .. PATH_SEP .. ".luarocks" .. PATH_SEP .. "share" .. PATH_SEP .. "lua" .. PATH_SEP .. version .. PATH_SEP .. "?" .. PATH_SEP .. "init.lua"
+        local ext = (PATH_SEP == "\\") and ".dll" or ".so"
+        local lua_clib = home .. PATH_SEP .. ".luarocks" .. PATH_SEP .. "lib" .. PATH_SEP .. "lua" .. PATH_SEP .. version .. PATH_SEP .. "?" .. ext
+
+        if not package.path:find(lua_path, 1, true) then
+            package.path = lua_path .. ";" .. lua_init .. ";" .. package.path
+        end
+        if not package.cpath:find(lua_clib, 1, true) then
+            package.cpath = lua_clib .. ";" .. package.cpath
+        end
+    end
+end
+setup_luarocks_paths()
+
 -- Configure module path to find app.lua in src directory
 local script_dir = debug.getinfo(1, 'S').source:match("^@(.+[/\\])")
 if script_dir then
-    package.path = script_dir .. "?.lua;" .. script_dir .. "?/init.lua;" .. package.path
+    package.path = script_dir .. "?.lua;" .. script_dir .. "?/init.lua;" .. script_dir .. "../../?.lua;" .. script_dir .. "../../?/init.lua;" .. package.path
 end
 
 -- Load the application module
 local ok, app = pcall(require, 'app')
 if not ok then
-    print("Error: module 'app' not found. Ensure you're running from the correct directory.")
-    local lfs = require('lfs')
-    print("Current directory: " .. (lfs and lfs.currentdir() or "."))
+    io.stderr:write("Error: module 'app' not found or failed to load.\n")
+    io.stderr:write("Details: " .. tostring(app) .. "\n")
+    io.stderr:write("Current directory: " .. (os.getenv("PWD") or ".") .. "\n")
     os.exit(1)
 end
 
@@ -152,13 +173,12 @@ function M.run(args)
     -- Create the main application
     local app = lumos.new_app({
         name = "%s",
-        version = lumos.version,
+        version = "__APP_VERSION__",
         description = "%s"
     })
 
     -- Add global flags
     app:flag("-v --verbose", "Enable verbose output")
-    app:flag("--version", "Show version information")
 
     -- Define the greet command (example)
     local greet = app:command("greet", "Greet someone politely")
@@ -188,19 +208,12 @@ function M.run(args)
         return true
     end)
     
-    -- Add version handling
-    if args and #args > 0 and args[1] == "--version" then
-        print("%s v" .. lumos.version)
-        print("Built with Lumos CLI Framework")
-        return
-    end
-
     -- Run the application
     return app:run(args)
 end
 
 return M
-]], name, name, description, name)
+]], name, name, description)
 end
 local function get_test_template(name)
     return [[-- Basic test for app
@@ -229,6 +242,7 @@ This project was generated with `lumos new`.
 - `Makefile` : Build automation
 - `.busted` : Busted test configuration
 - `.gitignore` : Git ignore patterns
+- `%s-dev-1.rockspec` : LuaRocks package specification
 
 ## Getting Started
 
@@ -256,6 +270,47 @@ busted tests/
 lua src/main.lua --help
 ```
 
+## Build & Distribution
+
+This project supports multiple build modes via Lumos. By default, builds target your **host platform only**. Use `make dist-all` to build for every supported platform.
+
+### Host platform (default)
+```bash
+make bundle     # Portable Lua script
+make package    # Standalone executable
+make build      # Native binary
+```
+
+### Specific platforms
+```bash
+# Package
+make package-linux          # Linux x86_64
+make package-linux-aarch64  # Linux ARM64
+make package-windows        # Windows x86_64
+make package-macos-x64      # macOS Intel
+make package-macos-arm64    # macOS Apple Silicon
+
+# Native build (requires C toolchain)
+make build-linux            # Linux x86_64
+make build-linux-aarch64    # Linux ARM64
+make build-windows          # Windows x86_64
+```
+
+### Versioning
+All output files include the version automatically:
+```bash
+make package VERSION=1.2.3
+# → dist/%%s-1.2.3
+
+make dist VERSION=1.2.3
+# → dist/%%s-1.2.3-bundle.lua, dist/%s-1.2.3, dist/%s-1.2.3-native
+```
+
+### Build everything
+```bash
+make dist-all VERSION=1.2.3
+```
+
 ## Key Features
 
 - Command aliases and subcommands
@@ -270,7 +325,38 @@ To contribute to this project, please refer to the [Lumos documentation](https:/
 ## License
 
 MIT License
-]], name)
+]], name, name, name, name, name)
+end
+
+local function get_rockspec_template(name, description)
+    return string.format([=[package = "%s"
+version = "dev-1"
+source = {
+    url = "git+https://github.com/YOUR_USERNAME/%s.git"
+}
+description = {
+    summary = "%s",
+    detailed = [[%s]],
+    homepage = "https://github.com/YOUR_USERNAME/%s",
+    license = "MIT"
+}
+dependencies = {
+    "lua >= 5.1",
+    "lumos",
+    "luafilesystem"
+}
+build = {
+    type = "builtin",
+    modules = {
+        ["%s.app"] = "src/app.lua"
+    },
+    install = {
+        bin = {
+            ["%s"] = "src/main.lua"
+        }
+    }
+}
+]=], name, name, description, description, name, name, name)
 end
 
 -- Main CLI application
@@ -280,10 +366,9 @@ local app = lumos.new_app({
     description = "Lumos CLI framework and project generator"
 })
 
-app:command("new", "Create a new Lumos CLI project")
-    :action(function(ctx)
+local function run_new_project(ctx)
         print(color.cyan("Welcome to the Lumos CLI project generator!"))
-        local project_name = prompt.input("Project name", "myapp")
+        local project_name = ctx.args[1] or prompt.input("Project name", "myapp") or "myapp"
         
         -- Check if project directory already exists
         if lfs.attributes(project_name, "mode") == "directory" then
@@ -296,7 +381,7 @@ app:command("new", "Create a new Lumos CLI project")
             end
         end
         
-        local description = prompt.input("Project description", "A CLI app built with Lumos")
+        local description = prompt.input("Project description", "A CLI app built with Lumos") or "A CLI app built with Lumos"
         print(color.yellow("Creating project structure for " .. project_name .. " ..."))
         
         -- Create directories
@@ -306,21 +391,52 @@ app:command("new", "Create a new Lumos CLI project")
         
         -- Create files
         write_file(project_name .. "/src/main.lua", get_main_template(project_name, description))
-        write_file(project_name .. "/src/app.lua", get_module_template(project_name, description))
+        local app_lua = get_module_template(project_name, description)
+        app_lua = app_lua:gsub('"__APP_VERSION__"', '"0.1.0"')
+        write_file(project_name .. "/src/app.lua", app_lua)
         write_file(project_name .. "/tests/app_spec.lua", get_test_template(project_name))
         write_file(project_name .. "/README.md", get_readme_template(project_name))
+
+        -- Create rockspec
+        write_file(project_name .. "/" .. project_name .. "-dev-1.rockspec", get_rockspec_template(project_name, description))
         
         -- Create Makefile
         write_file(project_name .. "/Makefile", string.format([[# %s CLI Project Makefile
 # Generated by Lumos CLI Framework
 
+NAME    ?= %s
+VERSION ?= dev
+ENTRY   := src/main.lua
+DIST_DIR := dist
+
+# Host platform detection
+UNAME_S := $(shell uname -s)
+UNAME_M := $(shell uname -m)
+ifeq ($(UNAME_S),Linux)
+    HOST_TARGET := linux-x86_64
+    ifeq ($(UNAME_M),aarch64)
+        HOST_TARGET := linux-aarch64
+    endif
+endif
+ifeq ($(UNAME_S),Darwin)
+    HOST_TARGET := darwin-x86_64
+    ifeq ($(UNAME_M),arm64)
+        HOST_TARGET := darwin-aarch64
+    endif
+endif
+
+LUA ?= lua
+LUMOS ?= $(shell command -v lumos 2>/dev/null || echo $(HOME)/.luarocks/bin/lumos)
+
 # Check if Lumos is installed
 check-lumos:
-	@lua -e "require('lumos')" 2>/dev/null || { echo "Error: Lumos not found. Install with: luarocks install lumos"; exit 1; }
+	@luarocks show lumos >/dev/null 2>&1 || { echo "Error: Lumos not found. Run 'make install' first."; exit 1; }
 
 install: check-lumos
 	@echo "Installing development dependencies..."
-	@luarocks install busted --local || echo "Warning: Could not install busted. Install manually if needed."
+	@luarocks install --local luafilesystem || echo "Warning: could not install luafilesystem"
+	@luarocks install --local busted || echo "Warning: could not install busted"
+	@luarocks make --local $(NAME)-dev-1.rockspec || echo "Warning: could not install local rockspec"
 	@echo "✓ Dependencies installed"
 
 test: check-lumos
@@ -329,21 +445,79 @@ test: check-lumos
 
 run: check-lumos
 	@echo "Running application..."
-	@lua src/main.lua greet World
+	@lua $(ENTRY) greet World
 
 help: check-lumos
-	@lua src/main.lua --help
+	@lua $(ENTRY) --help
 
 dev: check-lumos
 	@echo "Development mode - running with example args:"
-	@lua src/main.lua --verbose greet "Developer"
+	@lua $(ENTRY) --verbose greet "Developer"
+
+# Build for the host platform (default)
+bundle: check-lumos ensure-dist
+	@echo "Bundling portable Lua script..."
+	@$(LUMOS) bundle $(ENTRY) -d . -o $(DIST_DIR)/$(NAME)-$(VERSION)-bundle.lua --app-version $(VERSION)
+
+package: check-lumos ensure-dist
+	@echo "Packaging for host ($(HOST_TARGET))..."
+	@$(LUMOS) package $(ENTRY) -d . -o $(DIST_DIR)/$(NAME)-$(VERSION) -t $(HOST_TARGET) --app-version $(VERSION)
+
+build: check-lumos ensure-dist
+	@echo "Building native binary for host ($(HOST_TARGET))..."
+	@$(LUMOS) build $(ENTRY) -d . -o $(DIST_DIR)/$(NAME)-$(VERSION)-native -t $(HOST_TARGET) --app-version $(VERSION)
+
+# Platform-specific packaging
+package-linux: check-lumos ensure-dist
+	@echo "Packaging Linux x86_64 executable..."
+	@$(LUMOS) package $(ENTRY) -d . -o $(DIST_DIR)/$(NAME)-$(VERSION)-linux-x86_64 -t linux-x86_64 --app-version $(VERSION)
+
+package-linux-aarch64: check-lumos ensure-dist
+	@echo "Packaging Linux aarch64 executable..."
+	@$(LUMOS) package $(ENTRY) -d . -o $(DIST_DIR)/$(NAME)-$(VERSION)-linux-aarch64 -t linux-aarch64 --app-version $(VERSION)
+
+package-windows: check-lumos ensure-dist
+	@echo "Packaging Windows executable..."
+	@$(LUMOS) package $(ENTRY) -d . -o $(DIST_DIR)/$(NAME)-$(VERSION)-win.exe -t windows-x86_64 --app-version $(VERSION)
+
+package-macos-x64: check-lumos ensure-dist
+	@echo "Packaging macOS x86_64 executable..."
+	@$(LUMOS) package $(ENTRY) -d . -o $(DIST_DIR)/$(NAME)-$(VERSION)-macos-x86_64 -t darwin-x86_64 --app-version $(VERSION)
+
+package-macos-arm64: check-lumos ensure-dist
+	@echo "Packaging macOS arm64 executable..."
+	@$(LUMOS) package $(ENTRY) -d . -o $(DIST_DIR)/$(NAME)-$(VERSION)-macos-arm64 -t darwin-aarch64 --app-version $(VERSION)
+
+# Platform-specific native builds
+build-linux: check-lumos ensure-dist
+	@echo "Building native Linux x86_64 binary..."
+	@$(LUMOS) build $(ENTRY) -d . -o $(DIST_DIR)/$(NAME)-$(VERSION)-linux-x86_64-native -t linux-x86_64 --app-version $(VERSION)
+
+build-linux-aarch64: check-lumos ensure-dist
+	@echo "Building native Linux aarch64 binary..."
+	@$(LUMOS) build $(ENTRY) -d . -o $(DIST_DIR)/$(NAME)-$(VERSION)-linux-aarch64-native -t linux-aarch64 --app-version $(VERSION)
+
+build-windows: check-lumos ensure-dist
+	@echo "Building native Windows binary..."
+	@$(LUMOS) build $(ENTRY) -d . -o $(DIST_DIR)/$(NAME)-$(VERSION)-win.exe-native -t windows-x86_64 --app-version $(VERSION)
+
+# Default dist: build for host platform only
+dist: bundle package build
+	@echo "✓ Built $(NAME) v$(VERSION) for $(HOST_TARGET) in $(DIST_DIR)/"
+
+# Build for all supported platforms
+dist-all: bundle package-linux package-linux-aarch64 package-windows package-macos-x64 package-macos-arm64 build-linux build-linux-aarch64 build-windows
+	@echo "✓ Built $(NAME) v$(VERSION) for all platforms in $(DIST_DIR)/"
 
 clean:
 	@echo "Cleaning build artifacts..."
-	@rm -rf docs/*.txt *.log
+	@rm -rf $(DIST_DIR) docs/*.txt *.log
 
-.PHONY: check-lumos install test run help dev clean
-]], project_name))
+ensure-dist:
+	@mkdir -p $(DIST_DIR)
+
+.PHONY: check-lumos install test run help dev bundle package build package-linux package-linux-aarch64 package-windows package-macos-x64 package-macos-arm64 build-linux build-linux-aarch64 build-windows dist dist-all clean ensure-dist
+]], project_name, project_name))
         
         -- Create .gitignore
         write_file(project_name .. "/.gitignore", [[# IDE files
@@ -358,7 +532,9 @@ clean:
 Thumbs.db
 
 # Build artifacts
+dist/
 docs/*.txt
+*.log
 
 # Local configuration
 config.local.lua
@@ -381,18 +557,63 @@ config.local.lua
         print(color.green("\n✅ Lumos CLI project '" .. project_name .. "' created successfully!"))
         print(color.white("\nNext steps:"))
         print("  cd " .. project_name)
-        print("  make install    # Install dependencies")
-        print("  make run        # Run the application")
-        print("  make test       # Run tests")
+        print("  make install          # Install dependencies")
+        print("  make run              # Run the application")
+        print("  make test             # Run tests")
+        print("  make bundle           # Create portable Lua bundle (host platform)")
+        print("  make package          # Create standalone executable (host platform)")
+        print("  make build            # Create native binary (host platform)")
+        print("  make dist             # Build bundle + package + build for host")
+        print("  make dist-all         # Build for all supported platforms")
+        print(color.dim("\nTip: set a custom version with --app-version (e.g. lumos package src/main.lua --app-version 1.0.0)"))
         
         return true
-    end)
+    end
+
+app:command("new", "Create a new Lumos CLI project")
+    :arg("name", "Project name (optional)")
+    :action(run_new_project)
+
+app:command("create", "Alias for 'new'")
+    :arg("name", "Project name (optional)")
+    :action(run_new_project)
 
 app:command("version", "Show Lumos version")
     :action(function(ctx)
-        print("Lumos CLI Framework v" .. (lumos.version or "0.1.0"))
+        print("Lumos CLI Framework v" .. (lumos.version or "0.3.6"))
         print("A modern CLI framework for Lua")
         print("https://github.com/benoitpetit/lumos")
+        return true
+    end)
+
+app:command("update", "Update Lumos to the latest version via LuaRocks")
+    :action(function(ctx)
+        print(color.cyan("Updating Lumos..."))
+        print(color.white("Current version: v" .. (lumos.version or "0.3.6")))
+        print("")
+
+        local cmd = "luarocks install lumos"
+        print(color.yellow("Running: " .. cmd))
+        local ok = os.execute(cmd)
+
+        if ok then
+            print("")
+            print(color.green("✅ Lumos updated successfully!"))
+            -- Try to reload to show new version
+            local new_lumos, _ = pcall(require, 'lumos')
+            if new_lumos and require('lumos').version then
+                print(color.white("New version: v" .. require('lumos').version))
+            else
+                print(color.yellow("Restart your shell to use the updated version."))
+            end
+        else
+            print("")
+            print(color.red("❌ Update failed."))
+            print(color.yellow("Try running manually:"))
+            print(color.white("  luarocks install --local lumos"))
+            print(color.white("  sudo luarocks install lumos"))
+            return false
+        end
         return true
     end)
 
@@ -400,66 +621,119 @@ app:command("doctor", "Check the Lumos environment for common issues")
     :action(function(ctx)
         print(color.cyan("Lumos Environment Check"))
         print(string.rep("-", 40))
-        
+
         local checks = {}
         local issues = 0
-        
-        -- Lua version
-        table.insert(checks, {"Lua version", _VERSION or "unknown"})
-        
-        -- luafilesystem
+        local warnings = 0
+
+        local function add_check(label, value, level)
+            table.insert(checks, { label, value })
+            if level == "error" then
+                issues = issues + 1
+            elseif level == "warn" then
+                warnings = warnings + 1
+            end
+        end
+
+        local null_dev = (package.config:sub(1,1) == "\\") and " 2>nul" or " 2>/dev/null"
+        local function first_line(cmd)
+            local handle = io.popen(cmd .. null_dev)
+            local out = handle and handle:read("*l") or nil
+            if handle then handle:close() end
+            if out and out ~= "" then
+                return out
+            end
+            return nil
+        end
+
+        add_check("Lua version", _VERSION or "unknown")
+
         local lfs_ok, lfs_ver = pcall(function()
-            local info = lfs._VERSION or "installed"
-            return info
+            return lfs._VERSION or "installed"
         end)
         if lfs_ok then
-            table.insert(checks, {"luafilesystem", lfs_ver})
+            add_check("luafilesystem", lfs_ver)
         else
-            table.insert(checks, {"luafilesystem", color.red("NOT FOUND")})
-            issues = issues + 1
+            add_check("luafilesystem", color.red("NOT FOUND"), "error")
         end
-        
-        -- Lumos version
-        table.insert(checks, {"Lumos", lumos and lumos.version or color.red("NOT FOUND")})
-        if not lumos then issues = issues + 1 end
-        
-        -- LuaRocks
-        local null_dev = (package.config:sub(1,1) == "\\") and " 2>nul" or " 2>/dev/null"
-        local lr_handle = io.popen("luarocks --version" .. null_dev)
-        local lr_out = lr_handle and lr_handle:read("*l") or nil
-        if lr_handle then lr_handle:close() end
-        if lr_out and lr_out ~= "" then
-            table.insert(checks, {"LuaRocks", lr_out})
+
+        add_check("Lumos", lumos and lumos.version or color.red("NOT FOUND"), (not lumos) and "error" or nil)
+
+        local lr_out = first_line("luarocks --version")
+        if lr_out then
+            add_check("LuaRocks", lr_out)
         else
-            table.insert(checks, {"LuaRocks", color.red("NOT FOUND")})
-            issues = issues + 1
+            add_check("LuaRocks", color.red("NOT FOUND"), "error")
         end
-        
-        -- Busted (optional)
-        local b_handle = io.popen("busted --version" .. null_dev)
-        local b_out = b_handle and b_handle:read("*l") or nil
-        if b_handle then b_handle:close() end
-        if b_out and b_out ~= "" then
-            table.insert(checks, {"busted", b_out})
+
+        local b_out = first_line("busted --version")
+        if b_out then
+            add_check("busted", b_out)
         else
-            table.insert(checks, {"busted", color.yellow("not installed (optional)")})
+            add_check("busted", color.yellow("not installed (optional)"), "warn")
         end
-        
-        -- Current directory
-        table.insert(checks, {"Working directory", lfs.currentdir() or "."})
-        
+
+        local native_build = safe_require('lumos.native_build')
+        if native_build then
+            local compiler = native_build.detect_compiler()
+            if compiler then
+                add_check("C compiler", compiler)
+            else
+                add_check("C compiler", color.yellow("NOT FOUND (required for lumos build)"), "warn")
+            end
+
+            local tc, tc_err = native_build.detect_toolchain()
+            if tc then
+                local details = "headers=" .. (tc.lua_include_dir or "?")
+                if tc.liblua_path then
+                    details = details .. ", lib=" .. tc.liblua_path
+                end
+                add_check("Lua build toolchain", details)
+            else
+                add_check("Lua build toolchain", color.yellow("incomplete (" .. tostring(tc_err or "unknown") .. ")"), "warn")
+            end
+        else
+            add_check("Native build module", color.red("NOT FOUND"), "error")
+        end
+
+        local pkg_mod = safe_require('lumos.package')
+        if pkg_mod then
+            local targets = pkg_mod.list_targets()
+            if #targets > 0 then
+                add_check("Launchers", table.concat(targets, ", "))
+            else
+                add_check("Launchers", color.yellow("none found (required for lumos package)"), "warn")
+            end
+
+            local host_target = pkg_mod.detect_host_target()
+            local host_launcher = pkg_mod.find_launcher(host_target)
+            if host_launcher then
+                add_check("Host launcher", host_target)
+            else
+                add_check("Host launcher", color.yellow("missing for " .. host_target), "warn")
+            end
+        else
+            add_check("Package module", color.red("NOT FOUND"), "error")
+        end
+
+        add_check("Working directory", lfs.currentdir() or ".")
+
         for _, check in ipairs(checks) do
             print(string.format("  %-18s %s", check[1] .. ":", check[2]))
         end
-        
+
         print(string.rep("-", 40))
-        if issues == 0 then
+        if issues == 0 and warnings == 0 then
             print(color.green("✅ Environment looks good."))
             return true
-        else
-            print(color.red("⚠️  Found " .. issues .. " issue(s)."))
-            return false
         end
+        if issues == 0 then
+            print(color.yellow("⚠️  Environment is usable with " .. warnings .. " warning(s)."))
+            return true
+        end
+
+        print(color.red("⚠️  Found " .. issues .. " blocking issue(s)."))
+        return false
     end)
 
 -- Bundle command for creating portable CLI executables
@@ -533,7 +807,8 @@ bundle_cmd:action(function(ctx)
         output = ctx.flags.output,
         project_dir = project_dir,
         include_lumos = not ctx.flags["no_lumos"],
-        strip_comments = ctx.flags["strip_comments"]
+        strip_comments = ctx.flags["strip_comments"],
+        version = ctx.flags["app_version"],
     }
     
     local success, err, info = bundle.create(options)
@@ -568,6 +843,7 @@ build_cmd:flag("--static", "Produce a fully statically linked binary")
 build_cmd:flag("--bytecode", "Compile Lua payload to bytecode before embedding")
 build_cmd:flag("--debug-build", "Keep temporary C source file for debugging")
 build_cmd:flag_string("-t --target", "Target platform for cross-compilation (e.g. windows-x86_64)")
+build_cmd:flag_string("--app-version", "Application version to embed (replaces __APP_VERSION__ in source)")
 
 build_cmd:flag("--analyze", "Analyze dependencies without building")
 
@@ -638,6 +914,7 @@ build_cmd:action(function(ctx)
         bytecode = ctx.flags.bytecode,
         debug_build = ctx.flags["debug_build"],
         target = ctx.flags.target,
+        version = ctx.flags["app_version"],
     }
     
     local success, err, info = native_build.create(options)
@@ -679,8 +956,10 @@ package_cmd:flag_string("-o --output", "Output file path (default: dist/<name>)"
 package_cmd:flag_string("-d --dir", "Project directory (default: current directory)")
 package_cmd:flag_string("-t --target", "Target platform launcher (default: linux-x86_64)")
 package_cmd:flag("--list-targets", "List available launcher targets and exit")
+package_cmd:flag("--sync-runtime", "Download missing launchers before packaging")
 package_cmd:flag("--no-lumos", "Do not bundle Lumos framework")
 package_cmd:flag("--strip-comments", "Remove comments to reduce payload size")
+package_cmd:flag_string("--app-version", "Application version to embed (replaces __APP_VERSION__ in source)")
 package_cmd:flag("--analyze", "Analyze dependencies without building")
 
 package_cmd:action(function(ctx)
@@ -691,6 +970,12 @@ package_cmd:action(function(ctx)
     end
     
     if ctx.flags["list_targets"] then
+        if ctx.flags["sync_runtime"] then
+            local ok_sync, sync_err = pkg.sync_runtime()
+            if not ok_sync then
+                print(color.yellow("Runtime sync warning: " .. tostring(sync_err)))
+            end
+        end
         local targets = pkg.list_targets()
         print(color.cyan("Available launcher targets:"))
         if #targets == 0 then
@@ -762,6 +1047,8 @@ package_cmd:action(function(ctx)
         target = target,
         include_lumos = not ctx.flags["no_lumos"],
         strip_comments = ctx.flags["strip_comments"],
+        sync_runtime_force = ctx.flags["sync_runtime"],
+        version = ctx.flags["app_version"],
     }
     
     local success, err, info = pkg.create(options)

@@ -13,6 +13,9 @@ env:
 jobs:
   test:
     runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
     strategy:
       fail-fast: false
       matrix:
@@ -21,6 +24,8 @@ jobs:
         include:
           - lua: '5.4'
             os: macos-latest
+          - lua: '5.4'
+            os: windows-latest
 
     steps:
       - name: Checkout

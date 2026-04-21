@@ -144,8 +144,31 @@ function help_renderer.show_help(app)
     print(c.cyan("Global flags:"))
     local global_items = {
         {left = "-h, --help", right = "Show help information"},
-        {left = "-v, --version", right = "Show version information"},
     }
+
+    -- Avoid ambiguous short -v display when user-defined flags already use -v.
+    local user_claimed_v = false
+    if app.global_flags then
+        for _, flag_def in pairs(app.global_flags) do
+            if flag_def.short == "v" then
+                user_claimed_v = true
+                break
+            end
+        end
+    end
+    if not user_claimed_v and app.persistent_flags then
+        for _, flag_def in pairs(app.persistent_flags) do
+            if flag_def.short == "v" then
+                user_claimed_v = true
+                break
+            end
+        end
+    end
+    if user_claimed_v then
+        table.insert(global_items, {left = "--version", right = "Show version information"})
+    else
+        table.insert(global_items, {left = "-v, --version", right = "Show version information"})
+    end
 
     -- Display app-level flags defined via app:flag()
     if app.global_flags then

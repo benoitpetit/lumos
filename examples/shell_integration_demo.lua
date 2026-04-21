@@ -9,7 +9,7 @@ local logger = require('lumos.logger')
 -- Create a sample application with rich commands
 local app = lumos.new_app({
     name = "gitlike",
-    version = "0.1.0",
+    version = "0.3.6",
     description = "A Git-like CLI tool demonstrating Lumos shell integration features"
 })
 

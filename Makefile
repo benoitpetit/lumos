@@ -71,6 +71,10 @@ build-launcher-macos:
 	@echo "macOS runtime launchers must be built on a Mac or via CI."
 	@bash scripts/build-launchers.sh macos
 
+build-launcher-linux-aarch64:
+	@echo "Building Linux aarch64 runtime launcher..."
+	@bash scripts/build-launchers.sh linux-aarch64
+
 # Clean build artifacts
 clean:
 	@echo "Cleaning build artifacts..."
@@ -90,9 +94,10 @@ help:
 	@echo "  install          - Install locally for development"
 	@echo "  install-prod     - Install from rockspec"
 	@echo "  runtime-launchers - Build all native launchers"
-	@echo "  build-launcher-linux   - Build Linux launcher"
-	@echo "  build-launcher-windows - Build Windows launcher"
-	@echo "  build-launcher-macos   - Show macOS build instructions"
+	@echo "  build-launcher-linux       - Build Linux x86_64 launcher"
+	@echo "  build-launcher-linux-aarch64 - Build Linux aarch64 launcher"
+	@echo "  build-launcher-windows     - Build Windows launcher"
+	@echo "  build-launcher-macos       - Show macOS build instructions"
 	@echo "  doc              - Generate documentation"
 	@echo "  examples         - Run example applications"
 	@echo "  clean            - Clean build artifacts"

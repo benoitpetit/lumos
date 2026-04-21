@@ -9,7 +9,7 @@ Lumos uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-## [0.3.5] — 2026-04-16
+## [0.3.6] — 2026-04-16
 
 ### Fixed
 
@@ -29,7 +29,7 @@ Lumos uses [Semantic Versioning](https://semver.org/).
 - `lumos/package.lua` — migrated to `lumos.fs` helpers, removing duplicated `read_file` / `write_file` / `mkdir_p` / `path_exists` logic.
 - `lumos/bundle.lua` — synchronized `LUMOS_MODULES` to include all framework modules (`error_codes`, `version`, `platform`, `terminal`, `middleware`, `profiler`, `config_cache`).
 - `lumos/init.lua` — `M.use(plugin_type, fn, opts)` now accepts the optional `opts` argument; `M.preload(...)` returns `M` to allow chaining.
-- Documentation (`docs/api.md`) — added missing API entries for `persistent_flag_*`, `prompt.number/editor/form/wizard`, `profiler.wrap/reset/disable`, `config.load_file_cached/load_validated`, `security.safe_mkdir/safe_open`, `terminal.*`, and `config_cache.load/invalidate`.
+- Documentation (`docs/api.md`) — added missing API entries for `persistent_flag_*`, `prompt.number/editor/form/wizard`, `profiler.wrap/reset/disable`, `config.load_file_cached/load_validated`, `terminal.*`, and `config_cache.load/invalidate`. `security.safe_mkdir/safe_open` documented in Security examples.
 
 ### Added
 
@@ -63,6 +63,10 @@ Lumos uses [Semantic Versioning](https://semver.org/).
 
 - `lumos/platform.lua` — `supports_colors()` and `is_interactive()` now always return booleans instead of truthy numeric or file-handle values.
 - README / docs — synchronized documentation for v0.3.1 features and corrected quick-start examples.
+
+## [0.3.0] — 2026-04-16
+
+---
 
 ## [0.2.2] — 2026-04-15
 
@@ -220,37 +224,6 @@ Lumos uses [Semantic Versioning](https://semver.org/).
   anywhere in `core.lua`.
 - `lumos/progress.lua` (L.7) — unused `require('lumos.table')` import
   removed; `lumos_table` was never called in the module.
-
----
-
-## [0.3.0] — 2026-04-16
-
-### Added
-
-- `lumos/error.lua` — typed error system with `Error.new()`, `is_error()`, `format_user()`, `format_log()`, and `Error.success()`.
-- `lumos/error_codes.lua` — standardized exit codes (SUCCESS, INVALID_ARGUMENT, MUTEX_VIOLATION, EXECUTION_FAILED, etc.).
-- `lumos/middleware.lua` — Express-like middleware chain with builtin factories: `logger`, `auth`, `dry_run`, `confirm`, `rate_limit`.
-- `lumos/platform.lua` — cross-platform detection (Windows, macOS, Linux, FreeBSD, OpenBSD) with architecture, path, and TTY helpers.
-- `lumos/terminal.lua` — terminal control helpers: dimensions, cursor, clear, and pipe-aware color/animation decisions.
-- `lumos/profiler.lua` — integrated profiler with `start()`, `stop()`, `wrap()`, and `report()`.
-- `lumos/config_cache.lua` — in-memory configuration cache with mtime invalidation.
-- `lumos/flags.lua` — new flag types: `float`, `array`, `enum`; enriched validation for `path`, `url`, and `email`.
-- `lumos/app.lua` — new fluent flag methods: `flag_float()`, `flag_array()`, `flag_enum()`; `mutex_group()` for mutually exclusive flags; `use()` for middleware chaining at app and command level.
-- `lumos/bundle.lua` — `analyze_dependencies()`, `get_required_lumos_modules()`, `minimal()`, and `minify()` for tree-shaking bundles.
-- `tests/benchmark.lua` — basic benchmark suite for startup, command creation, parsing, and UI rendering.
-- `spec/error_spec.lua`, `spec/middleware_spec.lua`, `spec/platform_spec.lua`, `spec/terminal_spec.lua`, `spec/profiler_spec.lua` — full test coverage for new modules.
-
-### Changed
-
-- `lumos/init.lua` — converted to lazy-loading via `__index` metatable; modules are loaded on first access.
-- `lumos/core.lua` — `execute_command` now recognizes typed `Error` objects and `success` tables in addition to legacy boolean returns; integrated middleware execution.
-- `lumos/color.lua` — fallback color detection now uses `lumos.terminal.should_use_colors()` for automatic pipe-aware disable.
-- `lumos/prompt.lua` — now uses `lumos.platform` for Windows detection and improved native fallback paths.
-- `lumos/config.lua` — added `load_file_cached()` wrapper delegating to `lumos.config_cache`.
-
-### Fixed
-
-- `lumos/flags.lua` — `trim()` helper corrected so array splitting no longer drops items.
 
 ---
 

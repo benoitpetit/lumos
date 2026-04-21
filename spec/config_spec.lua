@@ -104,15 +104,6 @@ describe('Config Module', function()
             assert.is_table(result)
         end)
 
-        it('reads known env variable DEBUG when set', function()
-            -- Temporarily set env var (Lua os.getenv reads live env)
-            -- We use a temp approach: call load_env and check key presence
-            -- (We cannot truly set env vars from pure Lua; test that load_env
-            --  runs without error and returns a table)
-            local result = config.load_env("LUMOS_TEST_NONEXISTENT_PREFIX_XYZ")
-            assert.is_table(result)
-        end)
-
         it('uses an empty prefix when none is provided', function()
             local result = config.load_env()
             assert.is_table(result)

@@ -21,6 +21,39 @@ describe('Bundle Module', function()
             assert.is_true(mod_set["lumos.flags"]    ~= nil)
             assert.is_true(mod_set["lumos.security"] ~= nil)
             assert.is_true(mod_set["lumos.logger"]   ~= nil)
+            assert.is_true(mod_set["lumos.parser"]   ~= nil)
+            assert.is_true(mod_set["lumos.validator"] ~= nil)
+            assert.is_true(mod_set["lumos.executor"] ~= nil)
+            assert.is_true(mod_set["lumos.help_renderer"] ~= nil)
+            assert.is_true(mod_set["lumos.fs"] ~= nil)
+            assert.is_true(mod_set["lumos.runtime_manager"] ~= nil)
+        end)
+
+        it('does not contain duplicate module names', function()
+            local mods = bundle.get_lumos_modules()
+            local seen = {}
+            for _, m in ipairs(mods) do
+                assert.is_nil(seen[m], "Duplicate bundled module: " .. tostring(m))
+                seen[m] = true
+            end
+        end)
+
+        it('references only module files that exist in the repository', function()
+            local mods = bundle.get_lumos_modules()
+            for _, m in ipairs(mods) do
+                local rel = m:gsub('%.', '/') .. '.lua'
+                local path = './' .. rel
+                local f = io.open(path, 'r')
+                if not f then
+                    -- allow lumos.init special alias to map to lumos/init.lua
+                    assert.are.equal('lumos.init', m, 'Missing module file for ' .. m .. ' at ' .. path)
+                    local initf = io.open('./lumos/init.lua', 'r')
+                    assert.is_not_nil(initf, 'Missing module file for lumos.init')
+                    if initf then initf:close() end
+                else
+                    f:close()
+                end
+            end
         end)
     end)
 
@@ -56,6 +89,7 @@ describe('Bundle Module', function()
     -- -------------------------------------------------------------------------
     describe('amalgamate()', function()
         local tmp_entry
+        local tmp_root
 
         before_each(function()
             tmp_entry = os.tmpname() .. ".lua"
@@ -63,11 +97,15 @@ describe('Bundle Module', function()
             f:write('local json = require("lumos.json")\n')
             f:write('print("hello")\n')
             f:close()
+
+            tmp_root = os.tmpname() .. "_d"
+            fs.mkdir_p(tmp_root)
         end)
 
         after_each(function()
             os.remove(tmp_entry)
             fs.rmdir_p(".lumos/cache")
+            fs.rmdir_p(tmp_root)
         end)
 
         it('fails when no entry file is provided', function()
@@ -113,6 +151,49 @@ describe('Bundle Module', function()
             os.remove(out_file)
 
             assert.are.equal(lua_code, written)
+        end)
+
+        it('bundles all required Lumos submodules when include_lumos is true', function()
+            local ok, err, lua_code = bundle.amalgamate({
+                entry = tmp_entry,
+                include_lumos = true,
+            })
+            assert.is_true(ok, tostring(err))
+            assert.is_not_nil(lua_code:find('_BUNDLED_MODULES%["lumos.parser"%]'))
+            assert.is_not_nil(lua_code:find('_BUNDLED_MODULES%["lumos.validator"%]'))
+            assert.is_not_nil(lua_code:find('_BUNDLED_MODULES%["lumos.executor"%]'))
+            assert.is_not_nil(lua_code:find('_BUNDLED_MODULES%["lumos.help_renderer"%]'))
+        end)
+
+        it('resolves local dependencies from entry file directory even when project_dir differs', function()
+            local app_root = tmp_root .. "/myapp"
+            local src_dir = app_root .. "/src"
+            fs.mkdir_p(src_dir)
+
+            local entry = src_dir .. "/main.lua"
+            local app_mod = src_dir .. "/app.lua"
+
+            local f = io.open(entry, 'w')
+            assert.is_not_nil(f)
+            f:write('local app = require("app")\n')
+            f:write('print(app.message())\n')
+            f:close()
+
+            f = io.open(app_mod, 'w')
+            assert.is_not_nil(f)
+            f:write('local M = {}\n')
+            f:write('function M.message() return "ok" end\n')
+            f:write('return M\n')
+            f:close()
+
+            local ok, err, lua_code = bundle.amalgamate({
+                entry = entry,
+                project_dir = tmp_root,
+                include_lumos = false,
+            })
+
+            assert.is_true(ok, tostring(err))
+            assert.is_not_nil(lua_code:find('_BUNDLED_MODULES%["app"%]'))
         end)
     end)
 

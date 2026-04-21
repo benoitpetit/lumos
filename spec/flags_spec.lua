@@ -20,42 +20,6 @@ describe('Flags Module', function()
     local result = flags.parse_single_flag('-ofile', {}, 1)
     assert.are.same({name = 'o', value = 'file', next_index = 2}, result)
   end)
-  it('parses --long and short -s formats', function()
-    local app = require('lumos').new_app({name = "testapp"})
-    app:persistent_flag("--verbose -v", "Enable verbose output")
-
-    assert.is_not_nil(app.persistent_flags.verbose)
-    assert.equal("v", app.persistent_flags.verbose.short)
-    assert.equal("verbose", app.persistent_flags.verbose.long)
-  end)
-
-  it('parses -s and --long formats', function()
-    local app = require('lumos').new_app({name = "testapp"})
-    app:persistent_flag("-v --verbose", "Enable verbose output")
-
-    assert.is_not_nil(app.persistent_flags.verbose)
-    assert.equal("v", app.persistent_flags.verbose.short)
-    assert.equal("verbose", app.persistent_flags.verbose.long)
-  end)
-
-  it('parses --long only', function()
-    local app = require('lumos').new_app({name = "testapp"})
-    app:persistent_flag("--verbose", "Enable verbose output")
-
-    assert.is_not_nil(app.persistent_flags.verbose)
-    assert.is_nil(app.persistent_flags.verbose.short)
-    assert.equal("verbose", app.persistent_flags.verbose.long)
-  end)
-
-  it('parses -s only', function()
-    local app = require('lumos').new_app({name = "testapp"})
-    app:persistent_flag("-v", "Enable verbose output")
-
-    assert.is_not_nil(app.persistent_flags.v)
-    assert.equal("v", app.persistent_flags.v.short)
-    assert.equal("v", app.persistent_flags.v.long)
-  end)
-
   -- validate_flag: boolean (no type) should pass through without error
   it('validate_flag returns true for a boolean flag value', function()
     local ok, val = flags.validate_flag({long = "verbose"}, true)

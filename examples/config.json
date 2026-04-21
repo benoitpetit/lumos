@@ -1,6 +1,0 @@
-{
-  "timeout": 60,
-  "dry_run": false,
-  "environment": "production",
-  "debug": true
-}

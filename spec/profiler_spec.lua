@@ -67,7 +67,13 @@ describe("Profiler Module", function()
         profiler.reset()
         profiler.start("other")
         profiler.stop("other")
-        -- No easy way to inspect internals, but ensure no crash
-        assert.is_true(true)
+        -- After reset, the old timing should not appear in report output
+        local original_print = _G.print
+        local output = ""
+        _G.print = function(s) output = output .. (s or "") .. "\n" end
+        profiler.report()
+        _G.print = original_print
+        assert.is_nil(output:find("test"))
+        assert.is_not_nil(output:find("other"))
     end)
 end)

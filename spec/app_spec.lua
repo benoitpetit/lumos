@@ -227,6 +227,41 @@ describe('App Module', function()
       assert.is_not_nil(printed:match("2%.0%.0"))
     end)
 
+    it('shows --version (without -v) in help when -v is user-defined', function()
+      local test_app = app.new_app({name = 'myapp', version = '2.0.0'})
+      test_app:flag('-v --verbose', 'Verbose mode')
+
+      local output = {}
+      local original_print = _G.print
+      _G.print = function(...)
+        table.insert(output, table.concat({...}, ' '))
+      end
+
+      local result = test_app:run({'--help'})
+
+      _G.print = original_print
+      assert.are.equal(0, result)
+      local text = table.concat(output, '\n')
+      assert.truthy(text:find('%-%-version'))
+      assert.falsy(text:find('%-v, %-%-version'))
+    end)
+
+    it('treats -v as verbose when user defines -v flag', function()
+      local test_app = app.new_app({name = 'myapp', version = '2.0.0'})
+      local saw_verbose = false
+
+      local cmd = test_app:command('run', 'Run command')
+      cmd:flag('-v --verbose', 'Verbose mode')
+      cmd:action(function(ctx)
+        saw_verbose = ctx.flags.verbose == true
+        return true
+      end)
+
+      local result = test_app:run({'run', '-v'})
+      assert.are.equal(0, result)
+      assert.is_true(saw_verbose)
+    end)
+
     it('handles empty args and shows help', function()
       local test_app = app.new_app({name = 'testapp'})
       local original_print = _G.print
@@ -448,4 +483,3 @@ describe('App Module', function()
     end)
   end)
 end)
-

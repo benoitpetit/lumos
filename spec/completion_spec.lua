@@ -25,6 +25,17 @@ describe("Shell Completion Generation", function()
             assert.matches("_testapp_completions", completion)
             assert.matches("test t", completion) -- Commands with aliases
             assert.matches("%-%-verbose %-v", completion) -- Flags
+            assert.matches("%-%-version", completion)
+            assert.is_nil(completion:match("%-%-version %-v"))
+        end)
+
+        it("should omit short version flag when -v is already used", function()
+            local app = lumos.new_app({name = "testapp"})
+            app:flag("-v --verbose", "Verbose")
+
+            local script = app:generate_completion("bash")
+            assert.matches("%-%-version", script)
+            assert.is_nil(script:match("%-%-version %-v"))
         end)
         
         it("should include all commands and aliases in bash completion", function()
@@ -58,6 +69,15 @@ describe("Shell Completion Generation", function()
             assert.matches("'test:Test command'", completion)
             assert.matches("'t:Test command'", completion) -- Alias
         end)
+
+        it("should omit -v in zsh version option when already claimed", function()
+            local app = lumos.new_app({name = "testapp"})
+            app:flag("-v --verbose", "Verbose")
+
+            local script = app:generate_completion("zsh")
+            assert.matches("%-%-version", script)
+            assert.is_nil(script:match("%{%-%v,%-%-version%}"))
+        end)
         
         it("should format commands correctly for zsh", function()
             local app = lumos.new_app({name = "myapp"})
@@ -90,6 +110,15 @@ describe("Shell Completion Generation", function()
             assert.matches("__testapp_complete_commands", completion)
             assert.matches("echo 'test\\tTest command'", completion)
             assert.matches("echo 't\\tTest command'", completion) -- Alias
+        end)
+
+        it("should omit -v in fish version completion when already claimed", function()
+            local app = lumos.new_app({name = "testapp"})
+            app:flag("-v --verbose", "Verbose")
+
+            local script = app:generate_completion("fish")
+            assert.matches("%-l version", script)
+            assert.is_nil(script:match("%-l version %-s v"))
         end)
         
         it("should handle special characters in descriptions", function()

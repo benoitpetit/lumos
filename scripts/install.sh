@@ -44,7 +44,7 @@ if ! command -v lua &> /dev/null; then
 fi
 
 if ! command -v luarocks &> /dev/null; then
-    echo -e "${RED}Error: LuaRocks is not installed. Please install LuaRocks >= 3.9.${NC}"
+    echo -e "${RED}Error: LuaRocks is not installed. Please install LuaRocks >= 3.8.${NC}"
     echo "On Debian/Ubuntu: sudo apt-get install luarocks"
     echo "On CentOS/RHEL: sudo yum install luarocks"
     echo "On macOS: brew install luarocks"
@@ -53,17 +53,15 @@ fi
 
 # Check LuaRocks version
 LUAROCKS_VERSION=$(luarocks --version | head -n1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1)
-REQUIRED_VERSION="3.9.0"
+REQUIRED_VERSION="3.8.0"
 if [ "$(printf '%s\n' "$REQUIRED_VERSION" "$LUAROCKS_VERSION" | sort -V | head -n1)" != "$REQUIRED_VERSION" ]; then
-    echo -e "${RED}Error: LuaRocks version $LUAROCKS_VERSION is too old. Version >= 3.9 is required.${NC}"
+    echo -e "${RED}Error: LuaRocks version $LUAROCKS_VERSION is too old. Version >= 3.8 is required.${NC}"
     exit 1
 fi
 
-# Detect if installation is running as root or if --local should be used
-USE_LOCAL="--local"
+# Detect if installation is running as root
 if [ "$EUID" -eq 0 ]; then
     echo -e "${YELLOW}Running as root. Installing globally.${NC}"
-    USE_LOCAL=""
 else
     echo -e "${BLUE}Installing locally for current user.${NC}"
 fi
@@ -80,9 +78,9 @@ luarocks install --local luafilesystem || {
 
 # Install Lumos
 echo -e "${BLUE}Installing Lumos framework...${NC}"
-if [ -f "lumos-0.3.5-1.rockspec" ]; then
+if [ -f "lumos-0.3.6-1.rockspec" ]; then
     # Install from local source directory (production build)
-    luarocks make --local lumos-0.3.5-1.rockspec || {
+    luarocks make --local lumos-0.3.6-1.rockspec || {
         echo -e "${RED}Failed to install Lumos from production rockspec${NC}"
         exit 1
     }

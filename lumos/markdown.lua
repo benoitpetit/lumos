@@ -3,6 +3,24 @@ local markdown = {}
 local security = require('lumos.security')
 local logger = require('lumos.logger')
 
+local function version_short_available(app)
+    if app.global_flags then
+        for _, flag_def in pairs(app.global_flags) do
+            if flag_def.short == "v" then
+                return false
+            end
+        end
+    end
+    if app.persistent_flags then
+        for _, flag_def in pairs(app.persistent_flags) do
+            if flag_def.short == "v" then
+                return false
+            end
+        end
+    end
+    return true
+end
+
 -- Escape special markdown characters
 local function escape_markdown(text)
     if not text then return "" end
@@ -71,7 +89,11 @@ local function generate_global_options(app)
     options = options .. "| Flag | Short | Description |\n"
     options = options .. "|------|-------|-------------|\n"
     options = options .. "| `--help` | `-h` | Show help information |\n"
-    options = options .. "| `--version` | `-v` | Show version information |\n"
+    if version_short_available(app) then
+        options = options .. "| `--version` | `-v` | Show version information |\n"
+    else
+        options = options .. "| `--version` |  | Show version information |\n"
+    end
     
     -- Add persistent flags
     if app.persistent_flags and next(app.persistent_flags) then

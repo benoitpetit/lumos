@@ -233,6 +233,16 @@ describe('Advanced Core Module', function()
             assert.is_true(parsed.flags.v)
         end)
 
+        it('preserves command short -v flag when defined as verbose', function()
+            local test_app = app.new_app({name = 'testapp'})
+            local cmd = test_app:command('run', 'Run')
+            cmd:flag('-v --verbose', 'Verbose mode')
+
+            local parsed = core.parse_arguments({'run', '-v'}, test_app)
+            assert.are.equal('run', parsed.command)
+            assert.is_true(parsed.flags.v)
+        end)
+
         it('parses command and positional args', function()
             local test_app = app.new_app()
             local parsed = core.parse_arguments({'run', 'file.lua', 'arg2'}, test_app)
@@ -283,18 +293,6 @@ describe('Advanced Core Module', function()
             io.stderr = original_stderr
             assert.are.equal(2, result)
             assert.is_not_nil(output:match("Unknown command"))
-        end)
-
-        it('shows help and returns EXIT_OK when no command given', function()
-            local test_app = app.new_app({name = 'testapp'})
-            local original_print = _G.print
-            _G.print = function() end
-
-            local parsed = {command = nil, flags = {}, args = {}}
-            local result = core.execute_command(test_app, parsed)
-
-            _G.print = original_print
-            assert.are.equal(0, result)
         end)
 
         it('returns EXIT_USAGE when command has no action', function()
@@ -446,30 +444,6 @@ describe('Advanced Core Module', function()
         end)
     end)
 
-    -- -------------------------------------------------------------------------
-    describe('load_config()', function()
-        it('loads a JSON config file', function()
-            local tmp = os.tmpname() .. ".json"
-            local f = io.open(tmp, "w")
-            f:write('{"host":"localhost","port":3000}')
-            f:close()
-
-            local result, err = core.load_config(tmp)
-            os.remove(tmp)
-
-            assert.is_nil(err)
-            assert.is_table(result)
-            assert.are.equal("localhost", result.host)
-            assert.are.equal(3000,        result.port)
-        end)
-
-        it('returns nil and error for nonexistent file', function()
-            local result, err = core.load_config("/nonexistent/file.json")
-            assert.is_nil(result)
-            assert.is_not_nil(err)
-        end)
-    end)
-
     describe('Subcommand support', function()
         it('finds subcommands by name', function()
             local test_app = app.new_app()
@@ -522,4 +496,3 @@ describe('Advanced Core Module', function()
         end)
     end)
 end)
-

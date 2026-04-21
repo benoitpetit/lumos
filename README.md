@@ -17,6 +17,8 @@
 </p>
 
 ---
+> 💡 **Lumos is actively developed.** If you encounter a bug or have a feature request, please [open an issue](https://github.com/benoitpetit/lumos/issues/new) — we read everything.
+
 
 **Lumos** (Latin for "light") brings clarity to CLI development in Lua. Inspired by Cobra for Go, it provides everything you need to build professional command-line applications with minimal code and maximum functionality.
 
@@ -39,6 +41,7 @@
 - **Native Builds** - Compile to native binaries with `lumos build` (embeds Lua VM)
 - **Security Built-in** - Input sanitization, safe file operations, rate limiting
 - **Structured Logging** - 5-level logger with child loggers and environment configuration
+- **Native HTTP Client** - GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS with curl backend
 - **Lazy Loading** - On-demand module loading for fast startup (< 30ms)
 
 ## 5-Minute Quick Start
@@ -99,11 +102,20 @@ lumos package src/main.lua -o dist/myapp
 # Target a different OS (e.g. Windows from Linux)
 lumos package src/main.lua -o dist/myapp -t windows-x86_64
 
+# See which package targets are available in your installation
+lumos package --list-targets
+
+# (Optional) Download missing launchers for known targets
+lumos package --sync-runtime --list-targets
+
 # Maximum control: native binary with embedded Lua VM
 lumos build src/main.lua -o dist/myapp
 
 # Cross-compile to Windows from Linux
 lumos build src/main.lua -o dist/myapp -t windows-x86_64
+
+# For macOS targets from Linux, use package launchers
+lumos package src/main.lua -o dist/myapp -t darwin-aarch64
 
 ./dist/myapp --help
 ```
@@ -116,7 +128,7 @@ local color = require('lumos.color')
 
 local app = lumos.new_app({
     name = "my-awesome-cli",
-    version = "0.3.5",
+    version = "0.3.6",
     description = "My awesome CLI application"
 })
 
@@ -148,7 +160,7 @@ app:run(arg)
 
 ### Prerequisites
 - Lua 5.1+ or LuaJIT
-- LuaRocks >= 3.9
+- LuaRocks >= 3.8
 
 ### Option 1: From LuaRocks (Recommended)
 ```bash
@@ -174,8 +186,51 @@ luarocks make --local lumos-dev-1.rockspec
 ### Verify Installation
 ```bash
 lumos version
-# Should output: Lumos CLI Framework v0.3.5
+# Should output: Lumos CLI Framework v0.3.6
 ```
+
+## The Runtime & Distribution Model
+
+Lumos ships with a **`runtime/`** directory containing everything needed to bundle, package, or build your CLI without external dependencies:
+
+- **Precompiled launchers** (`runtime/lumos-launcher-<os>-<arch>`): Standalone binaries embedding a Lua interpreter. Used by `lumos package` to create zero-dependency executables without a C compiler.
+- **Static libraries & headers** (`runtime/lib/<platform>/liblua.a` + `include/*.h`): Bundled cross-compilation toolchains. `lumos build` prefers these over system libraries to guarantee version compatibility, especially when cross-compiling (e.g. Windows from Linux). They also serve as a fallback if system Lua dev packages are not installed.
+- **`launcher.c`**: Source code of the launcher, useful for custom builds or auditing.
+
+All of these are installed automatically when you run `luarocks install lumos` or `luarocks make`.
+
+### Three Ways to Distribute Your CLI
+
+| Method | Command | Output | Needs Lua on target? | Needs C compiler? | Includes native C modules? |
+|--------|---------|--------|----------------------|-------------------|---------------------------|
+| **Bundle** | `lumos bundle` | Single `.lua` script | ✅ Yes | ❌ No | ❌ No |
+| **Package** | `lumos package` | Native executable | ❌ No | ❌ No | ❌ No (fails if detected) |
+| **Build** | `lumos build` | Native binary | ❌ No | ✅ Yes | ✅ Yes (`liblua.a` always bundled; optional user C modules like `lfs`/`lpeg` if `.a` found) |
+
+- **`bundle`** is fastest and most portable among Lua users.
+- **`package`** gives you a native binary with **no C compiler required** on your build machine, thanks to the precompiled launchers.
+- **`build`** gives maximum control: it compiles a native binary embedding the Lua VM, and can statically link C modules like `lfs` or `lpeg` if their `.a` archives are available.
+
+### Cross-Compilation
+
+`lumos package` works from any host to any target because it uses precompiled launchers:
+
+```bash
+# From Linux, package for Windows or macOS
+lumos package src/main.lua -t windows-x86_64
+lumos package src/main.lua -t darwin-aarch64
+```
+
+`lumos build` compiles a native binary and requires a matching cross-compiler:
+
+| From → To | Supported | Required Tool |
+|-----------|-----------|---------------|
+| Linux → Windows | ✅ Yes | `x86_64-w64-mingw32-gcc` (mingw-w64) |
+| Linux → Linux ARM64 | ✅ Yes | `aarch64-linux-gnu-gcc` |
+| Linux → macOS | ❌ No* | Install [osxcross](https://github.com/tpoechtrager/osxcross) to unblock |
+| macOS → Any | ✅ Yes | Xcode Command Line Tools |
+
+\* From Linux, use `lumos package -t darwin-*` instead for macOS targets.
 
 ## Key Features
 
@@ -334,6 +389,35 @@ local ok, err = security.safe_mkdir("./data")
 logger.info("Action performed", {user = "john", id = 42})
 ```
 
+### Native HTTP Client
+```lua
+local http = require('lumos.http')
+
+-- GET with query parameters
+local resp, err = http.get("https://api.example.com/users", {
+    query = {page = "1", limit = "10"}
+})
+
+-- POST with JSON body (auto-encoded)
+local resp, err = http.post("https://api.example.com/users", {
+    body = {name = "Alice", email = "alice@example.com"},
+    headers = {["X-Request-ID"] = "abc123"}
+})
+
+-- Authenticated request
+local resp, err = http.put("https://api.example.com/users/1", {
+    body = {name = "Bob"},
+    auth = {bearer = "my_api_token"},
+    timeout = 10
+})
+
+-- Response helpers
+if resp and resp.ok then
+    local data = resp.json()
+    print(data.id)
+end
+```
+
 ### Advanced Prompts
 ```lua
 local prompt = require('lumos.prompt')
@@ -444,11 +528,11 @@ make install && make test
 
 ## Project Status
 
-- **Version:** 0.3.5
+- **Version:** 0.3.6
 - **License:** MIT
 - **Lua Versions:** 5.1, 5.2, 5.3, 5.4, LuaJIT
 - **Platforms:** Linux, macOS, Windows (native)
-- **Tests:** 434 passing tests
+- **Tests:** 455 passing tests
 - **Dependencies:** luafilesystem
 
 ## Acknowledgments

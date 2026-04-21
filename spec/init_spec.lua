@@ -15,10 +15,11 @@ describe('Lumos Main Module', function()
       assert.is_table(lumos.progress)
       assert.is_table(lumos.prompt)
       assert.is_table(lumos.table)
+      assert.is_table(lumos.runtime_manager)
     end)
 
     it('has correct version', function()
-      assert.are.equal('0.3.5', lumos.version)
+      assert.are.equal('0.3.6', lumos.version)
     end)
 
     it('can create an application', function()

@@ -150,5 +150,22 @@ describe('Advanced Flags Module', function()
             assert.is_true(valid)
             assert.truthy(result:find("foo"))
         end)
+
+        it('accepts path extensions with leading dot', function()
+            local tmp = os.tmpname() .. ".lua"
+            local f = io.open(tmp, "w")
+            assert.is_not_nil(f)
+            if f then
+                f:write("print('ok')\n")
+                f:close()
+            end
+
+            local flag_def = {type = "path", must_exist = true, extensions = {".lua"}}
+            local valid, result = flags.validate_flag(flag_def, tmp)
+            assert.is_true(valid)
+            assert.are.equal(tmp, result)
+
+            os.remove(tmp)
+        end)
     end)
 end)

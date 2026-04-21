@@ -16,7 +16,7 @@ If any are missing:
 - **Ubuntu/Debian**: `sudo apt-get install lua5.3 luarocks git`
 - **CentOS/RHEL**: `sudo yum install lua luarocks git`
 - **macOS**: `brew install lua luarocks git`
-- **Windows**: Use WSL with one of the above
+- **Windows**: Install [MSYS2](https://www.msys2.org/) or [Lua for Windows](http://luabinaries.sourceforge.net/), then install LuaRocks. For `lumos build`, MinGW-w64 is required.
 
 ## Installation
 
@@ -100,7 +100,7 @@ local color = require('lumos.color')
 
 local app = lumos.new_app({
     name = "example",
-    version = "0.1.0",
+    version = "0.3.6",
     description = "Example CLI application"
 })
 
@@ -309,9 +309,17 @@ lumos package src/main.lua -o dist/myapp
 # 4. Build — native binary with embedded Lua VM (requires C toolchain)
 lumos build src/main.lua -o dist/myapp
 
+# Show available package targets in your installation
+lumos package --list-targets
+
 # Test it
 ./dist/myapp --help
 ```
+
+Notes:
+
+- `lumos package` target support depends on bundled launcher binaries (`lumos package --list-targets`).
+- `lumos build -t darwin-*` requires a macOS host; from Linux use `lumos package -t darwin-*`.
 
 ### POSIX Shell Conventions
 

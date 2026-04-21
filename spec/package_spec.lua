@@ -40,6 +40,31 @@ describe('Package Module', function()
                 assert.is_true(found, 'Expected windows-x86_64 in targets')
             end
         end)
+
+        it('returns targets sorted alphabetically', function()
+            local targets = pkg.list_targets()
+            local sorted = {}
+            for _, t in ipairs(targets) do
+                table.insert(sorted, t)
+            end
+            table.sort(sorted)
+            assert.are.same(sorted, targets)
+        end)
+    end)
+
+    describe('runtime sync API', function()
+        it('returns success for a locally available target', function()
+            if not pkg.find_launcher('linux-x86_64') then
+                print('Runtime sync test skipped: linux-x86_64 launcher not available')
+                return
+            end
+
+            local ok, err, result = pkg.sync_runtime({ target = 'linux-x86_64' })
+            assert.is_true(ok, tostring(err))
+            assert.is_table(result)
+            assert.is_not_nil(result['linux-x86_64'])
+            assert.is_not_nil(result['linux-x86_64'].status)
+        end)
     end)
 
     describe('find_launcher()', function()

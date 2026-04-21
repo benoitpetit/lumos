@@ -17,6 +17,8 @@
 </p>
 
 ---
+> 💡 **Lumos est activement développé.** Si vous rencontrez un bug ou avez une suggestion, n'hésitez pas à [ouvrir une issue](https://github.com/benoitpetit/lumos/issues/new) — nous lisons tout.
+
 
 **Lumos** (du latin "lumière") apporte de la clarté au développement CLI en Lua. Inspiré par Cobra pour Go, il fournit tout ce dont vous avez besoin pour construire des applications en ligne de commande professionnelles avec un minimum de code et un maximum de fonctionnalités.
 
@@ -39,6 +41,7 @@
 - **Builds natifs** - Compilez en binaires natifs avec `lumos build` (embarque la VM Lua)
 - **Sécurité intégrée** - Assainissement des entrées, opérations fichiers sécurisées, rate limiting
 - **Logging structuré** - 5 niveaux de log avec loggers enfants et configuration via environnement
+- **Client HTTP natif** - GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS avec backend curl
 - **Chargement paresseux** - Chargement des modules à la demande pour un démarrage rapide (< 30ms)
 
 ## Démarrage rapide en 5 minutes
@@ -99,11 +102,20 @@ lumos package src/main.lua -o dist/myapp
 # Cibler un OS différent (ex: Windows depuis Linux)
 lumos package src/main.lua -o dist/myapp -t windows-x86_64
 
+# Voir les cibles package disponibles dans votre installation
+lumos package --list-targets
+
+# (Optionnel) Télécharger les launchers manquants
+lumos package --sync-runtime --list-targets
+
 # Contrôle maximal : binaire natif avec VM Lua embarquée
 lumos build src/main.lua -o dist/myapp
 
 # Cross-compilation Windows depuis Linux
 lumos build src/main.lua -o dist/myapp -t windows-x86_64
+
+# Pour macOS depuis Linux, utilisez les launchers package
+lumos package src/main.lua -o dist/myapp -t darwin-aarch64
 
 ./dist/myapp --help
 ```
@@ -116,7 +128,7 @@ local color = require('lumos.color')
 
 local app = lumos.new_app({
     name = "my-awesome-cli",
-    version = "0.3.5",
+    version = "0.3.6",
     description = "My awesome CLI application"
 })
 
@@ -148,7 +160,7 @@ app:run(arg)
 
 ### Prérequis
 - Lua 5.1+ ou LuaJIT
-- LuaRocks >= 3.9
+- LuaRocks >= 3.8
 
 ### Option 1 : Depuis LuaRocks (Recommandé)
 ```bash
@@ -174,8 +186,51 @@ luarocks make --local lumos-dev-1.rockspec
 ### Vérifier l'installation
 ```bash
 lumos version
-# Devrait afficher : Lumos CLI Framework v0.3.5
+# Devrait afficher : Lumos CLI Framework v0.3.6
 ```
+
+## Le runtime & modèle de distribution
+
+Lumos inclut un répertoire **`runtime/`** contenant tout le nécessaire pour bundler, packager ou builder votre CLI sans dépendances externes :
+
+- **Launchers précompilés** (`runtime/lumos-launcher-<os>-<arch>`) : Binaires autonomes embarquant un interpréteur Lua. Utilisés par `lumos package` pour créer des exécutables sans dépendances et sans compilateur C.
+- **Librairies statiques & headers** (`runtime/lib/<plateforme>/liblua.a` + `include/*.h`) : Toolchains de cross-compilation fournies avec Lumos. `lumos build` les préfère aux librairies système pour garantir la compatibilité de version, notamment en cross-compilation (ex: Windows depuis Linux). Elles servent aussi de fallback si les paquets de développement Lua système ne sont pas installés.
+- **`launcher.c`** : Code source du launcher, utile pour des builds personnalisés ou l'audit.
+
+Tous ces éléments sont installés automatiquement avec `luarocks install lumos` ou `luarocks make`.
+
+### Trois façons de distribuer votre CLI
+
+| Méthode | Commande | Sortie | Lua requis sur cible ? | Compilateur C requis ? | Modules C natifs |
+|---------|----------|--------|------------------------|------------------------|------------------|
+| **Bundle** | `lumos bundle` | Script `.lua` unique | ✅ Oui | ❌ Non | ❌ Non |
+| **Package** | `lumos package` | Exécutable natif | ❌ Non | ❌ Non | ❌ Non (échoue si détectés) |
+| **Build** | `lumos build` | Binaire natif | ❌ Non | ✅ Oui | ✅ Oui (`liblua.a` toujours fourni ; modules C utilisateur comme `lfs`/`lpeg` si `.a` trouvées) |
+
+- **`bundle`** est le plus rapide et le plus portable parmi les utilisateurs Lua.
+- **`package`** produit un binaire natif **sans compilateur C requis** sur la machine de build, grâce aux launchers précompilés.
+- **`build`** offre le contrôle maximal : il compile un binaire natif embarquant la VM Lua, et peut linker statiquement des modules C comme `lfs` ou `lpeg` si leurs archives `.a` sont disponibles.
+
+### Cross-compilation
+
+`lumos package` fonctionne depuis n'importe quel hôte vers n'importe quelle cible car il utilise des launchers précompilés :
+
+```bash
+# Depuis Linux, packager pour Windows ou macOS
+lumos package src/main.lua -t windows-x86_64
+lumos package src/main.lua -t darwin-aarch64
+```
+
+`lumos build` compile un binaire natif et nécessite un cross-compilateur adapté :
+
+| Depuis → Vers | Supporté | Outil requis |
+|---------------|----------|--------------|
+| Linux → Windows | ✅ Oui | `x86_64-w64-mingw32-gcc` (mingw-w64) |
+| Linux → Linux ARM64 | ✅ Oui | `aarch64-linux-gnu-gcc` |
+| Linux → macOS | ❌ Non* | Installer [osxcross](https://github.com/tpoechtrager/osxcross) pour débloquer |
+| macOS → Tout | ✅ Oui | Xcode Command Line Tools |
+
+\* Depuis Linux, utilisez `lumos package -t darwin-*` à la place pour les cibles macOS.
 
 ## Fonctionnalités clés
 
@@ -334,6 +389,35 @@ local ok, err = security.safe_mkdir("./data")
 logger.info("Action performed", {user = "john", id = 42})
 ```
 
+### Client HTTP natif
+```lua
+local http = require('lumos.http')
+
+-- GET avec paramètres de requête
+local resp, err = http.get("https://api.example.com/users", {
+    query = {page = "1", limit = "10"}
+})
+
+-- POST avec body JSON (encodage automatique)
+local resp, err = http.post("https://api.example.com/users", {
+    body = {name = "Alice", email = "alice@example.com"},
+    headers = {["X-Request-ID"] = "abc123"}
+})
+
+-- Requête authentifiée
+local resp, err = http.put("https://api.example.com/users/1", {
+    body = {name = "Bob"},
+    auth = {bearer = "my_api_token"},
+    timeout = 10
+})
+
+-- Helpers de réponse
+if resp and resp.ok then
+    local data = resp.json()
+    print(data.id)
+end
+```
+
 ### Prompts avancés
 ```lua
 local prompt = require('lumos.prompt')
@@ -444,11 +528,11 @@ make install && make test
 
 ## Statut du projet
 
-- **Version :** 0.3.5
+- **Version :** 0.3.6
 - **Licence :** MIT
 - **Versions Lua :** 5.1, 5.2, 5.3, 5.4, LuaJIT
 - **Plateformes :** Linux, macOS, Windows (natif)
-- **Tests :** 434 tests passants
+- **Tests :** 455 tests passants
 - **Dépendances :** luafilesystem
 
 ## Remerciements

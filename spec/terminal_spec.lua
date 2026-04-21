@@ -29,15 +29,26 @@ describe("Terminal Module", function()
         assert.is_true(h >= 0)
     end)
 
-    it('cursor controls write ANSI codes without error', function()
-        -- Just ensure they don't throw
+    it('cursor controls write ANSI codes', function()
+        -- Capture io.write output to verify sequences
+        local original_write = io.write
+        local captured = {}
+        io.write = function(...)
+            for _, v in ipairs({...}) do
+                table.insert(captured, tostring(v))
+            end
+        end
+
         terminal.save_cursor()
         terminal.restore_cursor()
         terminal.hide_cursor()
         terminal.show_cursor()
-        terminal.clear_to_end()
-        terminal.clear_to_bottom()
-        terminal.move_cursor(1, 1)
-        assert.is_true(true)
+
+        io.write = original_write
+        local output = table.concat(captured)
+        assert.is_not_nil(output:find("\27%[s"))
+        assert.is_not_nil(output:find("\27%[u"))
+        assert.is_not_nil(output:find("\27%[%?25l"))
+        assert.is_not_nil(output:find("\27%[%?25h"))
     end)
 end)

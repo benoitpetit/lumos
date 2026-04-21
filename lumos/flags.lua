@@ -199,10 +199,17 @@ function flags.validate_flag(flag_def, value)
             if flag_def.extensions and attr.mode == "file" then
                 local ext = path_val:match("%.([^%.]+)$")
                 local valid = false
-                for _, allowed in ipairs(flag_def.extensions) do
-                    if ext == allowed then
-                        valid = true
-                        break
+                if ext then
+                    ext = ext:lower()
+                    for _, allowed in ipairs(flag_def.extensions) do
+                        local normalized = tostring(allowed or "")
+                        if normalized:sub(1, 1) == "." then
+                            normalized = normalized:sub(2)
+                        end
+                        if normalized:lower() == ext then
+                            valid = true
+                            break
+                        end
                     end
                 end
                 if not valid then

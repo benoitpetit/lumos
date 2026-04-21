@@ -33,7 +33,8 @@ dependencies = {
 }
 
 test_dependencies = {
-   "busted >= 2.0"
+   "busted >= 2.0",
+   "luacov >= 0.14"
 }
 
 build = {
@@ -67,8 +68,10 @@ build = {
       ["lumos.terminal"] = "lumos/terminal.lua",
       ["lumos.profiler"] = "lumos/profiler.lua",
       ["lumos.config_cache"] = "lumos/config_cache.lua",
+      ["lumos.runtime_manager"] = "lumos/runtime_manager.lua",
       ["lumos.version"] = "lumos/version.lua",
       ["lumos.fs"] = "lumos/fs.lua",
+      ["lumos.http"] = "lumos/http.lua",
       ["lumos.parser"] = "lumos/parser.lua",
       ["lumos.validator"] = "lumos/validator.lua",
       ["lumos.executor"] = "lumos/executor.lua",

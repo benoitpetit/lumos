@@ -4,11 +4,48 @@ Guide for creating portable CLI applications with Lumos.
 
 ## Overview
 
-The `lumos bundle` command creates a single, portable Lua file containing your CLI application and all its dependencies. This file can be distributed and executed on any machine with **Lua installed**, without requiring Lumos to be installed.
+Lumos provides **three distribution strategies**, each suited to different deployment constraints. All three are available immediately after installing Lumos via LuaRocks — no extra setup required.
 
-The `lumos build` command compiles your application into a **native binary** (ELF/PE/Mach-O) that embeds the Lua VM, your code, and any available static native modules. When built with `--static` (automatic with `musl-gcc`), the resulting binary has **zero runtime dependencies** and works even on machines without Lua installed. This command requires a C toolchain on the build machine.
+### The `runtime/` Directory
 
-The `lumos package` command provides the best of both worlds: it creates a standalone executable by combining a precompiled launcher binary (which already contains a Lua interpreter) with your amalgamated Lua code. **No C compiler is required** on your machine — just the appropriate launcher for your target platform.
+When you install Lumos, a `runtime/` directory is copied alongside the Lua modules. It contains:
+
+- **Precompiled launchers** (`runtime/lumos-launcher-<os>-<arch>`): Small native binaries (~250–650 KB) that embed a complete Lua interpreter. These are the foundation of `lumos package`.
+- **Static libraries & headers** (`runtime/lib/<platform>/liblua.a` + `include/*.h`): Cross-compilation toolchains bundled with Lumos. `lumos build` prefers these over system libraries to guarantee version compatibility, especially when cross-compiling (e.g. building a Windows binary from Linux).
+- **`launcher.c`**: The C source of the launcher, for transparency and custom builds.
+
+> **Note:** If a launcher is missing for your target platform, Lumos can automatically download it from the corresponding GitHub Release (see `runtime_manager.sync()`).
+
+### Three Distribution Methods
+
+| Method | Command | What it does | Target needs Lua? | Build machine needs C compiler? |
+|--------|---------|--------------|-------------------|---------------------------------|
+| **Bundle** | `lumos bundle` | Amalgamates your code + dependencies into a single `.lua` file with a custom `package.searchers` preloader. | ✅ Yes | ❌ No |
+| **Package** | `lumos package` | Concatenates a precompiled launcher binary + your amalgamated Lua code + a size footer. The launcher reads itself at runtime to extract and execute the Lua payload. | ❌ No | ❌ No |
+| **Build** | `lumos build` | Generates a C wrapper that hex-encodes your Lua code, compiles it, and links it against the bundled `liblua.a`. Additional user C modules (e.g. `lfs`, `lpeg`, `cjson`) are statically linked when their `.a` archives are available on the build machine. Produces a true native binary. | ❌ No | ✅ Yes |
+
+**When to choose which:**
+- Use **`bundle`** when your users already have Lua installed and you want maximum transparency (plain text, debuggable).
+- Use **`package`** when you need a native executable **without installing a C compiler** or dealing with build toolchains. This is the sweet spot for most users.
+- Use **`build`** when you need maximum performance, want to statically link C modules (e.g. `lfs`, `lpeg`), or need fully static linking with `musl-gcc`.
+
+### How `lumos package` Works Under the Hood
+
+1. Your Lua entry file and all `require()` dependencies are amalgamated into a single Lua string.
+2. A precompiled launcher binary (e.g. `lumos-launcher-linux-x86_64`) is read from disk.
+3. The launcher binary + Lua payload + an 8-byte little-endian size footer are concatenated.
+4. At runtime on the target machine, the launcher opens its own executable path, seeks to the end, reads the 8-byte footer to get the payload size, extracts the Lua code, and executes it via `luaL_loadbuffer` → `lua_pcall`.
+
+### How `lumos build` Works Under the Hood
+
+1. **Amalgamation** (same as bundle).
+2. **Optional bytecode compilation** with `luac`.
+3. **Toolchain detection**: finds `gcc`/`clang`/`mingw` and Lua headers/lib (`liblua.a`). The bundled `runtime/lib/<target>/liblua.a` is preferred to ensure version match; system libraries are used as fallback.
+4. **Native module detection** (optional): scans for known C modules used by *your* application (`lfs`, `socket`, `ssl`, `cjson`, etc.). These are your own dependencies, not Lumos internals.
+5. **C wrapper generation**: creates a `.c` file containing the Lua payload as a `unsigned char[]` array, plus `extern int luaopen_*` declarations and `package.preload` registrations for any detected native modules that have a static `.a` archive available.
+6. **Compilation & linking**: produces the final binary. If a native module is missing its `.a` archive, the build continues and the module must be installed separately on the target machine.
+
+---
 
 ## Requirements
 
@@ -37,6 +74,9 @@ lumos package src/main.lua -o dist/myapp
 # Cross-compile to Windows from Linux
 lumos build src/main.lua -o dist/myapp -t windows-x86_64
 lumos package src/main.lua -o dist/myapp -t windows-x86_64
+
+# For macOS targets from Linux, use package (native build requires macOS host)
+lumos package src/main.lua -o dist/myapp -t darwin-aarch64
 ```
 
 ## The `lumos bundle` Command
@@ -102,11 +142,11 @@ lumos build <entry_file> [options]
 
 ### Cross-Platform Notes
 
-| Platform | Status | Notes |
-|----------|--------|-------|
-| **Linux** | Fully supported | Use `musl-gcc --static` for a 100% static, distro-independent binary. |
-| **Windows** | Supported | Cross-compile from Linux with `x86_64-w64-mingw32-gcc`. Requires cross-compiled `liblua.a` in `runtime/lib/windows-x86_64/`. |
-| **macOS** | Partial | macOS does not allow fully static binaries, but `liblua.a` can still be linked statically. Stubs are built via CI on macOS runners. |
+| Platform | Architectures | Status | Notes |
+|----------|--------------|--------|-------|
+| **Linux** | x86_64, aarch64 | Fully supported | Both native and cross-compilation supported. Use `musl-gcc --static` for a 100% static, distro-independent binary. The bundled `runtime/lib/linux-aarch64/liblua.a` enables cross-builds from x86_64 hosts. |
+| **Windows** | x86_64 | Supported | Cross-compile from Linux with `x86_64-w64-mingw32-gcc`. The bundled `runtime/lib/windows-x86_64/liblua.a` is used automatically; no need to build Lua for Windows manually. |
+| **macOS** | x86_64, aarch64 | Partial | `lumos build -t darwin-*` must run on macOS hosts. From Linux, use `lumos package -t darwin-*` with a prebuilt launcher. |
 
 ## The `lumos package` Command
 
@@ -130,6 +170,7 @@ lumos package <entry_file> [options]
 | `-d, --dir <path>` | Project directory (default: current directory) |
 | `-t, --target <name>` | Target platform launcher (default: host platform, e.g. `linux-x86_64`) |
 | `--list-targets` | List available launcher targets and exit |
+| `--sync-runtime` | Download missing launchers before listing/packaging |
 | `--no-lumos` | Do not bundle Lumos framework |
 | `--strip-comments` | Remove comments to reduce payload size |
 
@@ -142,14 +183,27 @@ lumos package <entry_file> [options]
 
 ### Stubs
 
-Launchers are precompiled static binaries stored in the `runtime/` directory of the Lumos installation. The following launchers are currently available:
+Launchers are precompiled binaries stored in the `runtime/` directory of the Lumos installation. The following launchers are currently available:
 
 - `lumos-launcher-linux-x86_64` -- Linux x86_64 (statically linked)
+- `lumos-launcher-linux-aarch64` -- Linux ARM64 / aarch64 (cross-compiled from Linux x86_64 with `aarch64-linux-gnu-gcc`)
 - `lumos-launcher-windows-x86_64` -- Windows x86_64 (cross-compiled from Linux)
 - `lumos-launcher-darwin-x86_64` -- macOS Intel (build from source on macOS or via CI)
 - `lumos-launcher-darwin-aarch64` -- macOS Apple Silicon (build from source on macOS or via CI)
 
-You can build additional launchers from `runtime/launcher.c` using your platform's C compiler and `liblua.a`. Use `make build-launcher-linux`, `make build-launcher-windows`, or the CI workflow `.github/workflows/build-launchers.yml` for macOS.
+All launchers are built against Lua 5.4.7 to keep runtime behavior consistent across platforms.
+
+You can rebuild launchers from `runtime/launcher.c` using your platform's C compiler and `liblua.a`:
+
+- `make build-launcher-linux`
+- `make build-launcher-windows`
+- `make build-launcher-macos` (prints instructions to run on macOS)
+
+Or use the helper script directly:
+
+```bash
+bash scripts/build-launchers.sh all
+```
 
 ### When to Use `package` vs `build`
 
@@ -384,7 +438,7 @@ If a static archive is not found, `lumos build` will emit a warning but still pr
 
 ### `lumos package` and Native C Modules
 
-`lumos package` uses a precompiled launcher that only contains the Lua interpreter. It cannot include native C modules. If your app uses `lfs`, `socket`, or any other C module, you must use `lumos build` instead.
+`lumos package` uses a precompiled launcher that only contains the Lua interpreter. It cannot include native C modules. If your app uses `lfs`, `socket`, or any other C module, `lumos package` now fails early with an explicit error and tells you to use `lumos build` instead.
 
 ### Recommendations
 

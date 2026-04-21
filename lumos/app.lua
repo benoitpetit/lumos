@@ -594,6 +594,9 @@ function lumos.new_app(config)
         end
         parsed.output_json = (parsed.output_format == "json")
 
+        -- Identify the target command early so we can check its flags
+        local cmd = core.find_command(self, parsed.command)
+
         -- Check for version flag.
         -- Only treat bare -v as --version if the user has NOT already defined a
         -- -v short flag (e.g. --verbose -v).  --version is always honoured.
@@ -603,6 +606,11 @@ function lumos.new_app(config)
         end
         if not user_claimed_v then
             for _, fdef in pairs(self.global_flags or {}) do
+                if fdef.short == "v" then user_claimed_v = true; break end
+            end
+        end
+        if not user_claimed_v and cmd then
+            for _, fdef in pairs(cmd.flags or {}) do
                 if fdef.short == "v" then user_claimed_v = true; break end
             end
         end

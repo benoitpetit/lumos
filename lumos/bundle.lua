@@ -16,7 +16,8 @@ local default_config = {
     include_lumos = true,
     shebang = "#!/usr/bin/env lua",
     strip_comments = false,
-    output_dir = "dist"
+    output_dir = "dist",
+    version = false,
 }
 
 -- List of Lumos core modules
@@ -24,6 +25,10 @@ local LUMOS_MODULES = {
     "lumos.init",
     "lumos.app",
     "lumos.core",
+    "lumos.parser",
+    "lumos.validator",
+    "lumos.executor",
+    "lumos.help_renderer",
     "lumos.flags",
     "lumos.color",
     "lumos.config",
@@ -42,13 +47,16 @@ local LUMOS_MODULES = {
     "lumos.native_build",
     "lumos.package",
     "lumos.plugin",
+    "lumos.error",
     "lumos.error_codes",
     "lumos.version",
     "lumos.platform",
     "lumos.terminal",
     "lumos.middleware",
     "lumos.profiler",
-    "lumos.config_cache"
+    "lumos.config_cache",
+    "lumos.runtime_manager",
+    "lumos.fs"
 }
 
 local read_file = fs.read_file
@@ -216,6 +224,14 @@ local function generate_preloader(modules, config)
                 content = strip_comments(content)
             end
 
+            -- Replace version placeholder if provided
+            local app_version = config.version
+            if app_version then
+                content = content:gsub('"__APP_VERSION__"', string.format('"%s"', app_version))
+            else
+                content = content:gsub('"__APP_VERSION__"', '"dev"')
+            end
+
             -- Use long string with unique delimiter to avoid conflicts
             -- Find a delimiter that doesn't appear in the content
             local delimiter = "="
@@ -278,6 +294,7 @@ local function amalgamation_cache_key(entry_content, options, modules)
         tostring(options.include_lumos),
         tostring(options.strip_comments),
         shebang_val,
+        tostring(options.version or ""),
     }
     -- Include dependency contents so cache is invalidated when any dependency changes
     for _, mod in ipairs(modules or {}) do
@@ -305,6 +322,7 @@ function bundle.amalgamate(options)
         end
     end
 
+
     local entry_file = options.entry
     local project_dir = options.project_dir or "."
 
@@ -327,7 +345,9 @@ function bundle.amalgamate(options)
     end
 
     -- Determine search paths
+    local entry_dir = entry_file:match("^(.+)[/\\][^/\\]+$") or "."
     local search_paths = options.search_paths or {
+        entry_dir,
         project_dir,
         project_dir .. PATH_SEP .. "src",
         project_dir .. PATH_SEP .. "lib",
@@ -394,6 +414,15 @@ function bundle.amalgamate(options)
 
     if config.strip_comments then
         entry_content = strip_comments(entry_content)
+    end
+
+    -- Replace version placeholder if provided
+    local app_version = options.version
+    if app_version then
+        entry_content = entry_content:gsub('"__APP_VERSION__"', string.format('"%s"', app_version))
+    else
+        -- Replace with 'dev' as default so the placeholder doesn't cause runtime errors
+        entry_content = entry_content:gsub('"__APP_VERSION__"', '"dev"')
     end
 
     -- Generate bundle

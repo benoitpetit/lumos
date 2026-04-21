@@ -23,7 +23,7 @@ Creates a new CLI application.
 local lumos = require('lumos')
 local app = lumos.new_app({
     name = "myapp",
-    version = "0.1.0",
+    version = "0.3.6",
     description = "My CLI application"
 })
 ```
@@ -57,6 +57,7 @@ Lumos exports the following modules:
 - `lumos.terminal` - Terminal control and capabilities
 - `lumos.profiler` - Performance profiling
 - `lumos.config_cache` - In-memory configuration cache
+- `lumos.http` - Lightweight HTTP client (GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS)
 
 ## Application Methods
 
@@ -421,8 +422,8 @@ color.colorize("Bright blue text", "bright_blue")
 ### Text Styles (delegated to format module)
 
 ```lua
-color.bold("Bold text")  -- Uses format.bold internally
-color.dim("Dimmed text") -- Uses format.dim internally
+color.bold("Bold text")  -- ANSI bold sequence
+color.dim("Dimmed text") -- ANSI dim sequence
 ```
 
 ### Background Colors
@@ -1286,6 +1287,66 @@ local data = config_cache.load("config.json", { reload = true })
 config_cache.invalidate("config.json")  -- single entry
 config_cache.invalidate()                -- all entries
 ```
+
+## HTTP Module (`lumos.http`)
+
+```lua
+local http = require('lumos.http')
+
+-- GET request
+local resp, err = http.get("https://api.example.com/users")
+if resp and resp.ok then
+    local data = resp.json()
+    print(data[1].name)
+end
+
+-- POST with JSON body (auto-encoded)
+local resp, err = http.post("https://api.example.com/users", {
+    body = {name = "Alice", email = "alice@example.com"},
+    headers = {["X-Request-ID"] = "abc123"}
+})
+
+-- PUT with Bearer token
+local resp, err = http.put("https://api.example.com/users/1", {
+    body = {name = "Bob"},
+    auth = {bearer = "my_api_token"}
+})
+
+-- DELETE
+local resp, err = http.delete("https://api.example.com/users/1")
+
+-- PATCH with basic auth
+local resp, err = http.patch("https://api.example.com/users/1", {
+    body = {role = "admin"},
+    auth = {user = "admin", pass = "secret"}
+})
+
+-- HEAD request
+local resp, err = http.head("https://api.example.com/health")
+
+-- Full request with all options
+local resp, err = http.request({
+    url = "https://api.example.com/users",
+    method = "POST",
+    headers = {["X-Custom"] = "value"},
+    query = {page = "1", limit = "10"},
+    body = {name = "Alice"},
+    json = true,                 -- auto encode/decode (default true for tables)
+    timeout = 10,                -- seconds
+    auth = {bearer = "token"},
+    follow_redirects = true,
+    insecure = false
+})
+```
+
+**Response object:**
+- `status` (number) — HTTP status code
+- `body` (string) — raw response body
+- `headers` (table) — response headers (keys lowercased)
+- `ok` (boolean) — true if status is 200-299
+- `json()` (function) — lazily decodes body as JSON, returns `data, err`
+
+**Backend:** Uses `curl` under the hood (available on virtually all systems). No extra Lua dependencies required.
 
 ## Bundle Minimal (Tree-Shaking)
 

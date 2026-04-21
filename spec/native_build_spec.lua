@@ -61,6 +61,54 @@ describe('Native Build Module', function()
             assert.is_string(tc.cflags)
             assert.is_not_nil(tc.lua_include_dir)
         end)
+
+        it('fails when windows target uses non-MinGW compiler', function()
+            local tc, err = native_build.detect_toolchain({
+                target = 'windows-x86_64',
+                cc = 'cc',
+            })
+            assert.is_nil(tc)
+            assert.is_not_nil(err)
+            assert.is_not_nil(err:find('requires a MinGW compiler'))
+        end)
+
+        it('can use runtime-managed windows cross libs when available', function()
+            local pkg = require('lumos.package')
+            if not pkg.find_launcher('windows-x86_64') then
+                print('Toolchain runtime libs test skipped: windows runtime assets not available')
+                return
+            end
+
+            local tc, err = native_build.detect_toolchain({ target = 'windows-x86_64' })
+            if not tc then
+                print('Toolchain runtime libs test skipped: ' .. tostring(err))
+                return
+            end
+            assert.is_not_nil(tc.liblua_path)
+            assert.is_true(tc.liblua_path:find('windows%-x86_64') ~= nil or tc.compiler:find('mingw') ~= nil)
+        end)
+    end)
+
+    describe('resolve_target()', function()
+        it('normalizes architecture alias', function()
+            local target, err = native_build.resolve_target('windows-amd64')
+            assert.is_nil(err)
+            assert.are.equal('windows-x86_64', target)
+        end)
+
+        it('rejects unknown target', function()
+            local target, err = native_build.resolve_target('plan9-x86_64')
+            assert.is_nil(target)
+            assert.is_not_nil(err)
+            assert.is_not_nil(err:find('Unsupported build target'))
+        end)
+
+        it('rejects malformed target', function()
+            local target, err = native_build.resolve_target('linux')
+            assert.is_nil(target)
+            assert.is_not_nil(err)
+            assert.is_not_nil(err:find('Invalid target format'))
+        end)
     end)
 
     describe('bytecode_compile()', function()
@@ -167,6 +215,34 @@ describe('Native Build Module', function()
             })
             assert.is_false(ok)
             assert.is_not_nil(err)
+        end)
+
+        it('returns a clear error for unsupported macOS cross-build from non-macOS hosts', function()
+            local uname_f = io.popen('uname -s 2>/dev/null')
+            local uname = uname_f and (uname_f:read('*l') or '') or ''
+            if uname_f then uname_f:close() end
+
+            if uname == 'Darwin' then
+                print('Cross-build restriction test skipped on macOS host')
+                return
+            end
+
+            -- Skip if osxcross is installed (cross-build is then supported)
+            if native_build.detect_compiler('o64-clang') then
+                print('Cross-build restriction test skipped (osxcross installed)')
+                return
+            end
+
+            local ok, err = native_build.create({
+                entry = tmp_entry,
+                output = tmp_output_dir .. '/testapp_macos',
+                include_lumos = false,
+                target = 'darwin-x86_64',
+            })
+
+            assert.is_false(ok)
+            assert.is_not_nil(err)
+            assert.is_not_nil(err:find('Cross%-compiling native binaries to macOS is not supported'))
         end)
     end)
 

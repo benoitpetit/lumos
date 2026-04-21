@@ -25,6 +25,8 @@ luarocks make --local lumos-dev-1.rockspec
 luarocks install --local lumos
 ```
 
+> **Note on the Runtime:** Both commands above install the complete `runtime/` directory containing precompiled launchers for all supported platforms (`linux-x86_64`, `windows-x86_64`, `darwin-x86_64`, `darwin-aarch64`) plus static Lua libraries and headers. This means `lumos bundle`, `lumos package`, and `lumos build` work immediately after installation, with no extra downloads required.
+
 ---
 
 ## Local Development: Testing the Lumos CLI
@@ -160,7 +162,7 @@ function M.run(args)
     -- Create the main application
     local app = lumos.new_app({
         name = "todo-cli",
-        version = lumos.version,
+        version = "0.1.0",
         description = "Simple task management CLI"
     })
 
@@ -306,6 +308,25 @@ lumos doctor
 
 Checks your environment for common issues: Lua version, LuaRocks installation, lfs availability, C compiler presence, and launcher binary status. Useful for troubleshooting build or packaging problems.
 
+### Update
+
+```bash
+lumos update
+```
+
+Updates Lumos to the latest version available on LuaRocks. This is a convenience wrapper around `luarocks install lumos` that shows your current version before updating and confirms the result after installation.
+
+```bash
+$ lumos update
+Updating Lumos...
+Current version: v0.3.6
+Running: luarocks install lumos
+✅ Lumos updated successfully!
+New version: v0.3.6
+```
+
+If the update fails, it prints the manual command so you can retry or investigate.
+
 ### Bundle Applications
 
 ```bash
@@ -327,6 +348,8 @@ lumos build src/main.lua -o dist/myapp.exe -t windows-x86_64
 
 Compiles your application into a native binary that embeds the Lua VM. Requires a C compiler and Lua development headers on the build machine. See [Bundling Guide](bundle.md) for details.
 
+Note: native macOS targets (`darwin-x86_64`, `darwin-aarch64`) must be built on macOS hosts. From Linux, use `lumos package -t darwin-*`.
+
 ### Package Standalone Executables
 
 ```bash
@@ -339,6 +362,8 @@ lumos package src/main.lua -t windows-x86_64 -o dist/myapp.exe
 ```
 
 Creates a standalone executable by combining a precompiled launcher binary (which already contains a Lua interpreter) with your amalgamated Lua code. **No C compiler is required** on your machine. See [Bundling Guide](bundle.md) for details.
+
+Tip: available package targets depend on launcher files shipped with your Lumos installation. Check with `lumos package --list-targets`.
 
 ## Development Tips
 

@@ -76,8 +76,17 @@ int main(int argc, char *argv[]) {
     }
 
     unsigned long long payload_size = read_u64_le(size_buf);
-    if (payload_size == 0 || payload_size > 100 * 1024 * 1024) {
-        fprintf(stderr, "Error: invalid payload size (%llu)\n", payload_size);
+    unsigned long long max_payload = 100ULL * 1024 * 1024;
+    const char *env_max = getenv("LUMOS_MAX_PAYLOAD_MB");
+    if (env_max) {
+        char *endptr = NULL;
+        unsigned long long val = strtoull(env_max, &endptr, 10);
+        if (endptr != env_max && *endptr == '\0' && val > 0) {
+            max_payload = val * 1024 * 1024;
+        }
+    }
+    if (payload_size == 0 || payload_size > max_payload) {
+        fprintf(stderr, "Error: invalid payload size (%llu, max %llu)\n", payload_size, max_payload);
         fclose(f);
         return 1;
     }

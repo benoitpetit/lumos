@@ -45,6 +45,15 @@ describe("Man Page Generation", function()
             assert.matches("Aliases: s, run", manpage)
             assert.matches("stop", manpage)
         end)
+
+        it("should show only --version when -v is already used", function()
+            local app = lumos.new_app({name = "myapp"})
+            app:flag("-v --verbose", "Verbose")
+
+            local page = app:generate_manpage()
+            assert.matches("\\fB\\%-\\%-version\\fR", page)
+            assert.is_nil(page:match("\\fB\\%-v\\fR, \\fB\\%-\\%-version\\fR"))
+        end)
         
         it("should include examples from commands", function()
             local app = lumos.new_app({name = "myapp"})

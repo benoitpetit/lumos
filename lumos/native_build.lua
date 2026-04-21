@@ -8,23 +8,17 @@ local native_build = {}
 local bundle = require("lumos.bundle")
 local fs = require("lumos.fs")
 local security = require("lumos.security")
+local runtime_manager = require("lumos.runtime_manager")
 local lfs = require("lfs")
 
 local PATH_SEP = _G.package.config:sub(1, 1)
 local IS_WINDOWS = PATH_SEP == "\\"
 
--- Locate the runtime directory relative to this module (for cross-compiled libs)
-local function get_runtime_dir()
-    local source = debug.getinfo(1, "S").source
-    if source:sub(1, 1) == "@" then
-        local path = source:sub(2)
-        local dir = path:match("^(.+)[/\\]native_build%.lua$")
-        if dir then
-            -- native_build.lua is inside lumos/, runtime is at project root
-            local dev_root = dir:match("^(.+)[/\\]lumos$")
-            if dev_root then
-                return dev_root .. PATH_SEP .. "runtime"
-            end
+local function find_runtime_root_for_target(target)
+    for _, runtime_dir in ipairs(runtime_manager.get_runtime_dirs()) do
+        local lib_dir = runtime_dir .. PATH_SEP .. "lib" .. PATH_SEP .. target
+        if fs.path_exists(lib_dir) then
+            return runtime_dir
         end
     end
     return nil
@@ -66,6 +60,14 @@ end
 
 
 
+-- Known osxcross installation directories
+local OSXCROSS_DIRS = {
+    "/usr/local/osxcross",
+    "/opt/osxcross",
+    os.getenv("HOME") and (os.getenv("HOME") .. "/osxcross") or nil,
+    "/tmp/osxcross",
+}
+
 -- Cross-platform command lookup (which / where)
 local function find_command(name)
     if IS_WINDOWS then
@@ -80,19 +82,162 @@ local function find_command(name)
             local path = out:gsub("%s+$", "")
             if path ~= "" then return path end
         end
+        -- Fallback: search in known osxcross directories
+        for _, dir in ipairs(OSXCROSS_DIRS) do
+            if dir then
+                local candidate = dir .. "/target/bin/" .. name
+                if fs.path_exists(candidate) then
+                    return candidate
+                end
+            end
+        end
     end
     return nil
 end
 
 -- Preferred compiler candidates
 local COMPILER_CANDIDATES = {
-    "cc", "gcc", "clang", "musl-gcc", "x86_64-w64-mingw32-gcc"
+    "cc", "gcc", "clang", "musl-gcc", "aarch64-linux-gnu-gcc",
+    "x86_64-w64-mingw32-gcc", "o64-clang", "oa64-clang"
 }
 
 -- Preferred luac candidates
 local LUAC_CANDIDATES = {
     "luac", "luac5.4", "luac5.3", "luac5.2", "luac5.1"
 }
+
+local SUPPORTED_BUILD_TARGETS = {
+    ["linux-x86_64"] = true,
+    ["linux-aarch64"] = true,
+    ["windows-x86_64"] = true,
+    ["darwin-x86_64"] = true,
+    ["darwin-aarch64"] = true,
+}
+
+local function normalize_arch(arch)
+    if not arch then
+        return nil
+    end
+    local normalized = arch:lower()
+    if normalized == "amd64" then
+        normalized = "x86_64"
+    elseif normalized == "arm64" then
+        normalized = "aarch64"
+    end
+    return normalized
+end
+
+local function normalize_os(os_name)
+    if not os_name then
+        return nil
+    end
+    local normalized = os_name:lower()
+    if normalized == "macos" then
+        normalized = "darwin"
+    end
+    return normalized
+end
+
+local function parse_target(target)
+    if type(target) ~= "string" or target == "" then
+        return nil, "Target must be a non-empty string"
+    end
+    local raw = target:lower()
+    local os_name, arch = raw:match("^([%w_]+)%-([%w_]+)$")
+    if not os_name or not arch then
+        return nil, "Invalid target format: " .. tostring(target) .. ". Expected <os>-<arch> (example: windows-x86_64)."
+    end
+    os_name = normalize_os(os_name)
+    arch = normalize_arch(arch)
+    return {
+        os = os_name,
+        arch = arch,
+        normalized = os_name .. "-" .. arch,
+    }, nil
+end
+
+function native_build.detect_host_target()
+    if IS_WINDOWS then
+        local arch = os.getenv("PROCESSOR_ARCHITECTURE") or "x86_64"
+        arch = normalize_arch(arch)
+        return "windows-" .. (arch or "x86_64")
+    end
+
+    local uname_s = "linux"
+    local uname_m = "x86_64"
+
+    local handle = io.popen("uname -s 2>/dev/null")
+    if handle then
+        local out = handle:read("*l")
+        if out and out ~= "" then
+            uname_s = out:lower()
+        end
+        handle:close()
+    end
+
+    handle = io.popen("uname -m 2>/dev/null")
+    if handle then
+        local out = handle:read("*l")
+        if out and out ~= "" then
+            uname_m = out:lower()
+        end
+        handle:close()
+    end
+
+    if uname_s:find("darwin", 1, true) then
+        uname_s = "darwin"
+    elseif uname_s:find("linux", 1, true) then
+        uname_s = "linux"
+    end
+
+    local arch = normalize_arch(uname_m)
+    return uname_s .. "-" .. (arch or "x86_64")
+end
+
+function native_build.resolve_target(target)
+    local selected = target or native_build.detect_host_target()
+    local parsed, parse_err = parse_target(selected)
+    if not parsed then
+        return nil, parse_err
+    end
+
+    if not SUPPORTED_BUILD_TARGETS[parsed.normalized] then
+        local supported = {}
+        for t in pairs(SUPPORTED_BUILD_TARGETS) do
+            table.insert(supported, t)
+        end
+        table.sort(supported)
+        return nil, "Unsupported build target: " .. parsed.normalized .. ". Supported targets: " .. table.concat(supported, ", ")
+    end
+
+    local host_parsed = parse_target(native_build.detect_host_target())
+    if host_parsed then
+        if parsed.os == "darwin" and host_parsed.os ~= "darwin" then
+            local has_darwin_cc = false
+            if parsed.arch == "x86_64" then
+                has_darwin_cc = find_command("o64-clang") ~= nil
+            elseif parsed.arch == "aarch64" then
+                has_darwin_cc = find_command("oa64-clang") ~= nil
+            end
+            if not has_darwin_cc then
+                return nil,
+                    "Cross-compiling native binaries to macOS is not supported on "
+                    .. host_parsed.os
+                    .. ". Install osxcross or build on macOS. Alternative: use 'lumos package -t "
+                    .. parsed.normalized
+                    .. "'."
+            end
+        end
+        if parsed.os == "linux" and host_parsed.os ~= "linux" then
+            return nil,
+                "Cross-compiling native binaries to Linux is not supported on "
+                .. host_parsed.os
+                .. ". Use a Linux build host."
+        end
+    end
+
+    return parsed.normalized, nil
+end
 
 -- Detect available C compiler
 -- @return string|nil compiler path
@@ -119,9 +264,11 @@ local function is_luajit()
 end
 
 -- Detect available luac compiler and verify version matches target VM
+-- @param preferred string|nil preferred luac name
+-- @param target_version string|nil expected Lua version (defaults to current VM version)
 -- @return string|nil luac path, string|nil error
-function native_build.detect_luac(preferred)
-    local target_ver = get_lua_version()
+function native_build.detect_luac(preferred, target_version)
+    local target_ver = target_version or get_lua_version()
     local candidates = {}
     if preferred then
         table.insert(candidates, preferred)
@@ -149,8 +296,8 @@ end
 
 -- Compile Lua source string to bytecode string
 -- @return string|nil bytecode, string|nil error
-function native_build.bytecode_compile(lua_code, preferred_luac)
-    local luac, lerr = native_build.detect_luac(preferred_luac)
+function native_build.bytecode_compile(lua_code, preferred_luac, target_version)
+    local luac, lerr = native_build.detect_luac(preferred_luac, target_version)
     if not luac then
         return nil, lerr or "No luac compiler found. Cannot compile to bytecode."
     end
@@ -197,19 +344,42 @@ end
 -- @return table|nil toolchain { compiler, cflags, ldflags, liblua_path, lua_include_dir, static }
 function native_build.detect_toolchain(options)
     options = options or {}
-    local target = options.target
+    local target, target_err = native_build.resolve_target(options.target)
+    if not target then
+        return nil, target_err
+    end
+    local target_info = parse_target(target)
+    local target_os = target_info and target_info.os or nil
     local preferred_compiler = options.cc
 
     -- Target-aware compiler selection
-    if target and not preferred_compiler then
-        if target:match("^windows") then
+    if not preferred_compiler then
+        if target_os == "windows" then
             preferred_compiler = "x86_64-w64-mingw32-gcc"
+        elseif target_os == "darwin" then
+            if target_info.arch == "aarch64" then
+                preferred_compiler = "oa64-clang"
+            else
+                preferred_compiler = "o64-clang"
+            end
+        elseif target_os == "linux" then
+            if target_info.arch == "aarch64" then
+                preferred_compiler = "aarch64-linux-gnu-gcc"
+            end
         end
     end
 
     local compiler = native_build.detect_compiler(preferred_compiler)
     if not compiler then
         return nil, "No C compiler found. Please install gcc, clang, or musl-gcc."
+    end
+
+    local is_mingw = compiler:find("mingw") ~= nil
+    if target_os == "windows" and not is_mingw then
+        return nil, "Target " .. target .. " requires a MinGW compiler (x86_64-w64-mingw32-gcc)."
+    end
+    if target_os ~= "windows" and is_mingw then
+        return nil, "Compiler " .. compiler .. " targets Windows, but requested target is " .. target .. "."
     end
 
     local lua_ver = get_lua_version()
@@ -271,7 +441,7 @@ function native_build.detect_toolchain(options)
         if env_lib then table.insert(search_paths, 1, env_lib) end
 
         -- Add bundled cross-compiled libraries from runtime/lib/<target>
-        local runtime_dir = get_runtime_dir()
+        local runtime_dir = find_runtime_root_for_target(target)
         if runtime_dir and target then
             local cross_lib_dir = runtime_dir .. PATH_SEP .. "lib" .. PATH_SEP .. target
             if fs.path_exists(cross_lib_dir) then
@@ -307,6 +477,15 @@ function native_build.detect_toolchain(options)
     end
 
     -- Find headers
+    -- Prefer bundled cross-compiled headers to guarantee version match with liblua.a
+    local runtime_dir = find_runtime_root_for_target(target)
+    if runtime_dir and target then
+        local cross_inc_dir = runtime_dir .. PATH_SEP .. "lib" .. PATH_SEP .. target .. PATH_SEP .. "include"
+        if fs.path_exists(cross_inc_dir .. "/lua.h") then
+            lua_include_dir = cross_inc_dir
+        end
+    end
+
     if not lua_include_dir then
         local inc_candidates = {}
         if is_luajit() then
@@ -330,14 +509,6 @@ function native_build.detect_toolchain(options)
                 table.insert(inc_candidates, "/usr/x86_64-w64-mingw32/include")
                 table.insert(inc_candidates, "/usr/i686-w64-mingw32/include")
             end
-            -- Add bundled cross-compiled headers from runtime/lib/<target>/include
-            local runtime_dir = get_runtime_dir()
-            if runtime_dir and target then
-                local cross_inc_dir = runtime_dir .. PATH_SEP .. "lib" .. PATH_SEP .. target .. PATH_SEP .. "include"
-                if fs.path_exists(cross_inc_dir) then
-                    table.insert(inc_candidates, 1, cross_inc_dir)
-                end
-            end
         end
         local env_inc = os.getenv("LUA_INCDIR")
         if env_inc then table.insert(inc_candidates, 1, env_inc) end
@@ -355,6 +526,13 @@ function native_build.detect_toolchain(options)
 
     if not liblua_path then
         return nil, "Could not find static Lua library (liblua.a). Please install liblua-dev or lua-devel."
+    end
+
+    -- If we are using a bundled cross-compiled library, discard system pkg-config
+    -- flags to avoid mixing system headers with the bundled library.
+    if liblua_path:find("runtime/lib", 1, true) then
+        cflags = "-I" .. lua_include_dir
+        ldflags = ""
     end
 
     -- musl-gcc is typically used specifically for static linking
@@ -379,9 +557,30 @@ function native_build.find_static_native_module(name)
     local home = os.getenv("HOME") or os.getenv("USERPROFILE")
     local lua_ver = get_lua_version()
     local search_paths = {}
+
+    -- Project-local paths (useful for vendored static libs)
+    local cwd = lfs.currentdir()
+    if cwd and cwd ~= "" then
+        table.insert(search_paths, cwd)
+        table.insert(search_paths, cwd .. PATH_SEP .. "lib")
+        table.insert(search_paths, cwd .. PATH_SEP .. "build")
+    end
+
+    -- LuaRocks user trees
     if home then
         table.insert(search_paths, home .. PATH_SEP .. ".luarocks" .. PATH_SEP .. "lib" .. PATH_SEP .. "lua" .. PATH_SEP .. lua_ver)
+        table.insert(search_paths, home .. PATH_SEP .. ".luarocks" .. PATH_SEP .. "lib")
     end
+
+    -- Parse package.cpath entries to discover nearby lib directories
+    local cpath_sep = IS_WINDOWS and ";" or ";"
+    for entry in (package.cpath or ""):gmatch("([^" .. cpath_sep .. "]+)") do
+        local dir = entry:match("^(.+)[/\\][^/\\]+$")
+        if dir then
+            table.insert(search_paths, dir)
+        end
+    end
+
     local common = {
         "/usr/lib/x86_64-linux-gnu",
         "/usr/lib/aarch64-linux-gnu",
@@ -401,10 +600,15 @@ function native_build.find_static_native_module(name)
         "lib" .. name .. ".a",
         "liblua" .. name .. ".a",
     }
+
+    local seen = {}
     for _, dir in ipairs(search_paths) do
-        for _, cand in ipairs(candidates) do
-            local p = dir .. PATH_SEP .. cand
-            if fs.path_exists(p) then return p end
+        if dir and dir ~= "" and not seen[dir] then
+            seen[dir] = true
+            for _, cand in ipairs(candidates) do
+                local p = dir .. PATH_SEP .. cand
+                if fs.path_exists(p) then return p end
+            end
         end
     end
     return nil
@@ -625,9 +829,10 @@ local KNOWN_NATIVE_MODULES = {
 }
 
 -- Determine which native C modules are used by the amalgamated code
-local function detect_native_modules(lua_code)
+function native_build.detect_native_modules(lua_code)
     local natives = {}
     for req_name, lib_name in pairs(KNOWN_NATIVE_MODULES) do
+        _ = lib_name
         if lua_code:find(req_name, 1, true) then
             local escaped = req_name:gsub("([%.%-%+%*%?%[%]%^%$%(%)])", "%%%1")
             -- Check multiple common require patterns
@@ -637,6 +842,8 @@ local function detect_native_modules(lua_code)
                 'require "' .. escaped .. '"',
                 "require '" .. escaped .. "'",
                 'require%(' .. escaped .. '%)',
+                'require%s*,%s*"' .. escaped .. '"',
+                "require%s*,%s*'" .. escaped .. "'",
             }
             local found = false
             for _, p in ipairs(patterns) do
@@ -653,14 +860,76 @@ local function detect_native_modules(lua_code)
     return natives
 end
 
+function native_build.detect_project_native_modules(options)
+    options = options or {}
+    if not options.entry then
+        return {}
+    end
+
+    local project_dir = options.project_dir or "."
+    local search_paths = options.search_paths or {
+        project_dir,
+        project_dir .. PATH_SEP .. "src",
+        project_dir .. PATH_SEP .. "lib",
+        project_dir .. PATH_SEP .. "lumos",
+        ".",
+    }
+
+    local modules = bundle.analyze(options.entry, search_paths) or {}
+    local files = { options.entry }
+    for _, mod in ipairs(modules) do
+        if mod.path and mod.name and not mod.name:match("^lumos") then
+            table.insert(files, mod.path)
+        end
+    end
+
+    local native_set = {}
+    for _, file_path in ipairs(files) do
+        local code = fs.read_file(file_path)
+        if code then
+            local found = native_build.detect_native_modules(code)
+            for _, mod_name in ipairs(found) do
+                native_set[mod_name] = true
+            end
+        end
+    end
+
+    local native_list = {}
+    for mod_name in pairs(native_set) do
+        table.insert(native_list, mod_name)
+    end
+    table.sort(native_list)
+    return native_list
+end
+
 -- Compile the C wrapper into a native binary
 local function compile(main_c_path, output_path, toolchain, native_module_paths, native_modules, options)
+    local is_mingw = toolchain.compiler:find("mingw")
+    local is_darwin = toolchain.compiler:find("clang") and (toolchain.compiler:find("o64") or toolchain.compiler:find("oa64"))
+
+    -- For osxcross, the compiler wrapper needs its own tools (ld64, ar, etc.) on PATH
+    -- and its libraries (libxar) on LD_LIBRARY_PATH
+    local env_prefix = ""
+    if is_darwin then
+        -- Resolve symlinks to find the real osxcross bin directory
+        local real_compiler, _, rc = shell_exec("readlink -f " .. security.shell_escape(toolchain.compiler))
+        if rc == 0 then
+            real_compiler = real_compiler:gsub("%s+$", "")
+        else
+            real_compiler = toolchain.compiler
+        end
+        local compiler_dir = real_compiler:match("^(.+)[/\\][^/\\]+$")
+        if compiler_dir then
+            local lib_dir = compiler_dir:match("^(.+)[/\\]bin$") .. PATH_SEP .. "lib"
+            env_prefix = "env PATH=" .. security.shell_escape(compiler_dir) .. ":$PATH LD_LIBRARY_PATH=" .. security.shell_escape(lib_dir) .. ":$LD_LIBRARY_PATH "
+        end
+    end
+
     local cmd_parts = {
-        security.shell_escape(toolchain.compiler),
+        env_prefix .. security.shell_escape(toolchain.compiler),
         toolchain.cflags,
     }
-    local is_mingw = toolchain.compiler:find("mingw")
-    if toolchain.static or options.static then
+    if (toolchain.static or options.static) and not is_darwin then
         table.insert(cmd_parts, "-static")
     end
     -- Define STATIC_xxx macros so the C wrapper registers native modules in package.preload
@@ -677,8 +946,10 @@ local function compile(main_c_path, output_path, toolchain, native_module_paths,
     for _, mod_path in ipairs(native_module_paths or {}) do
         table.insert(cmd_parts, security.shell_escape(mod_path))
     end
-    if not is_mingw and not IS_WINDOWS then
+    if not is_mingw and not is_darwin and not IS_WINDOWS then
         table.insert(cmd_parts, "-lm -ldl")
+    elseif is_darwin then
+        table.insert(cmd_parts, "-lm")
     end
     table.insert(cmd_parts, "-o " .. security.shell_escape(output_path))
 
@@ -698,6 +969,22 @@ local function djb2_hash(str)
     return string.format("%08x", hash)
 end
 
+-- Detect Lua version from headers (e.g. 5.4 from LUA_VERSION_NUM 504)
+local function get_lua_version_from_headers(include_dir)
+    local fh = io.open(include_dir .. "/lua.h", "r")
+    if not fh then return nil end
+    local content = fh:read("*a")
+    fh:close()
+    local num = content:match("#define%s+LUA_VERSION_NUM%s+(%d+)")
+    if num then
+        local n = tonumber(num)
+        local major = math.floor(n / 100)
+        local minor = n % 100
+        return major .. "." .. minor
+    end
+    return nil
+end
+
 -- Build a standalone native binary
 -- @param options table
 --   entry, output, project_dir, include_lumos, strip_comments,
@@ -705,6 +992,15 @@ end
 -- @return boolean success, string|nil err, table|nil info
 function native_build.create(options)
     options = options or {}
+
+    local resolved_target, target_err = native_build.resolve_target(options.target)
+    if not resolved_target then
+        return false, target_err
+    end
+    options.target = resolved_target
+
+    local target_info = parse_target(resolved_target)
+    local is_windows_target = target_info and target_info.os == "windows"
 
     -- Step 1: Amalgamate Lua code
     local ok, err, lua_code, modules_count = bundle.amalgamate(options)
@@ -718,7 +1014,13 @@ function native_build.create(options)
     local payload = lua_code
     local is_bytecode = false
 
-    -- Step 2: Bytecode compilation (with cache)
+    -- Step 2: Detect toolchain (needed early for bytecode version matching)
+    local toolchain, terr = native_build.detect_toolchain(options)
+    if not toolchain then
+        return false, terr
+    end
+
+    -- Step 3: Bytecode compilation (with cache)
     if options.bytecode then
         ensure_build_cache_dir()
         local bc_key = djb2_hash(lua_code)
@@ -729,7 +1031,12 @@ function native_build.create(options)
             f:close()
             is_bytecode = true
         else
-            local bc, berr = native_build.bytecode_compile(payload)
+            local header_ver = get_lua_version_from_headers(toolchain.lua_include_dir)
+            local preferred_luac = nil
+            if header_ver then
+                preferred_luac = "luac" .. header_ver
+            end
+            local bc, berr = native_build.bytecode_compile(payload, preferred_luac, header_ver)
             if not bc then
                 return false, berr
             end
@@ -742,14 +1049,6 @@ function native_build.create(options)
             end
         end
     end
-
-    -- Step 3: Detect toolchain
-    local toolchain, terr = native_build.detect_toolchain(options)
-    if not toolchain then
-        return false, terr
-    end
-
-    local target = options.target or (IS_WINDOWS and "windows-x86_64" or "linux-x86_64")
 
     -- Step 4: Determine output path (before writing any temp file so failures are cheap)
     local output_path = options.output
@@ -771,13 +1070,12 @@ function native_build.create(options)
     end
 
     -- Append .exe on Windows targets if missing
-    local is_windows_target = (options.target and options.target:match("^windows")) or (not options.target and IS_WINDOWS)
     if is_windows_target and not output_path:match("%.exe$") then
         output_path = output_path .. ".exe"
     end
 
     -- Step 5: Detect native C modules used
-    local native_modules = detect_native_modules(lua_code)
+    local native_modules = native_build.detect_project_native_modules(options)
     local native_module_paths = {}
     local missing_native = {}
     local linked_native_modules = {}
@@ -817,6 +1115,7 @@ function native_build.create(options)
 
     return true, nil, {
         output = output_path,
+        target = resolved_target,
         modules_count = modules_count,
         size = lfs.attributes(output_path, "size") or 0,
         compiler = toolchain.compiler,

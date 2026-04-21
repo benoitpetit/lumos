@@ -13,7 +13,7 @@ local lfs = require('lfs')
 
 local app = lumos.new_app({
     name = "fileutil",
-    version = "0.1.0",
+    version = "0.3.6",
     description = "File utilities CLI"
 })
 
@@ -187,7 +187,7 @@ local tbl = require('lumos.table')
 
 local app = lumos.new_app({
     name = "tasks",
-    version = "0.1.0",
+    version = "0.3.6",
     description = "Simple task manager"
 })
 
@@ -234,8 +234,10 @@ add_cmd:action(function(ctx)
         return false
     end
     
-    local _, priority = ctx.flags.priority or 
-        prompt.select("Priority:", {"Low", "Medium", "High"}, 2)
+    local priority = ctx.flags.priority
+    if not priority then
+        _, priority = prompt.select("Priority:", {"Low", "Medium", "High"}, 2)
+    end
     
     local tasks = load_tasks()
     table.insert(tasks, {
@@ -428,7 +430,7 @@ local json = require('lumos.json')
 
 local app = lumos.new_app({
     name = "configapp",
-    version = "0.1.0",
+    version = "0.3.6",
     description = "Configuration-driven deployment tool"
 })
 
@@ -510,7 +512,7 @@ local logger = require('lumos.logger')
 
 local app = lumos.new_app({
     name = "securefile",
-    version = "0.1.0",
+    version = "0.3.6",
     description = "Secure file management CLI"
 })
 
@@ -588,7 +590,7 @@ local platform = require('lumos.platform')
 
 local app = lumos.new_app({
     name = "deployctl",
-    version = "0.3.5",
+    version = "0.3.6",
     description = "Modern deployment controller"
 })
 

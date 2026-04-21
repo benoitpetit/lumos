@@ -9,12 +9,123 @@ jobs:
   test:
     uses: ./.github/workflows/test.yml
 
-  luarocks:
+  build-launchers-linux-windows:
     needs: [test]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y musl-tools gcc-mingw-w64-x86-64
+
+      - name: Build Linux and Windows launchers
+        run: |
+          bash scripts/build-launchers.sh linux
+          bash scripts/build-launchers.sh windows
+
+      - name: Upload launchers artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: launchers-linux-windows
+          path: runtime/lumos-launcher-*
+
+  build-launchers-macos:
+    needs: [test]
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build macOS launchers
+        run: |
+          bash scripts/build-launchers.sh macos
+
+      - name: Upload launchers artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: launchers-macos
+          path: runtime/lumos-launcher-darwin-*
+
+  build-launchers-linux-aarch64:
+    needs: [test]
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build Linux aarch64 launcher
+        run: |
+          bash scripts/build-launchers.sh linux-aarch64
+
+      - name: Upload launchers artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: launchers-linux-aarch64
+          path: runtime/lumos-launcher-linux-aarch64
+
+  github-release:
+    needs: [test, build-launchers-linux-windows, build-launchers-macos, build-launchers-linux-aarch64]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download Linux/Windows launchers
+        uses: actions/download-artifact@v4
+        with:
+          name: launchers-linux-windows
+          path: release-assets/
+
+      - name: Download macOS launchers
+        uses: actions/download-artifact@v4
+        with:
+          name: launchers-macos
+          path: release-assets/
+
+      - name: Download Linux aarch64 launchers
+        uses: actions/download-artifact@v4
+        with:
+          name: launchers-linux-aarch64
+          path: release-assets/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release-assets/lumos-launcher-*
+          generate_release_notes: true
+
+  luarocks:
+    needs: [test, build-launchers-linux-windows, build-launchers-macos, build-launchers-linux-aarch64]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download Linux/Windows launchers
+        uses: actions/download-artifact@v4
+        with:
+          name: launchers-linux-windows
+          path: runtime/
+
+      - name: Download macOS launchers
+        uses: actions/download-artifact@v4
+        with:
+          name: launchers-macos
+          path: runtime/
+
+      - name: Download Linux aarch64 launchers
+        uses: actions/download-artifact@v4
+        with:
+          name: launchers-linux-aarch64
+          path: runtime/
+
+      - name: List runtime directory
+        run: ls -la runtime/
 
       - name: Setup Lua
         uses: hishamhm/gh-actions-lua@master

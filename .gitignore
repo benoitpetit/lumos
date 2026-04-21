@@ -41,8 +41,28 @@ dist/
 .lumos/
 
 # Cross-compilation stubs and libraries
-runtime/lib/
-runtime/lumos-launcher-windows-x86_64
+runtime/lib/*
+!runtime/lib/windows-x86_64/
+!runtime/lib/windows-x86_64/liblua.a
+!runtime/lib/windows-x86_64/include/
+!runtime/lib/windows-x86_64/include/*.h
+!runtime/lib/linux-x86_64/
+!runtime/lib/linux-x86_64/liblua.a
+!runtime/lib/linux-x86_64/include/
+!runtime/lib/linux-x86_64/include/*.h
+!runtime/lib/darwin-x86_64/
+!runtime/lib/darwin-x86_64/liblua.a
+!runtime/lib/darwin-x86_64/include/
+!runtime/lib/darwin-x86_64/include/*.h
+!runtime/lib/darwin-aarch64/
+!runtime/lib/darwin-aarch64/liblua.a
+!runtime/lib/darwin-aarch64/include/
+!runtime/lib/darwin-aarch64/include/*.h
+
+!runtime/lib/linux-aarch64/
+!runtime/lib/linux-aarch64/liblua.a
+!runtime/lib/linux-aarch64/include/
+!runtime/lib/linux-aarch64/include/*.h
 
 # Editor backups
 *~
@@ -57,3 +77,6 @@ build/
 pmp_output
 whitepaper.md
 *.src.rock
+
+# e2e test artifacts
+lumos-e2e-demo/

@@ -7,10 +7,10 @@ local package = {}
 local bundle = require("lumos.bundle")
 local fs = require("lumos.fs")
 local security = require("lumos.security")
+local runtime_manager = require("lumos.runtime_manager")
 
 local PATH_SEP = _G.package.config:sub(1, 1)
 local IS_WINDOWS = PATH_SEP == "\\"
-local lfs = require("lfs")
 
 local read_file = fs.read_file
 local write_file = fs.write_file
@@ -28,118 +28,27 @@ local function u64_le(n)
     return table.concat(bytes)
 end
 
---- Determine the directory where this module is installed
----@return string
-local function get_module_dir()
-    local source = debug.getinfo(1, "S").source
-    if source:sub(1, 1) == "@" then
-        local path = source:sub(2)
-        -- Cross-platform pattern for package.lua
-        local dir = path:match("^(.+)[/\\]package%.lua$")
-        if dir then
-            return dir
-        end
-    end
-    return "lumos"
-end
-
 --- List available launcher targets
 ---@return table targets
 function package.list_targets()
-    local roots = {}
-    -- Development checkout
-    local dev_root = get_module_dir():match("^(.+)[/\\]lumos$")
-    if dev_root then
-        table.insert(roots, dev_root)
-    end
-    -- Installed rock tree (module dir parent might contain runtime if copy_directories worked)
-    local mod_dir = get_module_dir()
-    if mod_dir and mod_dir ~= "lumos" then
-        local rock_root = mod_dir .. PATH_SEP .. ".." .. PATH_SEP .. ".."
-        table.insert(roots, rock_root)
-    end
-    local targets = {}
-    for _, root in ipairs(roots) do
-        local runtime_dir = root .. PATH_SEP .. "runtime"
-        if path_exists(runtime_dir) then
-            for file in lfs.dir(runtime_dir) do
-                if file:match("^lumos%-launcher%-") then
-                    local target = file:match("^lumos%-launcher%-(.+)$")
-                    if target and not targets[target] then
-                        targets[target] = true
-                    end
-                end
-            end
-        end
-    end
-    local list = {}
-    for target in pairs(targets) do
-        table.insert(list, target)
-    end
-    table.sort(list)
-    return list
+    return runtime_manager.list_targets()
 end
 
 --- Find the launcher binary path for a given target
 ---@param target string
 ---@return string|nil
 function package.find_launcher(target)
-    local roots = {}
-    local dev_root = get_module_dir():match("^(.+)[/\\]lumos$")
-    if dev_root then
-        table.insert(roots, dev_root)
-    end
-    local mod_dir = get_module_dir()
-    if mod_dir and mod_dir ~= "lumos" then
-        local rock_root = mod_dir .. PATH_SEP .. ".." .. PATH_SEP .. ".."
-        table.insert(roots, rock_root)
-    end
-    for _, root in ipairs(roots) do
-        local launcher_path = root .. PATH_SEP .. "runtime" .. PATH_SEP .. "lumos-launcher-" .. target
-        if path_exists(launcher_path) then
-            return launcher_path
-        end
-    end
-    return nil
+    return runtime_manager.find_launcher(target)
 end
 
 --- Detect the host platform target
 ---@return string
 function package.detect_host_target()
-    if IS_WINDOWS then
-        local arch = os.getenv("PROCESSOR_ARCHITECTURE") or "x86_64"
-        if arch:match("AMD64") or arch:match("x86_64") then
-            return "windows-x86_64"
-        end
-        return "windows-" .. arch:lower()
-    end
-    local uname_s = "Linux"
-    local uname_m = "x86_64"
-    local handle = io.popen("uname -s 2>/dev/null")
-    if handle then
-        local out = handle:read("*l")
-        if out then uname_s = out end
-        handle:close()
-    end
-    handle = io.popen("uname -m 2>/dev/null")
-    if handle then
-        local out = handle:read("*l")
-        if out then uname_m = out end
-        handle:close()
-    end
-    local sys = uname_s:lower()
-    if sys:find("darwin") then
-        sys = "darwin"
-    elseif sys:find("linux") then
-        sys = "linux"
-    end
-    local arch = uname_m:lower()
-    if arch:match("amd64") or arch:match("x86_64") then
-        arch = "x86_64"
-    elseif arch:match("aarch64") or arch:match("arm64") then
-        arch = "aarch64"
-    end
-    return sys .. "-" .. arch
+    return runtime_manager.detect_host_target()
+end
+
+function package.sync_runtime(options)
+    return runtime_manager.sync(options)
 end
 
 --- Package a Lua CLI application into a standalone executable
@@ -160,14 +69,33 @@ function package.create(options)
         return false, "Entry file not found: " .. entry_file
     end
 
+    local project_native_modules = {}
+    do
+        local ok_nb, native_build = pcall(require, "lumos.native_build")
+        if ok_nb and native_build and type(native_build.detect_project_native_modules) == "function" then
+            project_native_modules = native_build.detect_project_native_modules(options)
+        end
+    end
+    if #project_native_modules > 0 then
+        local modules_list = table.concat(project_native_modules, ", ")
+        return false,
+            "Cannot package: native C modules detected (" .. modules_list .. "). "
+            .. "'lumos package' does not support native C modules because it uses a precompiled "
+            .. "Lua launcher without a C compiler step. "
+            .. "Use 'lumos build' instead (e.g. lumos build " .. entry_file .. " -t " .. (options.target or package.detect_host_target()) .. ")."
+    end
+
     local target = options.target or package.detect_host_target()
-    local launcher_path = package.find_launcher(target)
+    local launcher_path, launcher_err = runtime_manager.ensure_target(target, {
+        force = options.sync_runtime_force,
+    })
     if not launcher_path then
         local available = table.concat(package.list_targets(), ", ")
         if available == "" then
             available = "none"
         end
-        return false, "Launcher not found for target: " .. target .. ". Available: " .. available
+        local details = launcher_err and (". " .. launcher_err) or ""
+        return false, "Launcher not found for target: " .. target .. ". Available: " .. available .. details
     end
 
     -- Amalgamate Lua code
@@ -184,10 +112,18 @@ function package.create(options)
         return false, "Cannot read launcher binary: " .. launcher_path
     end
 
-    -- 100 MiB limit enforced by launcher.c
-    local MAX_PAYLOAD = 100 * 1024 * 1024
+    -- Payload limit: defaults to 100 MiB, overridable via LUMOS_MAX_PAYLOAD_MB env var
+    local MAX_PAYLOAD_MB = 100
+    local env_max = os.getenv("LUMOS_MAX_PAYLOAD_MB")
+    if env_max then
+        local n = tonumber(env_max)
+        if n and n > 0 then
+            MAX_PAYLOAD_MB = math.floor(n)
+        end
+    end
+    local MAX_PAYLOAD = MAX_PAYLOAD_MB * 1024 * 1024
     if #lua_code > MAX_PAYLOAD then
-        return false, "Payload exceeds maximum size of 100 MiB (" .. tostring(#lua_code) .. " bytes)"
+        return false, "Payload exceeds maximum size of " .. MAX_PAYLOAD_MB .. " MiB (" .. tostring(#lua_code) .. " bytes). Set LUMOS_MAX_PAYLOAD_MB to increase the limit."
     end
 
     local payload = launcher_data .. lua_code .. u64_le(#lua_code)
