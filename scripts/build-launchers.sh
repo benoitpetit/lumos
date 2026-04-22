@@ -165,27 +165,32 @@ build_macos() {
     echo ""
     echo "--- Building darwin launchers ---"
 
-    cd "$LUA_SRC"
-    make clean || true
-    make macosx
-
     cd "$BUILD_DIR"
 
     # Intel Macs
+    cd "$LUA_SRC"
+    make clean || true
+    make macosx CC="cc -arch x86_64"
+
     echo "Building darwin-x86_64 launcher..."
     cc -O2 -arch x86_64 "$LAUNCHERS_DIR/launcher.c" -o "$LAUNCHERS_DIR/lumos-launcher-darwin-x86_64" \
         "$LUA_SRC/src/liblua.a" -lm -I"$LUA_SRC/src"
 
-    # Apple Silicon
-    echo "Building darwin-aarch64 launcher..."
-    cc -O2 -arch arm64 "$LAUNCHERS_DIR/launcher.c" -o "$LAUNCHERS_DIR/lumos-launcher-darwin-aarch64" \
-        "$LUA_SRC/src/liblua.a" -lm -I"$LUA_SRC/src"
-
-    # Install darwin static libs and headers for native_build
+    # Install x86_64 static lib and headers for native_build
     mkdir -p "$LAUNCHERS_DIR/lib/darwin-x86_64/include"
     cp "$LUA_SRC/src/liblua.a" "$LAUNCHERS_DIR/lib/darwin-x86_64/"
     cp "$LUA_SRC/src/"*.h "$LAUNCHERS_DIR/lib/darwin-x86_64/include/"
 
+    # Apple Silicon
+    cd "$LUA_SRC"
+    make clean || true
+    make macosx CC="cc -arch arm64"
+
+    echo "Building darwin-aarch64 launcher..."
+    cc -O2 -arch arm64 "$LAUNCHERS_DIR/launcher.c" -o "$LAUNCHERS_DIR/lumos-launcher-darwin-aarch64" \
+        "$LUA_SRC/src/liblua.a" -lm -I"$LUA_SRC/src"
+
+    # Install arm64 static lib and headers for native_build
     mkdir -p "$LAUNCHERS_DIR/lib/darwin-aarch64/include"
     cp "$LUA_SRC/src/liblua.a" "$LAUNCHERS_DIR/lib/darwin-aarch64/"
     cp "$LUA_SRC/src/"*.h "$LAUNCHERS_DIR/lib/darwin-aarch64/include/"
