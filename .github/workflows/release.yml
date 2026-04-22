@@ -93,11 +93,34 @@ jobs:
           name: launchers-linux-aarch64
           path: release-assets/
 
+      - name: Generate release notes
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          cat << 'HEADER' > release_body.md
+          ## 📦 About the launcher files
+
+          The `lumos-launcher-*` binaries attached below are **precompiled Lua runtimes**, not standalone applications. They are internal building blocks used by the `lumos package` command.
+
+          When you run:
+
+          ```bash
+          lumos package src/main.lua -o myapp
+          ```
+
+          The CLI combines your amalgamated Lua code with the appropriate launcher to produce the final self-contained executable.
+
+          If the launcher for your target platform is missing locally, `lumos package --sync-runtime` downloads it automatically from this release page.
+
+          ## Changelog
+
+          HEADER
+          awk "/^## \\[$VERSION\\]/{flag=1; next} flag && /^## \\[/{flag=0} flag" CHANGELOG.md >> release_body.md
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: release-assets/lumos-launcher-*
-          generate_release_notes: true
+          body_path: release_body.md
 
   luarocks:
     needs: [test, build-launchers-linux-windows, build-launchers-macos, build-launchers-linux-aarch64]
