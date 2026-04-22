@@ -13,7 +13,7 @@ local logger = require('lumos.logger')
 -- Create the application
 local app = lumos.new_app({
     name = "aliases_demo",
-    version = "0.3.6",
+    version = "0.3.7",
     description = "Demonstrates command aliases and persistent flags"
 })
 

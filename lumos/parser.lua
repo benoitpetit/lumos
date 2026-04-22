@@ -60,6 +60,25 @@ function parser.suggest_subcommand(command, input_name)
     return best_match
 end
 
+-- Check if a flag name is defined as countable in the app (global, persistent, or command-level)
+local function is_countable(app, flag_name)
+    if not app then return false end
+    local collections = {app.global_flags, app.persistent_flags}
+    -- Also inspect command-level flags so cmd:flag("-v --verbose"):countable() works
+    for _, cmd in ipairs(app.commands or {}) do
+        table.insert(collections, cmd.flags)
+        table.insert(collections, cmd.persistent_flags)
+    end
+    for _, flag_defs in ipairs(collections) do
+        for name, def in pairs(flag_defs or {}) do
+            if (name == flag_name or def.short == flag_name) and def.countable then
+                return true
+            end
+        end
+    end
+    return false
+end
+
 -- Parse command line arguments into structured data with subcommand support
 function parser.parse_arguments(args, app)
     local parsed = {
@@ -97,8 +116,14 @@ function parser.parse_arguments(args, app)
         -- Handle flags (starting with - or --)
         elseif not end_of_options and arg:match('^%-%-?') then
             local flag_result = flags.parse_single_flag(arg, args, i)
-            parsed.flags[flag_result.name] = flag_result.value
-            i = flag_result.next_index
+            if is_countable(app, flag_result.name) then
+                -- Countable flags never consume the next token as a value
+                parsed.flags[flag_result.name] = (parsed.flags[flag_result.name] or 0) + 1
+                i = i + 1
+            else
+                parsed.flags[flag_result.name] = flag_result.value
+                i = flag_result.next_index
+            end
         -- Handle commands and subcommands
         elseif command_count == 0 then
             parsed.command = arg

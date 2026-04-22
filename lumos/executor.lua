@@ -113,7 +113,7 @@ function executor.execute_command(app, parsed_args)
                 if not run_hooks(app.persistent_pre_runs, context) then return executor.EXIT_ERROR end
                 if not run_hooks(cmd.persistent_pre_runs, context) then return executor.EXIT_ERROR end
                 if not run_hooks(subcmd.pre_runs, context) then return executor.EXIT_ERROR end
-                local success, result = xpcall(function()
+                local success, result, middleware_err = xpcall(function()
                     return executor.execute_action(app, subcmd, context, function()
                         return subcmd.action(context)
                     end)
@@ -135,6 +135,17 @@ function executor.execute_command(app, parsed_args)
                         io.stderr:write("Error executing command: " .. user_msg .. "\n")
                     end
                     return executor.EXIT_ERROR
+                end
+                if middleware_err then
+                    if Error.is_error(middleware_err) then
+                        if middleware_err.exit_code ~= 0 then
+                            io.stderr:write(middleware_err:format_user() .. "\n")
+                        end
+                        return middleware_err.exit_code
+                    else
+                        io.stderr:write("Error: " .. tostring(middleware_err) .. "\n")
+                        return executor.EXIT_ERROR
+                    end
                 end
                 -- Handle typed errors, success objects, and legacy booleans
                 if Error.is_error(result) then
@@ -223,7 +234,7 @@ function executor.execute_command(app, parsed_args)
         if not run_hooks(app.persistent_pre_runs, context) then return executor.EXIT_ERROR end
         if not run_hooks(cmd.persistent_pre_runs, context) then return executor.EXIT_ERROR end
         if not run_hooks(cmd.pre_runs, context) then return executor.EXIT_ERROR end
-        local success, result = xpcall(function()
+        local success, result, middleware_err = xpcall(function()
             return executor.execute_action(app, cmd, context, function()
                 return cmd.action(context)
             end)
@@ -241,6 +252,17 @@ function executor.execute_command(app, parsed_args)
                 io.stderr:write("Error executing command: " .. user_msg .. "\n")
             end
             return executor.EXIT_ERROR
+        end
+        if middleware_err then
+            if Error.is_error(middleware_err) then
+                if middleware_err.exit_code ~= 0 then
+                    io.stderr:write(middleware_err:format_user() .. "\n")
+                end
+                return middleware_err.exit_code
+            else
+                io.stderr:write("Error: " .. tostring(middleware_err) .. "\n")
+                return executor.EXIT_ERROR
+            end
         end
         -- Handle typed errors, success objects, and legacy booleans
         if Error.is_error(result) then

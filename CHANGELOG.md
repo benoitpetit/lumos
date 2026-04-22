@@ -9,6 +9,26 @@ Lumos uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.7] — 2026-04-22
+
+### Added
+
+- **YAML support** — `lumos/yaml.lua` minimal YAML parser; `config.load` now supports `.yaml` / `.yml` files.
+- **Countable flags** — `flag:countable()` allows flags like `-vvv` to be counted; parsed value is an integer.
+- **Global quiet mode** — built-in `--quiet` / `-q` global flag suppresses non-error output and sets logger level to ERROR.
+- **JSON logging** — `logger.set_format("json")` outputs structured JSON log lines with timestamp, level, message and context.
+- **New middleware builtins** — `timeout`, `circuit_breaker`, and `retry` middlewares for resilient command execution.
+- **Config schema validation** — `config.validate(data, schema)` with typed, required and nested field rules.
+- **New examples** — `countable_flags_demo.lua`, `json_logging_demo.lua`, `middleware_resilience_demo.lua`, `yaml_config_demo.lua`.
+- **Test coverage** — specs for YAML parsing, countable flags, JSON logging, middleware resilience, and config validation.
+
+### Changed
+
+- `lumos/config.lua` — TOML parser now supports nested tables, inline tables and improved array handling.
+- `lumos/executor.lua` — improved middleware error propagation with typed error handling.
+- `lumos/init.lua` — exposes `yaml` module for lazy-loading.
+- CI: auto-generate release notes with launcher explanation + changelog.
+
 ## [0.3.6] — 2026-04-16
 
 ### Fixed

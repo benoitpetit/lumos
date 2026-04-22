@@ -35,6 +35,9 @@ local include_timestamp = true
 -- Whether to include context
 local include_context = true
 
+-- Log output format: "text" or "json"
+local log_format = "text"
+
 -- Color support for log levels
 local color_enabled = false
 local colors = {
@@ -109,17 +112,38 @@ local function do_log(level, level_name, message, context)
     if level > current_level then
         return  -- Don't log if below current level
     end
-    
+
     local timestamp = format_timestamp()
+
+    if log_format == "json" then
+        local entry = {
+            timestamp = timestamp ~= "" and timestamp or nil,
+            level = level_name,
+            message = message
+        }
+        if context and next(context) then
+            entry.context = context
+        end
+        local ok, json_line = pcall(json.encode, entry)
+        if ok then
+            log_output:write(json_line .. "\n")
+            log_output:flush()
+        else
+            log_output:write('{"level":"ERROR","message":"Failed to encode log entry"}\n')
+            log_output:flush()
+        end
+        return
+    end
+
     local ctx = format_context(context)
-    
+
     local color_start = ""
     local color_end = ""
     if color_enabled then
         color_start = colors[level_name] or ""
         color_end = colors.RESET
     end
-    
+
     local log_line = string.format("%s%s [%s] %s%s%s\n",
         (timestamp ~= "" and (timestamp .. " ") or ""),
         color_start,
@@ -128,7 +152,7 @@ local function do_log(level, level_name, message, context)
         ctx,
         color_end
     )
-    
+
     log_output:write(log_line)
     log_output:flush()
 end
@@ -171,6 +195,21 @@ end
 -- Get current log level
 function logger.get_level()
     return current_level, LEVEL_NAMES[current_level]
+end
+
+-- Set log output format ("text" or "json")
+function logger.set_format(fmt)
+    if fmt == "json" or fmt == "text" then
+        log_format = fmt
+        logger.debug("Log format set", {format = fmt})
+    else
+        logger.warn("Invalid log format", {provided = fmt, expected = "text or json"})
+    end
+end
+
+-- Get current log format
+function logger.get_format()
+    return log_format
 end
 
 -- Set log output destination

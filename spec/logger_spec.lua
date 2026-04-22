@@ -210,6 +210,36 @@ describe('Logger Module', function()
     end)
 
     -- -------------------------------------------------------------------------
+    describe('set_format / get_format', function()
+        it('defaults to text format', function()
+            assert.are.equal("text", logger.get_format())
+        end)
+
+        it('switches to json format', function()
+            logger.set_format("json")
+            assert.are.equal("json", logger.get_format())
+        end)
+
+        it('outputs JSON when format is json', function()
+            logger.set_format("json")
+            logger.info("test message", {key = "value"})
+            local out = capture:get()
+            assert.is_not_nil(out:match('"level":"INFO"'))
+            assert.is_not_nil(out:match('"message":"test message"'))
+            assert.is_not_nil(out:match('"key":"value"'))
+            -- Reset format for other tests
+            logger.set_format("text")
+        end)
+
+        it('warns on invalid format', function()
+            capture:reset()
+            logger.set_format("xml")
+            local out = capture:get()
+            assert.is_not_nil(out:match("Invalid log format"))
+        end)
+    end)
+
+    -- -------------------------------------------------------------------------
     describe('LEVELS table', function()
         it('exposes numeric log level constants', function()
             assert.are.equal(1, logger.LEVELS.ERROR)

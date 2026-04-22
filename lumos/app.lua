@@ -181,6 +181,13 @@ function Command:deprecated(message)
     return self
 end
 
+function Command:countable()
+    if self._last_flag then
+        self._last_flag.countable = true
+    end
+    return self
+end
+
 function Command:plugin(plugin_fn, opts)
     local plugin_mod = require('lumos.plugin')
     plugin_mod.use(self, plugin_fn, opts)
@@ -417,7 +424,9 @@ function lumos.new_app(config)
         version = config.version or "0.1.0",
         description = config.description or "A Lua CLI application",
         commands = {},
-        global_flags = {},
+        global_flags = {
+            quiet = {short = "q", long = "quiet", description = "Suppress non-error output", type = "boolean"}
+        },
         persistent_flags = {},
         config_file = config.config_file,
         env_prefix = config.env_prefix,
@@ -557,6 +566,13 @@ function lumos.new_app(config)
         return self
     end
 
+    function app:countable()
+        if self._last_flag then
+            self._last_flag.countable = true
+        end
+        return self
+    end
+
     local json = require('lumos.json')
     local config_module = require('lumos.config')
     local completion = require('lumos.completion')
@@ -581,6 +597,13 @@ function lumos.new_app(config)
 
         -- Handle global flags first
         local parsed = core.parse_arguments(args, self)
+
+        -- Quiet mode: suppress non-error output and set logger to ERROR
+        if parsed.flags.quiet or parsed.flags.q then
+            local logger = require('lumos.logger')
+            logger.set_level("ERROR")
+            parsed.quiet = true
+        end
 
         -- Check for global output format
         parsed.output_format = "table"
@@ -617,6 +640,9 @@ function lumos.new_app(config)
         local version_triggered = parsed.flags.version or
             (not user_claimed_v and parsed.flags.v)
         if version_triggered then
+            if parsed.quiet then
+                return core.EXIT_OK
+            end
             if parsed.output_json then
                 print(json.encode({version = self.version, name = self.name}))
             else
@@ -627,6 +653,9 @@ function lumos.new_app(config)
 
         -- Check for global help
         if parsed.flags.help or parsed.flags.h then
+            if parsed.quiet then
+                return core.EXIT_OK
+            end
             if parsed.output_json then
                 -- Serialize only command names to avoid circular reference crashes
                 local cmd_names = {}

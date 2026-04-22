@@ -36,10 +36,12 @@ end)
 -- "remove" command for removing items
 local remove = app:command("remove", "Remove an item")
 remove:arg("item", "Item to remove")
-remove:flag("-q --quiet", "Suppress output")
+remove:flag("-s --silent", "Suppress output")
 remove:action(function(ctx)
     local item = ctx.args[1] or "item"
-    logger.info("Removing " .. item)
+    if not ctx.flags.silent then
+        logger.info("Removing " .. item)
+    end
     return true
 end)
 

@@ -258,6 +258,28 @@ describe('Advanced Core Module', function()
             assert.are.equal('prod',    parsed.flags.env)
             assert.are.equal('myapp',   parsed.args[1])
         end)
+
+        it('counts repeated countable flags', function()
+            local test_app = app.new_app()
+            test_app:flag('-v --verbose', 'Verbose mode'):countable()
+            local parsed = core.parse_arguments({'-v', '-v', '-v'}, test_app)
+            assert.are.equal(3, parsed.flags.v)
+        end)
+
+        it('counts combined countable flags (-vvv)', function()
+            local test_app = app.new_app()
+            test_app:flag('-v --verbose', 'Verbose mode'):countable()
+            local parsed = core.parse_arguments({'-vvv'}, test_app)
+            assert.are.equal(3, parsed.flags.v)
+        end)
+
+        it('does not count non-countable flags', function()
+            local test_app = app.new_app()
+            test_app:flag('-v --verbose', 'Verbose mode')
+            local parsed = core.parse_arguments({'-v', '-v'}, test_app)
+            -- second occurrence overwrites the first
+            assert.is_true(parsed.flags.v)
+        end)
     end)
 
     -- -------------------------------------------------------------------------
@@ -307,6 +329,32 @@ describe('Advanced Core Module', function()
 
             _G.print = original_print
             assert.are.equal(2, result)
+        end)
+
+        it('suppresses output in quiet mode for version', function()
+            local test_app = app.new_app({name = 'testapp', version = '1.0'})
+            local output = ""
+            local original_print = _G.print
+            _G.print = function(s) output = output .. (s or "") .. "\n" end
+
+            local result = test_app:run({'--quiet', '--version'})
+
+            _G.print = original_print
+            assert.are.equal(0, result)
+            assert.are.equal("", output)
+        end)
+
+        it('suppresses output in quiet mode for help', function()
+            local test_app = app.new_app({name = 'testapp'})
+            local output = ""
+            local original_print = _G.print
+            _G.print = function(s) output = output .. (s or "") .. "\n" end
+
+            local result = test_app:run({'-q', '--help'})
+
+            _G.print = original_print
+            assert.are.equal(0, result)
+            assert.are.equal("", output)
         end)
     end)
 

@@ -32,7 +32,7 @@
 - **Advanced Flags** - int, float, array, enum, path, url, email with built-in validation
 - **Hidden & Deprecated Flags** - Evolve your CLI without breaking users
 - **Shell Integration** - Auto-completion, man pages, and documentation generation
-- **Configuration Management** - JSON, TOML, and key=value files, environment variables, built-in cache
+- **Configuration Management** - JSON, YAML, TOML, and key=value files, environment variables, built-in cache
 - **Test-Ready** - Generated projects include a Busted configuration and a starter test file
 - **Minimal Dependencies** - Only requires `luafilesystem`, modular architecture
 - **Cross-Platform** - Linux, macOS, and native Windows with automatic detection
@@ -128,7 +128,7 @@ local color = require('lumos.color')
 
 local app = lumos.new_app({
     name = "my-awesome-cli",
-    version = "0.3.6",
+    version = "0.3.7",
     description = "My awesome CLI application"
 })
 
@@ -186,7 +186,7 @@ luarocks make --local lumos-dev-1.rockspec
 ### Verify Installation
 ```bash
 lumos version
-# Should output: Lumos CLI Framework v0.3.6
+# Should output: Lumos CLI Framework v0.3.7
 ```
 
 ## The Runtime & Distribution Model
@@ -337,16 +337,50 @@ platform.is_piped()           -- boolean (auto-disables colors)
 local config = require('lumos.config')
 local core = require('lumos.core')
 
--- Supports JSON, TOML, and key=value files
+-- Supports JSON, YAML, TOML, and key=value files
 local settings = config.merge_configs(
     {timeout = 30},                   -- defaults
-    core.load_config("config.toml"),  -- file (JSON, TOML, or key=value)
+    core.load_config("config.yaml"),  -- file (JSON, YAML, TOML, or key=value)
     config.load_env("MYAPP"),         -- environment variables
     ctx.flags                         -- command line
 )
 
 -- With in-memory cache
 local cached = config.load_file_cached("config.json")
+```
+
+### Countable Flags (POSIX-style `-vvv`)
+```lua
+cmd:flag("-v --verbose", "Increase verbosity"):countable()
+-- myapp -vvv  →  ctx.flags.verbose == 3
+```
+
+### Middleware: Timeout & Circuit Breaker
+```lua
+-- Abort commands that run too long
+app:command("sync", "Sync data")
+    :use(lumos.middleware.builtin.timeout({ seconds = 30 }))
+
+-- Stop calling failing commands after repeated errors
+app:command("api", "Call API")
+    :use(lumos.middleware.builtin.circuit_breaker({
+        failure_threshold = 5,
+        recovery_timeout = 60
+    }))
+```
+
+### JSON Logging
+```lua
+local logger = require('lumos.logger')
+logger.set_format("json")
+logger.info("Server started", { port = 8080 })
+-- {"timestamp":"2026-04-22 12:00:00","level":"INFO","message":"Server started","context":{"port":8080}}
+```
+
+### Global Quiet Mode
+```bash
+myapp --quiet   # Suppresses all non-error output
+myapp -q        # Short alias
 ```
 
 ### Integrated Profiling
@@ -528,11 +562,11 @@ make install && make test
 
 ## Project Status
 
-- **Version:** 0.3.6
+- **Version:** 0.3.7
 - **License:** MIT
 - **Lua Versions:** 5.1, 5.2, 5.3, 5.4, LuaJIT
 - **Platforms:** Linux, macOS, Windows (native)
-- **Tests:** 455 passing tests
+- **Tests:** 528 passing tests
 - **Dependencies:** luafilesystem
 
 ## Acknowledgments

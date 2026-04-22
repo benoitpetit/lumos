@@ -47,6 +47,7 @@ build = {
       ["lumos.color"] = "lumos/color.lua",
       ["lumos.config"] = "lumos/config.lua",
       ["lumos.json"] = "lumos/json.lua",
+      ["lumos.yaml"] = "lumos/yaml.lua",
       ["lumos.loader"] = "lumos/loader.lua",
       ["lumos.progress"] = "lumos/progress.lua",
       ["lumos.prompt"] = "lumos/prompt.lua",

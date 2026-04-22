@@ -580,7 +580,7 @@ app:command("create", "Alias for 'new'")
 
 app:command("version", "Show Lumos version")
     :action(function(ctx)
-        print("Lumos CLI Framework v" .. (lumos.version or "0.3.6"))
+        print("Lumos CLI Framework v" .. (lumos.version or "0.3.7"))
         print("A modern CLI framework for Lua")
         print("https://github.com/benoitpetit/lumos")
         return true
@@ -589,7 +589,7 @@ app:command("version", "Show Lumos version")
 app:command("update", "Update Lumos to the latest version via LuaRocks")
     :action(function(ctx)
         print(color.cyan("Updating Lumos..."))
-        print(color.white("Current version: v" .. (lumos.version or "0.3.6")))
+        print(color.white("Current version: v" .. (lumos.version or "0.3.7")))
         print("")
 
         local cmd = "luarocks install lumos"

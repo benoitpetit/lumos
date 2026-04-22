@@ -35,7 +35,7 @@ deploy:action(function(ctx)
     -- Load configuration
     local configs = {}
     
-    -- Try to load from config file
+    -- Try to load from config file (JSON, YAML, or TOML)
     if ctx.flags.config then
         local file_config, err = config.load_file(ctx.flags.config)
         if file_config then
@@ -45,6 +45,18 @@ deploy:action(function(ctx)
             logger.warn("Could not load config: " .. err)
         end
     end
+
+    -- Demo: show that YAML configs work out of the box
+    local yaml = require('lumos.yaml')
+    local sample_yaml = [[
+host: localhost
+port: 8080
+features:
+  - logging
+  - metrics
+]]
+    local yaml_config = yaml.decode(sample_yaml)
+    logger.info("YAML sample host: " .. tostring(yaml_config.host))
     
     -- Load from environment
     local env_config = config.load_env("CONFIG_APP")

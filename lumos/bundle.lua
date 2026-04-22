@@ -33,6 +33,7 @@ local LUMOS_MODULES = {
     "lumos.color",
     "lumos.config",
     "lumos.json",
+    "lumos.yaml",
     "lumos.loader",
     "lumos.progress",
     "lumos.prompt",

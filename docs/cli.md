@@ -319,10 +319,10 @@ Updates Lumos to the latest version available on LuaRocks. This is a convenience
 ```bash
 $ lumos update
 Updating Lumos...
-Current version: v0.3.6
+Current version: v0.3.7
 Running: luarocks install lumos
 ✅ Lumos updated successfully!
-New version: v0.3.6
+New version: v0.3.7
 ```
 
 If the update fails, it prints the manual command so you can retry or investigate.

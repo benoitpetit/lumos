@@ -16,6 +16,7 @@ local modules = {
     prompt = "lumos.prompt",
     table = "lumos.table",
     json = "lumos.json",
+    yaml = "lumos.yaml",
     config = "lumos.config",
     completion = "lumos.completion",
     manpage = "lumos.manpage",

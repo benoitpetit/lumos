@@ -197,4 +197,87 @@ function Middleware.builtin.verbosity(options)
     end
 end
 
+--- Timeout middleware: aborts the action if it exceeds a duration
+function Middleware.builtin.timeout(options)
+    options = options or {}
+    local seconds = options.seconds or options.timeout or 30
+    local Error = require("lumos.error")
+
+    -- Use wall-clock time when LuaSocket is available, otherwise fallback to CPU time
+    local has_socket, socket = pcall(require, "socket")
+    local gettime = has_socket and socket.gettime or os.clock
+
+    return function(ctx, next)
+        -- Lua doesn't have native coroutine timeout, but we can use a simple
+        -- cooperative approach: start a timer and check after next() returns.
+        -- For true preemption we'd need os.execute('sleep') tricks, but this
+        -- is sufficient for most CLI operations.
+        local start = gettime()
+        local result, err = next()
+        local elapsed = gettime() - start
+        if elapsed > seconds then
+            return nil, Error.new("TIMEOUT", "Operation exceeded " .. seconds .. " seconds")
+        end
+        return result, err
+    end
+end
+
+--- Circuit breaker middleware: stops calling the action after repeated failures
+function Middleware.builtin.circuit_breaker(options)
+    options = options or {}
+    local failure_threshold = options.failure_threshold or 5
+    local recovery_timeout = options.recovery_timeout or 30
+    local half_open_max_calls = options.half_open_max_calls or 3
+
+    local state = "closed"      -- closed, open, half_open
+    local failures = 0
+    local last_failure_time = nil
+    local half_open_calls = 0
+
+    local Error = require("lumos.error")
+    local logger = require("lumos.logger")
+
+    return function(ctx, next)
+        if state == "open" then
+            if os.time() - last_failure_time >= recovery_timeout then
+                logger.info("Circuit breaker entering half-open state")
+                state = "half_open"
+                half_open_calls = 0
+            else
+                return nil, Error.new("EXECUTION_FAILED", "Circuit breaker is OPEN")
+            end
+        end
+
+        if state == "half_open" and half_open_calls >= half_open_max_calls then
+            return nil, Error.new("EXECUTION_FAILED", "Circuit breaker is OPEN (half-open limit reached)")
+        end
+
+        if state == "half_open" then
+            half_open_calls = half_open_calls + 1
+        end
+
+        local result, err = next()
+
+        if err then
+            failures = failures + 1
+            last_failure_time = os.time()
+            if failures >= failure_threshold then
+                logger.warn("Circuit breaker tripped to OPEN", {failures = failures})
+                state = "open"
+            end
+        else
+            if state == "half_open" then
+                logger.info("Circuit breaker recovered to CLOSED")
+                state = "closed"
+                failures = 0
+                last_failure_time = nil
+            elseif state == "closed" then
+                failures = 0
+            end
+        end
+
+        return result, err
+    end
+end
+
 return Middleware

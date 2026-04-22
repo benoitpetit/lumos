@@ -118,4 +118,48 @@ describe("Middleware Module", function()
         assert.is_not_nil(err)
         assert.equal("INVALID_ARGUMENT", err.type)
     end)
+
+    it('builtin timeout allows fast operations', function()
+        local mw = Middleware.builtin.timeout({ seconds = 5 })
+        local ctx = {}
+        local result, err = mw(ctx, function() return "ok" end)
+        assert.equal("ok", result)
+        assert.is_nil(err)
+    end)
+
+    it('builtin timeout errors on slow operations', function()
+        local mw = Middleware.builtin.timeout({ seconds = 0.01 })
+        local ctx = {}
+        local result, err = mw(ctx, function()
+            -- Simulate a slow operation
+            local start = os.clock()
+            while os.clock() - start < 0.1 do end
+            return "ok"
+        end)
+        assert.is_nil(result)
+        assert.is_not_nil(err)
+        assert.equal("TIMEOUT", err.type)
+    end)
+
+    it('builtin circuit breaker allows calls when closed', function()
+        local mw = Middleware.builtin.circuit_breaker({ failure_threshold = 3 })
+        local ctx = {}
+        local result, err = mw(ctx, function() return "ok" end)
+        assert.equal("ok", result)
+        assert.is_nil(err)
+    end)
+
+    it('builtin circuit breaker trips after threshold', function()
+        local mw = Middleware.builtin.circuit_breaker({ failure_threshold = 2, recovery_timeout = 3600 })
+        local ctx = {}
+        -- First failure
+        mw(ctx, function() return nil, { type = "ERROR" } end)
+        -- Second failure (should trip)
+        mw(ctx, function() return nil, { type = "ERROR" } end)
+        -- Third call should be blocked
+        local result, err = mw(ctx, function() return "ok" end)
+        assert.is_nil(result)
+        assert.is_not_nil(err)
+        assert.equal("EXECUTION_FAILED", err.type)
+    end)
 end)

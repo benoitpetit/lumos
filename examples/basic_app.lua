@@ -13,7 +13,7 @@ local logger = require('lumos.logger')
 -- Create the application
 local app = lumos.new_app({
     name = "myapp",
-    version = "0.3.6", 
+    version = "0.3.7", 
     description = "Basic example using Lumos"
 })
 
@@ -60,7 +60,7 @@ info:flag("-a --all", "Show all information")
 info:action(function(ctx)
     logger.info("Application Information:")
     logger.info("Name: " .. color.cyan("myapp"))
-    logger.warn("Version: " .. color.yellow("0.3.6"))
+    logger.warn("Version: " .. color.yellow("0.3.7"))
     
     if ctx.flags.all then
         logger.info("Framework: " .. color.magenta("Lumos"))

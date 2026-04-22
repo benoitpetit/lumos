@@ -1,10 +1,10 @@
 rockspec_format = "3.0"
 package = "lumos"
-version = "0.3.6-1"
+version = "0.3.7-1"
 
 source = {
    url = "git+https://github.com/benoitpetit/lumos.git",
-   tag = "v0.3.6"
+   tag = "v0.3.7"
 }
 
 description = {
@@ -48,6 +48,7 @@ build = {
       ["lumos.color"] = "lumos/color.lua",
       ["lumos.config"] = "lumos/config.lua",
       ["lumos.json"] = "lumos/json.lua",
+      ["lumos.yaml"] = "lumos/yaml.lua",
       ["lumos.loader"] = "lumos/loader.lua",
       ["lumos.progress"] = "lumos/progress.lua",
       ["lumos.prompt"] = "lumos/prompt.lua",

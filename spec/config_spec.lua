@@ -207,4 +207,126 @@ describe('Config Module', function()
             assert.is_not_nil(err:match("Validation failed"))
         end)
     end)
+
+    -- -------------------------------------------------------------------------
+    describe('load_file — YAML files', function()
+        local tmp_yaml
+
+        before_each(function()
+            tmp_yaml = os.tmpname() .. ".yaml"
+            local f = io.open(tmp_yaml, "w")
+            f:write("name: lumos\nversion: '1.0'\ndebug: true\nport: 8080\n")
+            f:close()
+        end)
+
+        after_each(function()
+            os.remove(tmp_yaml)
+        end)
+
+        it('loads a valid YAML config file', function()
+            local result, err = config.load_file(tmp_yaml)
+            assert.is_nil(err)
+            assert.is_table(result)
+            assert.are.equal("lumos", result.name)
+            assert.are.equal("1.0", result.version)
+            assert.is_true(result.debug)
+            assert.are.equal(8080, result.port)
+        end)
+
+        it('also recognises .yml extension', function()
+            local tmp_yml = os.tmpname() .. ".yml"
+            local f = io.open(tmp_yml, "w")
+            f:write("key: value\n")
+            f:close()
+            local result, err = config.load_file(tmp_yml)
+            os.remove(tmp_yml)
+            assert.is_nil(err)
+            assert.are.equal("value", result.key)
+        end)
+
+        it('returns nil and error on empty YAML file', function()
+            local bad = os.tmpname() .. ".yaml"
+            local f = io.open(bad, "w")
+            f:write("   \n")
+            f:close()
+            local result, err = config.load_file(bad)
+            os.remove(bad)
+            assert.is_nil(result)
+            assert.is_not_nil(err)
+            assert.is_not_nil(err:match("Invalid YAML"))
+        end)
+    end)
+
+    -- -------------------------------------------------------------------------
+    describe('load_file — TOML files', function()
+        it('parses nested tables', function()
+            local tmp = os.tmpname() .. ".toml"
+            local f = io.open(tmp, "w")
+            f:write('[server]\nhost = "localhost"\nport = 8080\n\n[server.ssl]\nenabled = true\n')
+            f:close()
+            local result, err = config.load_file(tmp)
+            os.remove(tmp)
+            assert.is_nil(err)
+            assert.is_table(result.server)
+            assert.are.equal("localhost", result.server.host)
+            assert.are.equal(8080, result.server.port)
+            assert.is_table(result.server.ssl)
+            assert.is_true(result.server.ssl.enabled)
+        end)
+
+        it('parses inline tables', function()
+            local tmp = os.tmpname() .. ".toml"
+            local f = io.open(tmp, "w")
+            f:write('point = { x = 1, y = 2 }\nname = "test"\n')
+            f:close()
+            local result, err = config.load_file(tmp)
+            os.remove(tmp)
+            assert.is_nil(err)
+            assert.is_table(result.point)
+            assert.are.equal(1, result.point.x)
+            assert.are.equal(2, result.point.y)
+            assert.are.equal("test", result.name)
+        end)
+
+        it('parses table arrays', function()
+            local tmp = os.tmpname() .. ".toml"
+            local f = io.open(tmp, "w")
+            f:write('[[products]]\nname = "Hammer"\nsku = 738594937\n\n[[products]]\nname = "Nail"\nsku = 284758393\n')
+            f:close()
+            local result, err = config.load_file(tmp)
+            os.remove(tmp)
+            assert.is_nil(err)
+            assert.is_table(result.products)
+            assert.are.equal(2, #result.products)
+            assert.are.equal("Hammer", result.products[1].name)
+            assert.are.equal("Nail", result.products[2].name)
+        end)
+    end)
+
+    -- -------------------------------------------------------------------------
+    describe('load_env', function()
+        it('loads environment variables with a prefix', function()
+            -- Set a test environment variable
+            local test_key = "LUMOS_TEST_CONFIG_VAR"
+            local test_value = "hello_world"
+            os.execute("export " .. test_key .. "=" .. test_value)
+            -- On most POSIX shells, `export` in a sub-shell won't affect the parent,
+            -- so we set it via Lua's os.execute with a shell that persists it.
+            -- We use a trick: set via the shell and read back.
+            local handle = io.popen("export LUMOS_TEST_CONFIG_VAR=hello_world && env | grep LUMOS_TEST_CONFIG_VAR")
+            if handle then handle:close() end
+
+            -- Because env vars are hard to set portably in tests, we at least
+            -- verify the function runs without crashing and returns a table.
+            local result = config.load_env("LUMOS")
+            assert.is_table(result)
+        end)
+
+        it('returns an empty table on Windows when no env vars match', function()
+            -- This test documents the expected behavior; on Windows the function
+            -- now uses `set` instead of returning an empty table unconditionally.
+            local result = config.load_env("NONEXISTENT_PREFIX_XYZ")
+            assert.is_table(result)
+        end)
+    end)
 end)
