@@ -138,7 +138,7 @@ end
 -- Adds random entropy to avoid predictable names and collisions.
 function security.temp_file()
     local base = os.tmpname()
-    local entropy = tostring(math.random(0, 0xFFFFFFFF))
+    local entropy = tostring(os.time()) .. "_" .. tostring(math.random(1, 999999))
     return base .. "_" .. entropy
 end
 
