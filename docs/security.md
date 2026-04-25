@@ -485,4 +485,4 @@ This security guide is updated regularly. Review it before each major deployment
 
 **Guide Version:** 1.0  
 **Last Updated:** April 2026  
-**Lumos Framework:** v0.3.7+
+**Lumos Framework:** v0.3.8+

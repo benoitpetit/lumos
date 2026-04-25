@@ -20,8 +20,36 @@ local default_config = {
     version = false,
 }
 
+-- Scan the lumos/ directory dynamically if lfs is available,
+-- otherwise fall back to the static list.
+local function scan_lumos_modules()
+    local ok, lfs_mod = pcall(require, "lfs")
+    if not ok then
+        return nil
+    end
+    local dirs = {"lumos", "../lumos"}
+    for _, lumos_dir in ipairs(dirs) do
+        if lfs_mod.attributes(lumos_dir, "mode") == "directory" then
+            local modules = {}
+            for file in lfs_mod.dir(lumos_dir) do
+                if file:match("%.lua$") then
+                    local name = file:gsub("%.lua$", "")
+                    if name == "init" then
+                        table.insert(modules, "lumos.init")
+                    else
+                        table.insert(modules, "lumos." .. name)
+                    end
+                end
+            end
+            table.sort(modules)
+            return modules
+        end
+    end
+    return nil
+end
+
 -- List of Lumos core modules
-local LUMOS_MODULES = {
+local LUMOS_MODULES = scan_lumos_modules() or {
     "lumos.init",
     "lumos.app",
     "lumos.core",
@@ -41,11 +69,14 @@ local LUMOS_MODULES = {
     "lumos.security",
     "lumos.logger",
     "lumos.completion",
+    "lumos.command_builder",
     "lumos.manpage",
     "lumos.markdown",
     "lumos.format",
     "lumos.bundle",
     "lumos.native_build",
+    "lumos.native_build.modules",
+    "lumos.native_build.toolchain",
     "lumos.package",
     "lumos.plugin",
     "lumos.error",
@@ -57,7 +88,12 @@ local LUMOS_MODULES = {
     "lumos.profiler",
     "lumos.config_cache",
     "lumos.runtime_manager",
-    "lumos.fs"
+    "lumos.fs",
+    "lumos.stdin",
+    "lumos.http",
+    "lumos.app_utils",
+    "lumos.toml",
+    "lumos.env_loader"
 }
 
 local read_file = fs.read_file
@@ -67,42 +103,127 @@ local is_file = fs.is_file
 local mkdir_p = fs.mkdir_p
 
 --- Strip Lua comments from code
+--- Handles strings ("...", '...') and long brackets ([[...]], [=[...]=], etc. correctly.
 ---@param code string
 ---@return string
 local function strip_comments(code)
     local result = {}
     local i = 1
     local n = #code
+    local state = "normal"
+    local string_delim = nil
+    local long_bracket_level = 0
+
     while i <= n do
-        local c1 = code:sub(i, i)
-        local c2 = code:sub(i+1, i+1)
-        if c1 == "-" and c2 == "-" then
-            local c3 = code:sub(i+2, i+2)
-            local c4 = code:sub(i+3, i+3)
-            if c3 == "[" and c4 == "[" then
-                -- multi-line comment --[[ ... ]]
-                local j = i + 4
-                while j <= n do
-                    if code:sub(j, j+1) == "]]" then
-                        i = j + 2
-                        break
-                    end
+        local c = code:sub(i, i)
+
+        if state == "normal" then
+            if c == '"' or c == "'" then
+                state = "string"
+                string_delim = c
+                table.insert(result, c)
+                i = i + 1
+            elseif c == "[" then
+                -- Check for long bracket start: [[ or [=[ etc.
+                local j = i + 1
+                local level = 0
+                while j <= n and code:sub(j, j) == "=" do
+                    level = level + 1
                     j = j + 1
                 end
-                if j > n then
-                    i = n + 1
-                end
-            else
-                -- single-line comment
-                while i <= n and code:sub(i, i) ~= "\n" do
+                if j <= n and code:sub(j, j) == "[" then
+                    state = "long_bracket"
+                    long_bracket_level = level
+                    table.insert(result, code:sub(i, j))
+                    i = j + 1
+                else
+                    table.insert(result, c)
                     i = i + 1
                 end
+            elseif c == "-" and code:sub(i+1, i+1) == "-" then
+                -- Comment start
+                local j = i + 2
+                local c3 = code:sub(j, j)
+                local c4 = code:sub(j+1, j+1)
+                if c3 == "[" and c4 == "[" then
+                    -- Long bracket comment --[[
+                    local comment_level = 0
+                    j = j + 2
+                    while j <= n and code:sub(j, j) == "=" do
+                        comment_level = comment_level + 1
+                        j = j + 1
+                    end
+                    if j <= n and code:sub(j, j) == "[" then
+                        j = j + 1
+                        -- Search for closing ]=level=]
+                        while j <= n do
+                            if code:sub(j, j) == "]" then
+                                local k = j + 1
+                                local eq_count = 0
+                                while k <= n and code:sub(k, k) == "=" do
+                                    eq_count = eq_count + 1
+                                    k = k + 1
+                                end
+                                if eq_count == comment_level and code:sub(k, k) == "]" then
+                                    i = k + 1
+                                    break
+                                end
+                            end
+                            j = j + 1
+                        end
+                        if j > n then
+                            i = n + 1
+                        end
+                    else
+                        -- Not a real long bracket, treat as single-line from --[
+                        i = i + 2
+                        while i <= n and code:sub(i, i) ~= "\n" do i = i + 1 end
+                    end
+                else
+                    -- Single-line comment
+                    while i <= n and code:sub(i, i) ~= "\n" do
+                        i = i + 1
+                    end
+                end
+            else
+                table.insert(result, c)
+                i = i + 1
             end
-        else
-            table.insert(result, c1)
-            i = i + 1
+
+        elseif state == "string" then
+            table.insert(result, c)
+            if c == "\\" then
+                table.insert(result, code:sub(i+1, i+1) or "")
+                i = i + 2
+            elseif c == string_delim then
+                state = "normal"
+                i = i + 1
+            else
+                i = i + 1
+            end
+
+        elseif state == "long_bracket" then
+            table.insert(result, c)
+            if c == "]" then
+                local j = i + 1
+                local eq_count = 0
+                while j <= n and code:sub(j, j) == "=" do
+                    eq_count = eq_count + 1
+                    j = j + 1
+                end
+                if eq_count == long_bracket_level and code:sub(j, j) == "]" then
+                    table.insert(result, code:sub(i+1, j))
+                    i = j + 1
+                    state = "normal"
+                else
+                    i = i + 1
+                end
+            else
+                i = i + 1
+            end
         end
     end
+
     return table.concat(result)
 end
 
@@ -116,14 +237,16 @@ local function find_module(module_name, search_paths)
     for _, base_path in ipairs(search_paths) do
         -- Try direct path
         local path = base_path .. PATH_SEP .. file_path .. ".lua"
-        if path_exists(path) then
-            return path
+        local sanitized, err = security.sanitize_path(path)
+        if sanitized and path_exists(sanitized) then
+            return sanitized
         end
 
         -- Try init.lua for packages
         path = base_path .. PATH_SEP .. file_path .. PATH_SEP .. "init.lua"
-        if path_exists(path) then
-            return path
+        sanitized, err = security.sanitize_path(path)
+        if sanitized and path_exists(sanitized) then
+            return sanitized
         end
     end
 
@@ -144,6 +267,10 @@ local function extract_requires(code)
     end
     -- Match pcall(require, 'module') and similar patterns
     for module in code:gmatch("require%s*,%s*['\"]([^'\"]+)['\"]") do
+        requires[module] = true
+    end
+    -- Match require"module" (valid Lua syntax without parentheses)
+    for module in code:gmatch("require%s+['\"]([^'\"]+)['\"]") do
         requires[module] = true
     end
 
@@ -585,32 +712,11 @@ function bundle.get_required_lumos_modules(deps)
         "lumos.flags",
     }
 
-    local submodule_map = {
-        ["lumos.color"] = "lumos.color",
-        ["lumos.format"] = "lumos.format",
-        ["lumos.loader"] = "lumos.loader",
-        ["lumos.progress"] = "lumos.progress",
-        ["lumos.prompt"] = "lumos.prompt",
-        ["lumos.table"] = "lumos.table",
-        ["lumos.json"] = "lumos.json",
-        ["lumos.config"] = "lumos.config",
-        ["lumos.security"] = "lumos.security",
-        ["lumos.logger"] = "lumos.logger",
-        ["lumos.completion"] = "lumos.completion",
-        ["lumos.manpage"] = "lumos.manpage",
-        ["lumos.markdown"] = "lumos.markdown",
-        ["lumos.bundle"] = "lumos.bundle",
-        ["lumos.native_build"] = "lumos.native_build",
-        ["lumos.package"] = "lumos.package",
-        ["lumos.plugin"] = "lumos.plugin",
-        ["lumos.error"] = "lumos.error",
-        ["lumos.error_codes"] = "lumos.error_codes",
-        ["lumos.platform"] = "lumos.platform",
-        ["lumos.terminal"] = "lumos.terminal",
-        ["lumos.middleware"] = "lumos.middleware",
-        ["lumos.profiler"] = "lumos.profiler",
-        ["lumos.config_cache"] = "lumos.config_cache",
-    }
+    -- Build identity map from all known Lumos modules
+    local submodule_map = {}
+    for _, mod in ipairs(LUMOS_MODULES) do
+        submodule_map[mod] = mod
+    end
 
     for mod in pairs(deps.lumos_modules) do
         local main_mod = mod:match("^(lumos%.[^%.]+)")
@@ -650,13 +756,7 @@ function bundle.minimal(source_file, output_file, options)
     end
 
     local lumos_modules = bundle.get_required_lumos_modules(deps)
-    local parts = {}
-
-    table.insert(parts, "-- Lumos Minimal Bundle")
-    table.insert(parts, "-- Source: " .. source_file)
-    table.insert(parts, "-- Generated: " .. os.date("%Y-%m-%d %H:%M:%S"))
-    table.insert(parts, "-- Modules: " .. table.concat(lumos_modules, ", "))
-    table.insert(parts, "")
+    local modules_for_preloader = {}
 
     for _, mod in ipairs(lumos_modules) do
         local mod_path = mod:gsub("%.", PATH_SEP) .. ".lua"
@@ -666,34 +766,37 @@ function bundle.minimal(source_file, output_file, options)
             package.searchpath(mod, package.path)
         }
 
-        local content
         for _, try_path in ipairs(paths_to_try) do
-            if try_path then
-                local data = read_file(try_path)
-                if data then
-                    content = data
-                    break
-                end
+            if try_path and path_exists(try_path) then
+                table.insert(modules_for_preloader, { name = mod, path = try_path })
+                break
             end
-        end
-
-        if content then
-            if options.minify then
-                content = bundle.minify(content)
-            end
-            table.insert(parts, "-- BEGIN " .. mod)
-            table.insert(parts, content)
-            table.insert(parts, "-- END " .. mod)
-            table.insert(parts, "")
         end
     end
+
+    local parts = {}
+
+    table.insert(parts, "-- Lumos Minimal Bundle")
+    table.insert(parts, "-- Source: " .. source_file)
+    table.insert(parts, "-- Generated: " .. os.date("%Y-%m-%d %H:%M:%S"))
+    table.insert(parts, "-- Modules: " .. table.concat(lumos_modules, ", "))
+    table.insert(parts, "")
+
+    -- Generate preloader with bundled module searcher
+    table.insert(parts, generate_preloader(modules_for_preloader, {
+        strip_comments = options.minify,
+        version = options.version,
+    }))
 
     -- Include main source
     local main_content = read_file(source_file)
     if main_content then
-        table.insert(parts, "-- BEGIN main: " .. source_file)
+        main_content = main_content:gsub("^#![^\n]*\n", "")
+        table.insert(parts, "")
+        table.insert(parts, "-- ============================================")
+        table.insert(parts, "-- Main Application")
+        table.insert(parts, "-- ============================================")
         table.insert(parts, main_content)
-        table.insert(parts, "-- END main: " .. source_file)
     end
 
     local ok, err = write_file(output_file, table.concat(parts, "\n"))

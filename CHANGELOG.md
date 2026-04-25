@@ -9,25 +9,89 @@ Lumos uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-## [0.3.7] — 2026-04-22
+## [0.3.8] — 2026-04-22
 
 ### Added
 
 - **YAML support** — `lumos/yaml.lua` minimal YAML parser; `config.load` now supports `.yaml` / `.yml` files.
+- **TOML support** — `lumos/toml.lua` pure-Lua TOML parser with support for nested tables, inline tables, arrays and heterogeneous types.
 - **Countable flags** — `flag:countable()` allows flags like `-vvv` to be counted; parsed value is an integer.
 - **Global quiet mode** — built-in `--quiet` / `-q` global flag suppresses non-error output and sets logger level to ERROR.
 - **JSON logging** — `logger.set_format("json")` outputs structured JSON log lines with timestamp, level, message and context.
 - **New middleware builtins** — `timeout`, `circuit_breaker`, and `retry` middlewares for resilient command execution.
 - **Config schema validation** — `config.validate(data, schema)` with typed, required and nested field rules.
-- **New examples** — `countable_flags_demo.lua`, `json_logging_demo.lua`, `middleware_resilience_demo.lua`, `yaml_config_demo.lua`.
-- **Test coverage** — specs for YAML parsing, countable flags, JSON logging, middleware resilience, and config validation.
+- **HTTP client** — `lumos/http.lua` native HTTP client (GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS) with curl backend, JSON auto-encoding, bearer auth, query params and timeout support.
+- **Standard input module** — `lumos/stdin.lua` provides `read()`, `read_lines()`, `read_json()` and `is_pipe()` for stdin handling.
+- **Environment loader** — `lumos/env_loader.lua` dedicated module for loading prefixed environment variables.
+- **App utilities** — `lumos/app_utils.lua` shared helpers for application construction.
+- **Command builder** — `lumos/command_builder.lua` fluent command builder extracted from `app.lua`.
+- **Flag negation** — boolean flags automatically support `--no-*` prefix (e.g. `--no-verbose`).
+- **Unknown flag & command suggestions** — Levenshtein-based "Did you mean?" suggestions for typos in flags and subcommands.
+- **PowerShell completion** — `lumos/completion.lua` now generates completion scripts for Bash, Zsh, Fish **and PowerShell**.
+- **Custom completion values** — `cmd:complete(choices)` lets you embed custom completion values into generated shell scripts.
+- **`app:add_completion_command()`** — auto-adds a `completion` subcommand to print shell scripts on demand.
+- **Instantiable loaders** — `loader.new()` creates independent spinner instances with `:start()`, `:next()`, `:success()`, `:error()`, `:run()`.
+- **New flag types** — `cmd:flag_duration()` (human-readable durations: `5m30s`), `cmd:flag_map()` (accumulates `key=value` pairs).
+- **Flag & command grouping** — `cmd:group("Connection")` groups flags in help; `cmd:category("Network")` groups commands.
+- **Positional arg enhancements** — `cmd:arg()` now supports `required`, `type`, `default`, `validate`, and `variadic` options.
+- **Prepublish script** — `scripts/prepublish.sh` orchestrates version bump, module sync, tests, lint and release workflow.
+- **New examples** — `03_typed_flags.lua` (countable flags), `07_logging.lua` (JSON logging), `09_middleware.lua` (resilience middleware), `10_configuration.lua` (YAML config), `14_http_client.lua` (HTTP client), `18_variadic_args.lua`, `19_categories.lua`, `20_mutex.lua`, `21_lua_config.lua`.
+- **Test coverage** — specs for YAML parsing, countable flags, JSON logging, middleware resilience, config validation, HTTP client, stdin, table pagination, loader instances, parser immutability, runtime manager, and variadic arguments.
 
 ### Changed
 
-- `lumos/config.lua` — TOML parser now supports nested tables, inline tables and improved array handling.
-- `lumos/executor.lua` — improved middleware error propagation with typed error handling.
-- `lumos/init.lua` — exposes `yaml` module for lazy-loading.
-- CI: auto-generate release notes with launcher explanation + changelog.
+- **Major refactor of `lumos/app.lua`** — eliminated ~300 lines of duplicated flag constructor code via `add_flag_to` factory; added fluent modifiers (`:default()`, `:required()`, `:env()`, `:validate()`, `:complete()`, `:group()`, `:countable()`, `:deprecated()`).
+- **`lumos/bundle.lua` complete rewrite** — `strip_comments` now correctly handles strings, long brackets (`[=[...]=]`) and nested comments; added dynamic `scan_lumos_modules()`; introduced `generate_preloader()` for bundled module searcher; paths are now sanitized via `security.sanitize_path()`.
+- **`lumos/native_build.lua` modularized** — split into `native_build/modules.lua` and `native_build/toolchain.lua`; migrated to `lumos.fs` helpers; `random_tmp_name` no longer pollutes the global RNG.
+- **`lumos/completion.lua` overhauled** — PowerShell support; enum/subcommand completion embedding; custom `:complete()` values; `add_completion_command()` helper.
+- **`lumos/loader.lua` overhauled** — instantiable loader instances; new animation styles; cleaner API.
+- **`lumos/progress.lua` enhanced** — new animation styles and better terminal detection.
+- **`lumos/table.lua` enhanced** — pagination with `paginate()` and `page()`.
+- **`lumos/prompt.lua` enhanced** — `prompt.number()`, `prompt.editor()`, `prompt.form()`, `prompt.wizard()`, and built-in `validators` table.
+- **`lumos/config.lua`** — TOML parser now supports nested tables, inline tables and improved array handling; added `config.load_validated()`.
+- **`lumos/executor.lua`** — improved middleware error propagation with typed error handling.
+- **`lumos/parser.lua`** — extracted from `core.lua`; supports flag negation, unknown-flag detection, and command suggestions.
+- **`lumos/validator.lua`** — extracted from `core.lua`; centralized validation logic.
+- **`lumos/help_renderer.lua`** — extracted from `core.lua`; dedicated help formatting.
+- **`lumos/init.lua`** — exposes `yaml`, `stdin`, `toml`, `env_loader` modules for lazy-loading.
+- **`lumos/package.lua`** — added `--app-version`, `--analyze`, and `--sync-runtime` options.
+- **`lumos/platform.lua`** — improved `supports_colors()` and `is_interactive()` reliability.
+- **`lumos/security.lua`** — `sanitize_path` hardened against false positives.
+- **`lumos/flags.lua`** — `countable()` support; negative number parsing fixed (`-5` no longer treated as a flag).
+- **`lumos/logger.lua`** — JSON format support; child logger filter fixed.
+- **`lumos/color.lua`** — improved terminal and pipe detection.
+- **`lumos/format.lua`** — enhanced text formatting utilities.
+- **`lumos/fs.lua`** — expanded cross-platform file-system utilities.
+- **`lumos/terminal.lua`** — terminal capability detection improvements.
+- **`lumos/manpage.lua`** — global dash escaping.
+- **`lumos/markdown.lua`** — fixed heading hierarchy.
+- **`lumos/runtime_manager.lua`** — runtime path and launcher management.
+- **`lumos/http.lua`** — response helpers (`resp.ok`, `resp.json()`).
+- **CI** — auto-generate release notes with launcher explanation + changelog.
+- **Documentation** — `docs/api.md` expanded with new modules and methods; `docs/cli.md` updated; `docs/qs.md` refreshed.
+
+### Fixed
+
+- `examples/14_http_client.lua` — removed invalid `:trim()` calls on strings (Lua has no `string.trim` method).
+- `lumos/bundle.lua` — `find_module()` now sanitizes paths before checking existence.
+- `lumos/bundle.lua` — `extract_requires()` now matches `require"module"` syntax (without parentheses).
+- `lumos/bundle.lua` — `LUMOS_MODULES` static fallback synchronized with all current framework modules.
+- `lumos/native_build.lua` — `LUA_OK` compatibility for Lua 5.1 in generated C wrappers.
+- `lumos/native_build.lua` — replaced predictable `os.tmpname()` with randomized temps inside `.lumos/cache/` to avoid TOCTOU issues.
+- `lumos/config_cache.lua` — `get_mtime` now uses `lfs.attributes` for cross-platform compatibility (macOS/BSD).
+- `lumos/prompt.lua` — `prompt.password` now safely restores `stty echo` even if the user interrupts with Ctrl+C.
+- `lumos/logger.lua` — `set_output()` now closes the previous file handle before opening a new one.
+- `lumos/logger.lua` — child logger filter pattern widened to support underscores.
+- `lumos/flags.lua` — `int` validator now returns explicit booleans instead of nil.
+- `lumos/flags.lua` — range-check block guarded to prevent string/number comparison crashes.
+- Rockspecs — added missing `lumos.native_build.modules` and `lumos.native_build.toolchain` entries required at runtime.
+
+### Removed
+
+- Old example scripts (`basic_app.lua`, `advanced_features.lua`, `colors_demo.lua`, `config_example.lua`, `countable_flags_demo.lua`, `json_logging_demo.lua`, `middleware_resilience_demo.lua`, `yaml_config_demo.lua`, etc.) replaced by the new numbered example suite (`01_`–`21_`).
+- `lumos-0.3.7-1.rockspec` — superseded by `lumos-0.3.8-1.rockspec`.
+
+---
 
 ## [0.3.6] — 2026-04-16
 
@@ -55,6 +119,8 @@ Lumos uses [Semantic Versioning](https://semver.org/).
 
 - New test coverage for subcommands, `safe_open`, `safe_mkdir`, `is_elevated`, `sanitize_path` regression, and `middleware.builtin.confirm`.
 
+---
+
 ## [0.3.3] — 2026-04-16
 
 ### Added
@@ -77,12 +143,16 @@ Lumos uses [Semantic Versioning](https://semver.org/).
 - `bin/lumos` — fixed outdated embedded version (`0.2.2` → `0.3.3`).
 - `Makefile` — added missing `build:` target (delegates to `install-prod`).
 
+---
+
 ## [0.3.1] — 2026-04-16
 
 ### Fixed
 
 - `lumos/platform.lua` — `supports_colors()` and `is_interactive()` now always return booleans instead of truthy numeric or file-handle values.
 - README / docs — synchronized documentation for v0.3.1 features and corrected quick-start examples.
+
+---
 
 ## [0.3.0] — 2026-04-16
 
@@ -109,6 +179,8 @@ Lumos uses [Semantic Versioning](https://semver.org/).
 - Rockspecs — Added `copy_directories = {"runtime"}` so `lumos package` works after `luarocks install`.
 - README / docs — Corrected false shell-integration examples, added Prompts/Plugins/Hooks sections, removed Lua 5.1-incompatible `goto` snippets.
 
+---
+
 ## [0.2.1] — 2026-04-15
 
 ### Fixed
@@ -117,6 +189,8 @@ Lumos uses [Semantic Versioning](https://semver.org/).
 - `lumos/core.lua` — Wrapped `xpcall` arguments in closures to work around Lua 5.1's inability to pass extra arguments to `xpcall`.
 - CI workflow — Added `luarocks make lumos-dev-1.rockspec` so GitHub Actions runners correctly resolve `require('lumos')`.
 - `spec/package_spec.lua` — Skipped Linux launcher binary execution on macOS to prevent `cannot execute binary file` failures on `macos-latest` runners.
+
+---
 
 ## [0.2.0] — 2026-04-15
 

@@ -14,6 +14,7 @@ local function get_color()
             red = function(s) return s end,
             dim = function(s) return s end,
             bold = function(s) return s end,
+            strip = function(s) return s end,
         }
     end
     return color
@@ -61,8 +62,9 @@ local function print_aligned(items, indent)
     indent = indent or 2
     local prefix = string.rep(" ", indent)
     local max_left = 0
+    local col = get_color()
     for _, item in ipairs(items) do
-        max_left = math.max(max_left, #item.left)
+        max_left = math.max(max_left, #col.strip(item.left))
     end
     local term_width = 80
     local ok, terminal = pcall(require, "lumos.terminal")
@@ -241,22 +243,42 @@ function help_renderer.show_command_help(app, cmd)
     if cmd.flags then
         for name, flag in pairs(cmd.flags) do
             if should_show(flag) then
-                table.insert(all_flags, {left = build_flag_text(flag), right = (flag.description or "") .. c.dim(flag_meta(flag)), _sort = name})
+                table.insert(all_flags, {left = build_flag_text(flag), right = (flag.description or "") .. c.dim(flag_meta(flag)), _sort = name, _group = flag._group})
             end
         end
     end
     if cmd.persistent_flags and next(cmd.persistent_flags) then
         for name, flag in pairs(cmd.persistent_flags) do
             if should_show(flag) then
-                table.insert(all_flags, {left = build_flag_text(flag), right = (flag.description or "") .. c.dim(flag_meta(flag)) .. c.dim(" [persistent]"), _sort = name})
+                table.insert(all_flags, {left = build_flag_text(flag), right = (flag.description or "") .. c.dim(flag_meta(flag)) .. c.dim(" [persistent]"), _sort = name, _group = flag._group})
             end
         end
     end
     if #all_flags > 0 then
         table.sort(all_flags, function(a, b) return a._sort < b._sort end)
-        print(c.cyan("Flags:"))
-        print_aligned(all_flags)
-        print()
+        -- Group flags by _group
+        local grouped = {}
+        local ungrouped = {}
+        for _, item in ipairs(all_flags) do
+            if item._group then
+                grouped[item._group] = grouped[item._group] or {}
+                table.insert(grouped[item._group], item)
+            else
+                table.insert(ungrouped, item)
+            end
+        end
+        -- Print grouped flags first
+        for group_name, items in pairs(grouped) do
+            print(c.cyan(group_name .. ":"))
+            print_aligned(items)
+            print()
+        end
+        -- Print ungrouped flags
+        if #ungrouped > 0 then
+            print(c.cyan("Flags:"))
+            print_aligned(ungrouped)
+            print()
+        end
     end
 
     if cmd.mutex_groups then

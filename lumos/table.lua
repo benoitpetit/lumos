@@ -4,45 +4,15 @@
 
 local tbl = {}
 
--- Detect Windows
-local function is_windows()
-    return package.config:sub(1, 1) == "\\"
-end
-
--- Cross-platform terminal width detection
+-- Cross-platform terminal width detection (delegates to terminal module)
 local function get_terminal_width()
-    -- First, try environment variable
-    local cols = tonumber(os.getenv("COLUMNS"))
-    if cols and cols > 0 then
-        return cols
-    end
-    
-    if is_windows() then
-        -- Try mode con on Windows
-        local handle = io.popen("mode con /status 2>nul")
-        if handle then
-            for line in handle:lines() do
-                local num = line:match("Columns:%s*(%d+)")
-                if num then
-                    handle:close()
-                    return tonumber(num)
-                end
-            end
-            handle:close()
-        end
-    else
-        -- Try tput on Unix
-        local fh = io.popen("tput cols 2>/dev/null")
-        if fh then
-            local w = fh:read("*l")
-            fh:close()
-            local num = tonumber(w)
-            if num and num > 0 then
-                return num
-            end
+    local ok, term = pcall(require, "lumos.terminal")
+    if ok and term and term.width then
+        local w = term.width()
+        if w and w > 0 then
+            return w
         end
     end
-    
     return 80 -- default fallback
 end
 
@@ -63,9 +33,54 @@ local function to_string(val)
 end
 
 -- Return the visible width of a string (ANSI escape sequences are ignored)
+-- Count UTF-8 characters (not bytes), stripping ANSI codes first
+local function utf8_len(s)
+    s = tostring(s or ""):gsub("\27%[[0-9;]*m", "")
+    local len = 0
+    local i = 1
+    while i <= #s do
+        local c = s:byte(i)
+        if c < 0x80 then
+            i = i + 1
+        elseif c < 0xE0 then
+            i = i + 2
+        elseif c < 0xF0 then
+            i = i + 3
+        else
+            i = i + 4
+        end
+        len = len + 1
+    end
+    return len
+end
+
+-- Return first n UTF-8 characters, preserving multi-byte sequences
+local function utf8_sub(s, n)
+    local result = {}
+    local count = 0
+    local i = 1
+    while i <= #s and count < n do
+        local c = s:byte(i)
+        if c < 0x80 then
+            table.insert(result, s:sub(i, i))
+            i = i + 1
+        elseif c < 0xE0 then
+            table.insert(result, s:sub(i, i+1))
+            i = i + 2
+        elseif c < 0xF0 then
+            table.insert(result, s:sub(i, i+2))
+            i = i + 3
+        else
+            table.insert(result, s:sub(i, i+3))
+            i = i + 4
+        end
+        count = count + 1
+    end
+    return table.concat(result)
+end
+
 local function display_width(s)
-    s = tostring(s or "")
-    return #(s:gsub("\27%[[0-9;]*m", ""))
+    return utf8_len(s)
 end
 
 
@@ -260,7 +275,7 @@ function tbl.create(data, options)
             local width = col_widths[i]
             -- Truncate cell if it exceeds the column width (e.g. due to max_width)
             if display_width(cell) > width then
-                cell = cell:sub(1, width)
+                cell = utf8_sub(cell, width)
             end
             local padded_cell
             
@@ -371,7 +386,7 @@ function tbl.simple(data, options)
             local width = col_widths[i]
             -- Truncate cell if it exceeds the column width
             if display_width(cell) > width then
-                cell = cell:sub(1, width)
+                cell = utf8_sub(cell, width)
             end
             local align = options.align and options.align[i] or "left"
             local padded_cell

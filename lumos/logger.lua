@@ -49,22 +49,21 @@ local colors = {
     RESET = "\27[0m"
 }
 
--- Check if colors should be enabled
+-- Check if colors should be enabled (single source of truth: terminal module)
 local function init_colors()
-    if os.getenv("LUMOS_NO_COLOR") or os.getenv("NO_COLOR") then
-        return false
-    end
-    if os.getenv("FORCE_COLOR") or os.getenv("CLICOLOR_FORCE") then
-        return true
-    end
-    -- Use platform detection for better Windows support
-    local ok, platform = pcall(require, "lumos.platform")
-    if ok and platform and platform.supports_colors then
-        return platform.supports_colors()
+    local ok, term = pcall(require, "lumos.terminal")
+    if ok and term and term.should_use_colors then
+        return term.should_use_colors()
     end
     -- Fallback for non-Windows terminals
-    local term = os.getenv("TERM")
-    if term and (term:match("color") or term:match("xterm")) then
+    if os.getenv("NO_COLOR") then
+        return false
+    end
+    if os.getenv("FORCE_COLOR") then
+        return true
+    end
+    local t = os.getenv("TERM")
+    if t and (t:match("color") or t:match("xterm")) then
         return true
     end
     return false

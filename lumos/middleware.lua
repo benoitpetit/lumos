@@ -145,6 +145,22 @@ function Middleware.builtin.rate_limit(options)
     end
 end
 
+-- Portable sleep helper
+local function sleep(seconds)
+    local ok, socket = pcall(require, "socket")
+    if ok and socket and socket.select then
+        socket.select(nil, nil, seconds)
+        return
+    end
+    if package.config:sub(1,1) ~= "\\" then
+        os.execute("sleep " .. tostring(seconds) .. " 2>/dev/null")
+    else
+        -- Windows fallback: busy-wait
+        local start = os.clock()
+        while os.clock() - start < seconds do end
+    end
+end
+
 --- Retry middleware: retries the action on retryable errors
 function Middleware.builtin.retry(options)
     options = options or {}
@@ -166,10 +182,7 @@ function Middleware.builtin.retry(options)
             if attempt < max_attempts then
                 local delay = (backoff == "exponential") and (base_delay * math.pow(2, attempt - 1)) or base_delay
                 logger.warn("Retrying after error", {attempt = attempt, delay = delay, error = err.message or tostring(err)})
-                -- Use os.execute sleep for portability, or busy-wait if unavailable
-                if package.config:sub(1,1) ~= "\\" then
-                    os.execute("sleep " .. tostring(delay) .. " 2>/dev/null")
-                end
+                sleep(delay)
             end
         end
         return nil, last_err

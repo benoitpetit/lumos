@@ -6,6 +6,18 @@ local http = {}
 
 local json = require("lumos.json")
 
+-- Detect curl availability once
+local curl_checked = false
+local curl_available = false
+
+local function check_curl()
+    if curl_checked then return curl_available end
+    curl_checked = true
+    local ok = os.execute("curl --version >/dev/null 2>&1")
+    curl_available = (ok == 0 or ok == true)
+    return curl_available
+end
+
 -- Internal executor; exposed for testability
 http._exec = function(cmd)
     local handle, err = io.popen(cmd, "r")
@@ -99,6 +111,9 @@ end
 --   - insecure(boolean): skip SSL verification (default: false)
 -- @return response table {status, body, headers, ok, json()} or nil, error
 function http.request(opts)
+    if not check_curl() then
+        return nil, "curl is not installed or not available in PATH"
+    end
     opts = opts or {}
     local url = opts.url
     if not url or url == "" then
@@ -107,8 +122,9 @@ function http.request(opts)
 
     url = build_url(url, opts.query)
 
-    local headers_file = os.tmpname()
-    local body_file = os.tmpname()
+    local security = require("lumos.security")
+    local headers_file = security.temp_file()
+    local body_file = security.temp_file()
 
     local parts = {
         "curl",

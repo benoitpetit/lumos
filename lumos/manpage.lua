@@ -2,24 +2,7 @@
 local manpage = {}
 local security = require('lumos.security')
 local logger = require('lumos.logger')
-
-local function version_short_available(app)
-    if app.global_flags then
-        for _, flag_def in pairs(app.global_flags) do
-            if flag_def.short == "v" then
-                return false
-            end
-        end
-    end
-    if app.persistent_flags then
-        for _, flag_def in pairs(app.persistent_flags) do
-            if flag_def.short == "v" then
-                return false
-            end
-        end
-    end
-    return true
-end
+local app_utils = require('lumos.app_utils')
 
 -- Escape special characters for man page format
 local function escape_man(text)
@@ -40,6 +23,8 @@ local function format_flag(flag_def, flag_name)
         result = string.format("\\fB\\-%s\\fR, \\fB\\-\\-%s\\fR", flag_def.short, flag_def.long)
     elseif flag_def.short then
         result = string.format("\\fB\\-%s\\fR", flag_def.short)
+    elseif flag_def.long then
+        result = string.format("\\fB\\-\\-%s\\fR", flag_def.long)
     else
         result = string.format("\\fB\\-\\-%s\\fR", flag_name)
     end
@@ -54,7 +39,7 @@ end
 
 function manpage.generate_main(app)
     local version_option
-    if version_short_available(app) then
+    if app_utils.version_short_available(app) then
         version_option = [[.TP
 \fB\-v\fR, \fB\-\-version\fR
 Show version information

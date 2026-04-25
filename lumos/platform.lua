@@ -78,10 +78,73 @@ end
 
 -- Platform helpers
 function platform.name() return platform.detect() end
+function platform.os() return platform.name() end
+function platform.type() return platform.name() end
 function platform.is_windows() return platform.detect() == "windows" end
 function platform.is_macos() return platform.detect() == "macos" end
 function platform.is_linux() return platform.detect() == "linux" end
 function platform.is_unix() return not platform.is_windows() end
+
+function platform.version()
+    if platform.is_windows() then
+        local h = io.popen("ver 2>nul")
+        if h then
+            local v = h:read("*a"):match("%d+%.%d+%.%d+")
+            h:close()
+            return v
+        end
+    else
+        local h = io.popen("uname -r 2>/dev/null")
+        if h then
+            local v = h:read("*l")
+            h:close()
+            return v
+        end
+    end
+    return nil
+end
+
+function platform.release()
+    return platform.version()
+end
+
+function platform.has_colors()
+    return platform.supports_colors()
+end
+
+function platform.is_tty()
+    return platform.is_interactive()
+end
+
+function platform.current_dir()
+    local ok, lfs = pcall(require, "lfs")
+    if ok and lfs then
+        return lfs.currentdir()
+    end
+    local h = io.popen("pwd 2>/dev/null")
+    if h then
+        local d = h:read("*l")
+        h:close()
+        return d
+    end
+    return nil
+end
+
+function platform.temp_dir()
+    return os.getenv("TMPDIR") or os.getenv("TEMP") or os.getenv("TMP") or (not platform.is_windows() and "/tmp" or nil)
+end
+
+function platform.get_pid()
+    if not platform.is_windows() then
+        local h = io.open("/proc/self/stat", "r")
+        if h then
+            local pid = h:read("*l"):match("^(%d+)")
+            h:close()
+            return tonumber(pid)
+        end
+    end
+    return nil
+end
 
 --- Checks if the terminal supports colors
 function platform.supports_colors()
@@ -136,15 +199,11 @@ function platform.is_interactive()
             end
         end
     else
-        local stdin_h = io.popen("[ -t 0 ] && echo yes || echo no 2>/dev/null")
-        local stdout_h = io.popen("[ -t 1 ] && echo yes || echo no 2>/dev/null")
-        if stdin_h and stdout_h then
-            local stdin_tty = stdin_h:read("*l") == "yes"
-            local stdout_tty = stdout_h:read("*l") == "yes"
-            stdin_h:close()
-            stdout_h:close()
-            interactive = (stdin_tty == true) and (stdout_tty == true)
-        end
+        -- Use os.execute so the child inherits parent's file descriptors;
+        -- io.popen would redirect stdout to a pipe, making [ -t 1 ] always false.
+        local stdin_ok, _, stdin_code = os.execute("[ -t 0 ] 2>/dev/null")
+        local stdout_ok, _, stdout_code = os.execute("[ -t 1 ] 2>/dev/null")
+        interactive = ((stdin_ok == true) and (stdin_code == 0)) and ((stdout_ok == true) and (stdout_code == 0))
     end
 
     platform._cache.is_interactive = interactive
@@ -168,11 +227,10 @@ function platform.is_piped()
             end
         end
     else
-        local handle = io.popen("[ -t 1 ] && echo no || echo yes 2>/dev/null")
-        if handle then
-            piped = handle:read("*l") == "yes"
-            handle:close()
-        end
+        -- Use os.execute so the child inherits parent's stdout;
+        -- io.popen redirects stdout to a pipe, making [ -t 1 ] always false.
+        local ok, _, code = os.execute("[ -t 1 ] 2>/dev/null")
+        piped = not (ok and code == 0)
     end
 
     platform._cache.is_piped = piped

@@ -100,7 +100,7 @@ local color = require('lumos.color')
 
 local app = lumos.new_app({
     name = "example",
-    version = "0.3.7",
+    version = "0.3.8",
     description = "Example CLI application"
 })
 

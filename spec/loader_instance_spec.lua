@@ -1,0 +1,46 @@
+local loader = require('lumos.loader')
+
+describe('Loader instantiable pattern', function()
+  it('can create independent instances', function()
+    local a = loader.new("Task A", "dots")
+    local b = loader.new("Task B", "bounce")
+
+    assert.is_not.equal(a, b)
+    assert.are.equal("Task A", a._state.message)
+    assert.are.equal("Task B", b._state.message)
+  end)
+
+  it('instances do not interfere with each other', function()
+    local a = loader.new("A")
+    local b = loader.new("B")
+
+    a:start()
+    assert.is_true(a:is_active())
+    assert.is_false(b:is_active())
+
+    a:success()
+    assert.is_false(a:is_active())
+    assert.is_false(b:is_active())
+  end)
+
+  it('instance run wrapper works', function()
+    local ld = loader.new()
+    local result = ld:run(function(self)
+      assert.is_equal(ld, self)
+      return 42
+    end, "Working", "dots")
+    assert.are.equal(42, result)
+    assert.are.equal("success", ld:get_status())
+  end)
+
+  it('instance fail wrapper works', function()
+    local ld = loader.new()
+    local ok, err = pcall(function()
+      ld:run(function()
+        error("boom")
+      end, "Working")
+    end)
+    assert.is_false(ok)
+    assert.are.equal("fail", ld:get_status())
+  end)
+end)

@@ -47,6 +47,71 @@ function executor.execute_action(app, cmd, context, action_fn)
     return chain:execute(context, action_fn)
 end
 
+-- Shared error handler for xpcall
+local function error_handler(err)
+    if debug and type(debug.traceback) == "function" then
+        return err .. "\n" .. debug.traceback("", 2)
+    end
+    return err
+end
+
+-- Execute a single command/subcommand with unified hook handling.
+-- pre_hooks and post_hooks are arrays of hook arrays, executed left-to-right.
+function executor._execute_single(app, target, context, pre_hooks, post_hooks)
+    for _, hook_list in ipairs(pre_hooks) do
+        if not run_hooks(hook_list, context) then
+            return executor.EXIT_ERROR
+        end
+    end
+
+    local success, result, middleware_err = xpcall(function()
+        return executor.execute_action(app, target, context, function()
+            return target.action(context)
+        end)
+    end, error_handler)
+
+    -- Unify hook signatures: post hooks receive the same context enriched with success/result
+    context.success = success
+    context.result = result
+    for _, hook_list in ipairs(post_hooks) do
+        run_hooks(hook_list, context)
+    end
+
+    if not success then
+        logger.error("Command action failed", {command = target.name, error = tostring(result)})
+        if os.getenv("LUMOS_DEBUG") then
+            io.stderr:write("Error executing command: " .. tostring(result) .. "\n")
+        else
+            local user_msg = tostring(result):match("^([^\n]+)") or tostring(result)
+            io.stderr:write("Error executing command: " .. user_msg .. "\n")
+        end
+        return executor.EXIT_ERROR
+    end
+
+    if middleware_err then
+        if Error.is_error(middleware_err) then
+            if middleware_err.exit_code ~= 0 then
+                io.stderr:write(middleware_err:format_user() .. "\n")
+            end
+            return middleware_err.exit_code
+        else
+            io.stderr:write("Error: " .. tostring(middleware_err) .. "\n")
+            return executor.EXIT_ERROR
+        end
+    end
+
+    if Error.is_error(result) then
+        if result.exit_code ~= 0 then
+            io.stderr:write(result:format_user() .. "\n")
+        end
+        return result.exit_code
+    elseif type(result) == "table" and result.success ~= nil then
+        return result.exit_code or (result.success and executor.EXIT_OK or executor.EXIT_ERROR)
+    end
+
+    return (result == false) and executor.EXIT_ERROR or executor.EXIT_OK
+end
+
 -- Execute the appropriate command with parsed arguments
 function executor.execute_command(app, parsed_args)
     local cmd = parser.find_command(app, parsed_args.command)
@@ -79,88 +144,48 @@ function executor.execute_command(app, parsed_args)
                 return executor.EXIT_OK
             end
 
-            -- Validate args and flags for subcommand
-            if rawget(subcmd, 'action') then
-                local validated_args, arg_errors = validator.validate_args(subcmd, parsed_args)
-                if #arg_errors > 0 then
-                    logger.error("Subcommand argument validation failed", {errors = arg_errors})
-                    for _, error in ipairs(arg_errors) do
-                        io.stderr:write("Error: " .. error .. "\n")
-                    end
-                    return executor.EXIT_USAGE
-                end
-
-                local validated_flags, validation_errors = validator.validate_and_merge_flags(app, subcmd, parsed_args.flags)
-                if #validation_errors > 0 then
-                    logger.error("Subcommand flag validation failed", {errors = validation_errors})
-                    for _, error in ipairs(validation_errors) do
-                        io.stderr:write("Error: " .. error .. "\n")
-                    end
-                    return executor.EXIT_USAGE
-                end
-
-                -- Execute subcommand action
-                local context = {
-                    args = validated_args,
-                    flags = validated_flags,
-                    command = subcmd,
-                    parent = cmd,
-                    config = app.loaded_config,
-                    env = app.loaded_env,
-                    output_format = parsed_args.output_format or "table"
-                }
-
-                if not run_hooks(app.persistent_pre_runs, context) then return executor.EXIT_ERROR end
-                if not run_hooks(cmd.persistent_pre_runs, context) then return executor.EXIT_ERROR end
-                if not run_hooks(subcmd.pre_runs, context) then return executor.EXIT_ERROR end
-                local success, result, middleware_err = xpcall(function()
-                    return executor.execute_action(app, subcmd, context, function()
-                        return subcmd.action(context)
-                    end)
-                end, function(err)
-                    if debug and type(debug.traceback) == "function" then
-                        return err .. "\n" .. debug.traceback("", 2)
-                    end
-                    return err
-                end)
-                run_hooks(subcmd.post_runs, {success = success, result = result, config = context.config, env = context.env, command = subcmd, parent = cmd, args = context.args, flags = context.flags})
-                run_hooks(cmd.persistent_post_runs, {success = success, result = result, config = context.config, env = context.env, command = subcmd, parent = cmd, args = context.args, flags = context.flags})
-                run_hooks(app.persistent_post_runs, {success = success, result = result, config = context.config, env = context.env, command = subcmd, parent = cmd, args = context.args, flags = context.flags})
-                if not success then
-                    logger.error("Command action failed", {command = subcmd.name, error = tostring(result)})
-                    if os.getenv("LUMOS_DEBUG") then
-                        io.stderr:write("Error executing command: " .. tostring(result) .. "\n")
-                    else
-                        local user_msg = tostring(result):match("^([^\n]+)") or tostring(result)
-                        io.stderr:write("Error executing command: " .. user_msg .. "\n")
-                    end
-                    return executor.EXIT_ERROR
-                end
-                if middleware_err then
-                    if Error.is_error(middleware_err) then
-                        if middleware_err.exit_code ~= 0 then
-                            io.stderr:write(middleware_err:format_user() .. "\n")
-                        end
-                        return middleware_err.exit_code
-                    else
-                        io.stderr:write("Error: " .. tostring(middleware_err) .. "\n")
-                        return executor.EXIT_ERROR
-                    end
-                end
-                -- Handle typed errors, success objects, and legacy booleans
-                if Error.is_error(result) then
-                    if result.exit_code ~= 0 then
-                        io.stderr:write(result:format_user() .. "\n")
-                    end
-                    return result.exit_code
-                elseif type(result) == "table" and result.success ~= nil then
-                    return result.exit_code or (result.success and executor.EXIT_OK or executor.EXIT_ERROR)
-                end
-                return (result == false) and executor.EXIT_ERROR or executor.EXIT_OK
-            else
+            if not rawget(subcmd, 'action') then
                 io.stderr:write("Error: No action defined for subcommand '" .. subcmd.name .. "'\n")
                 return executor.EXIT_USAGE
             end
+
+            local validated_args, arg_errors = validator.validate_args(subcmd, parsed_args)
+            if #arg_errors > 0 then
+                logger.error("Subcommand argument validation failed", {errors = arg_errors})
+                for _, err in ipairs(arg_errors) do
+                    io.stderr:write("Error: " .. err .. "\n")
+                end
+                return executor.EXIT_USAGE
+            end
+
+            local validated_flags, validation_errors = validator.validate_and_merge_flags(app, subcmd, parsed_args.flags)
+            if #validation_errors > 0 then
+                logger.error("Subcommand flag validation failed", {errors = validation_errors})
+                for _, err in ipairs(validation_errors) do
+                    io.stderr:write("Error: " .. err .. "\n")
+                end
+                return executor.EXIT_USAGE
+            end
+
+            local context = {
+                args = validated_args,
+                flags = validated_flags,
+                command = subcmd,
+                parent = cmd,
+                config = app.loaded_config,
+                env = app.loaded_env,
+                output_format = parsed_args.output_format or "table"
+            }
+
+            local pre_hooks = {}
+            if app.persistent_pre_runs then table.insert(pre_hooks, app.persistent_pre_runs) end
+            if cmd.persistent_pre_runs then table.insert(pre_hooks, cmd.persistent_pre_runs) end
+            if subcmd.pre_runs then table.insert(pre_hooks, subcmd.pre_runs) end
+            local post_hooks = {}
+            if subcmd.post_runs then table.insert(post_hooks, subcmd.post_runs) end
+            if cmd.persistent_post_runs then table.insert(post_hooks, cmd.persistent_post_runs) end
+            if app.persistent_post_runs then table.insert(post_hooks, app.persistent_post_runs) end
+            return executor._execute_single(app, subcmd, context, pre_hooks, post_hooks)
         else
             io.stderr:write("Error: Unknown subcommand '" .. parsed_args.subcommand .. "' for command '" .. cmd.name .. "'\n")
             local sub_suggestion = parser.suggest_subcommand(cmd, parsed_args.subcommand)
@@ -191,12 +216,11 @@ function executor.execute_command(app, parsed_args)
         return executor.EXIT_OK
     end
 
-    -- Validate args and flags
     local validated_args, arg_errors = validator.validate_args(cmd, parsed_args)
     if #arg_errors > 0 then
         logger.error("Argument validation failed", {errors = arg_errors})
-        for _, error in ipairs(arg_errors) do
-            io.stderr:write("Error: " .. error .. "\n")
+        for _, err in ipairs(arg_errors) do
+            io.stderr:write("Error: " .. err .. "\n")
         end
         return executor.EXIT_USAGE
     end
@@ -204,13 +228,12 @@ function executor.execute_command(app, parsed_args)
     local validated_flags, validation_errors = validator.validate_and_merge_flags(app, cmd, parsed_args.flags)
     if #validation_errors > 0 then
         logger.error("Flag validation failed", {errors = validation_errors})
-        for _, error in ipairs(validation_errors) do
-            io.stderr:write("Error: " .. error .. "\n")
+        for _, err in ipairs(validation_errors) do
+            io.stderr:write("Error: " .. err .. "\n")
         end
         return executor.EXIT_USAGE
     end
 
-    -- Execute the command action if it exists
     if rawget(cmd, 'action') then
         local context = {
             args = validated_args,
@@ -221,61 +244,16 @@ function executor.execute_command(app, parsed_args)
             output_format = parsed_args.output_format or "table"
         }
 
-        -- Execute with error handling.
-        -- xpcall captures the traceback at the point of the actual error,
-        -- not at the recovery site.  Guard against sandboxed Lua without debug lib.
-        local function error_handler(err)
-            if debug and type(debug.traceback) == "function" then
-                return err .. "\n" .. debug.traceback("", 2)
-            end
-            return err
-        end
-
-        if not run_hooks(app.persistent_pre_runs, context) then return executor.EXIT_ERROR end
-        if not run_hooks(cmd.persistent_pre_runs, context) then return executor.EXIT_ERROR end
-        if not run_hooks(cmd.pre_runs, context) then return executor.EXIT_ERROR end
-        local success, result, middleware_err = xpcall(function()
-            return executor.execute_action(app, cmd, context, function()
-                return cmd.action(context)
-            end)
-        end, error_handler)
-        run_hooks(cmd.post_runs, {success = success, result = result, config = context.config, env = context.env, command = cmd, args = context.args, flags = context.flags})
-        run_hooks(cmd.persistent_post_runs, {success = success, result = result, config = context.config, env = context.env, command = cmd, args = context.args, flags = context.flags})
-        run_hooks(app.persistent_post_runs, {success = success, result = result, config = context.config, env = context.env, command = cmd, args = context.args, flags = context.flags})
-        if not success then
-            logger.error("Command action failed", {command = cmd.name, error = tostring(result)})
-            if os.getenv("LUMOS_DEBUG") then
-                io.stderr:write("Error executing command: " .. tostring(result) .. "\n")
-            else
-                -- Strip traceback from user-visible message when not in debug mode
-                local user_msg = tostring(result):match("^([^\n]+)") or tostring(result)
-                io.stderr:write("Error executing command: " .. user_msg .. "\n")
-            end
-            return executor.EXIT_ERROR
-        end
-        if middleware_err then
-            if Error.is_error(middleware_err) then
-                if middleware_err.exit_code ~= 0 then
-                    io.stderr:write(middleware_err:format_user() .. "\n")
-                end
-                return middleware_err.exit_code
-            else
-                io.stderr:write("Error: " .. tostring(middleware_err) .. "\n")
-                return executor.EXIT_ERROR
-            end
-        end
-        -- Handle typed errors, success objects, and legacy booleans
-        if Error.is_error(result) then
-            if result.exit_code ~= 0 then
-                io.stderr:write(result:format_user() .. "\n")
-            end
-            return result.exit_code
-        elseif type(result) == "table" and result.success ~= nil then
-            return result.exit_code or (result.success and executor.EXIT_OK or executor.EXIT_ERROR)
-        end
-        return (result == false) and executor.EXIT_ERROR or executor.EXIT_OK
+        local pre_hooks = {}
+        if app.persistent_pre_runs then table.insert(pre_hooks, app.persistent_pre_runs) end
+        if cmd.persistent_pre_runs then table.insert(pre_hooks, cmd.persistent_pre_runs) end
+        if cmd.pre_runs then table.insert(pre_hooks, cmd.pre_runs) end
+        local post_hooks = {}
+        if cmd.post_runs then table.insert(post_hooks, cmd.post_runs) end
+        if cmd.persistent_post_runs then table.insert(post_hooks, cmd.persistent_post_runs) end
+        if app.persistent_post_runs then table.insert(post_hooks, app.persistent_post_runs) end
+        return executor._execute_single(app, cmd, context, pre_hooks, post_hooks)
     else
-        -- If no action but has subcommands, show help
         if cmd.subcommands and #cmd.subcommands > 0 then
             help_renderer.show_command_help(app, cmd)
             return executor.EXIT_OK

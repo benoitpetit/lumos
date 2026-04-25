@@ -1,8 +1,10 @@
 -- Lumos Configuration Module
--- Simple configuration file loader supporting JSON, YAML, TOML and basic key-value pairs
+-- Simple configuration file loader supporting JSON, YAML, TOML, key-value pairs, and Lua.
 
 local json = require('lumos.json')
 local yaml = require('lumos.yaml')
+local toml = require('lumos.toml')
+local env_loader = require('lumos.env_loader')
 local security = require('lumos.security')
 local logger = require('lumos.logger')
 
@@ -36,199 +38,6 @@ function config.parse_key_value(content)
     return result
 end
 
--- Minimal TOML parser supporting nested tables, inline tables, arrays, strings, numbers, booleans
-function config.parse_toml(content)
-    local result = {}
-    local section = nil       -- current dotted section path (string)
-    local section_type = nil  -- "table" or "array"
-
-    -- Helper: split a dotted path into parts
-    local function split_path(path)
-        local parts = {}
-        for part in path:gmatch("[^.]+") do
-            table.insert(parts, part)
-        end
-        return parts
-    end
-
-    -- Helper: ensure nested tables exist and return the deepest table + last key
-    local function ensure_table(root, parts)
-        local current = root
-        for i = 1, #parts - 1 do
-            local part = parts[i]
-            if type(current[part]) ~= "table" then
-                current[part] = {}
-            end
-            current = current[part]
-        end
-        return current, parts[#parts]
-    end
-
-    -- Helper: parse a TOML value (scalar, array, inline table)
-    local function parse_value(val)
-        val = val:match("^%s*(.-)%s*$")
-        if val == "" then return nil end
-
-        -- Inline table
-        if val:match("^%{") then
-            local obj = {}
-            local inner = val:match("^%{(.*)%}$")
-            if inner then
-                inner = inner:match("^%s*(.-)%s*$")
-                -- Simple split by comma at top level
-                local depth = 0
-                local current = ""
-                local kv_pairs = {}
-                for i = 1, #inner do
-                    local c = inner:sub(i, i)
-                    if c == "{" then
-                        depth = depth + 1
-                        current = current .. c
-                    elseif c == "}" then
-                        depth = depth - 1
-                        current = current .. c
-                    elseif c == "," and depth == 0 then
-                        table.insert(kv_pairs, current)
-                        current = ""
-                    else
-                        current = current .. c
-                    end
-                end
-                if current ~= "" then
-                    table.insert(kv_pairs, current)
-                end
-                for _, kv in ipairs(kv_pairs) do
-                    local k, v = kv:match("^%s*([%w_%-]+)%s*=%s*(.*)$")
-                    if k then
-                        obj[k] = parse_value(v)
-                    end
-                end
-            end
-            return obj
-        end
-
-        -- Array
-        if val:match("^%[") then
-            local arr = {}
-            local inner = val:match("^%[(.*)%]$") or ""
-            local depth = 0
-            local current = ""
-            for i = 1, #inner do
-                local c = inner:sub(i, i)
-                if c == "[" then
-                    depth = depth + 1
-                    current = current .. c
-                elseif c == "]" then
-                    depth = depth - 1
-                    current = current .. c
-                elseif c == "," and depth == 0 then
-                    if current:match("%S") then
-                        table.insert(arr, parse_value(current))
-                    end
-                    current = ""
-                else
-                    current = current .. c
-                end
-            end
-            if current:match("%S") then
-                table.insert(arr, parse_value(current))
-            end
-            return arr
-        end
-
-        -- String
-        local str = val:match('^"(.*)"$') or val:match("^'(.*)'$")
-        if str then
-            return str
-        end
-
-        -- Boolean
-        local lower = val:lower()
-        if lower == "true" then return true end
-        if lower == "false" then return false end
-
-        -- Number
-        local num = tonumber(val)
-        if num then return num end
-
-        -- Raw string
-        return val
-    end
-
-    -- Helper: set a value in result under current section
-    local function set_key(key, value)
-        local parts
-        if section then
-            parts = split_path(section .. "." .. key)
-        else
-            parts = split_path(key)
-        end
-        local tbl, last = ensure_table(result, parts)
-        tbl[last] = value
-    end
-
-    for line in content:gmatch("[^\r\n]+") do
-        line = line:match("^%s*(.-)%s*$")
-        if line ~= "" and not line:match("^#") then
-            -- Table array [[section]]
-            local arr_sec = line:match("^%[%[(.-)%]%]$")
-            if arr_sec then
-                section = arr_sec:gsub("%s+", "")
-                section_type = "array"
-                local parts = split_path(section)
-                local tbl, last = ensure_table(result, parts)
-                if type(tbl[last]) ~= "table" then
-                    tbl[last] = {}
-                end
-                local new_entry = {}
-                table.insert(tbl[last], new_entry)
-                -- Redirect subsequent keys into the new entry
-                -- We do this by treating section as the path to the new entry
-                section = section .. "." .. tostring(#tbl[last])
-                -- But this is tricky... let's instead store the array entry path
-                -- Actually, simpler: store that we're in an array entry
-                section_type = "array_entry"
-                -- Override ensure_table behavior for array entries
-                -- We need a way to know the current array entry
-                -- Let's store the current array entry table directly
-                result._toml_current_array_entry = new_entry
-                result._toml_array_entry_depth = #parts
-            else
-                -- Section header [section] or [section.subsection]
-                local sec = line:match("^%[([^%]]+)%]$")
-                if sec then
-                    section = sec:gsub("%s+", "")
-                    section_type = "table"
-                    result._toml_current_array_entry = nil
-                    -- Ensure the table exists
-                    local parts = split_path(section)
-                    local tbl, last = ensure_table(result, parts)
-                    if type(tbl[last]) ~= "table" then
-                        tbl[last] = {}
-                    end
-                else
-                    local key, value = line:match("^([%w_%-]+)%s*=%s*(.*)$")
-                    if key and value then
-                        -- Trim trailing comment (naive: everything after unquoted #)
-                        local val_str = value:match("^(.-)%s*#.*$") or value
-                        local parsed = parse_value(val_str)
-                        if result._toml_current_array_entry and section_type == "array_entry" then
-                            result._toml_current_array_entry[key] = parsed
-                        else
-                            set_key(key, parsed)
-                        end
-                    end
-                end
-            end
-        end
-    end
-
-    -- Clean up internal markers
-    result._toml_current_array_entry = nil
-    result._toml_array_entry_depth = nil
-    return result
-end
-
 -- Load configuration from a file
 function config.load_file(file_path)
     logger.debug("Loading configuration file", {path = file_path})
@@ -259,7 +68,7 @@ function config.load_file(file_path)
     -- Try TOML
     if file_path:match("%.toml$") then
         local success, result = pcall(function()
-            return config.parse_toml(content)
+            return toml.parse(content)
         end)
         if success then
             logger.info("Loaded TOML configuration", {path = file_path})
@@ -284,6 +93,50 @@ function config.load_file(file_path)
         end
     end
 
+    -- Try native Lua config (must return a table)
+    if file_path:match("%.lua$") then
+        -- Sandbox environment: only pure data-construction functions
+        local safe_env = {
+            pairs = pairs, ipairs = ipairs, next = next,
+            tonumber = tonumber, tostring = tostring, type = type,
+            math = math, string = string, table = table,
+            os = {date = os.date, time = os.time, difftime = os.difftime, clock = os.clock},
+        }
+        local chunk, load_err
+        if setfenv then
+            -- Lua 5.1 / LuaJIT
+            chunk, load_err = loadfile(file_path)
+            if chunk then setfenv(chunk, safe_env) end
+        else
+            -- Lua 5.2+
+            local f = io.open(file_path, "r")
+            if f then
+                local content = f:read("*a")
+                f:close()
+                chunk, load_err = load(content, nil, "t", safe_env)
+            else
+                load_err = "Cannot read file"
+            end
+        end
+        if not chunk then
+            logger.error("Invalid Lua in config file", {path = file_path, error = load_err})
+            return nil, "Invalid Lua in config file: " .. file_path .. " (" .. tostring(load_err) .. ")"
+        end
+        local success, result = pcall(chunk)
+        if success then
+            if type(result) == "table" then
+                logger.info("Loaded Lua configuration", {path = file_path})
+                return result
+            else
+                logger.error("Lua config did not return a table", {path = file_path, type = type(result)})
+                return nil, "Lua config must return a table: " .. file_path
+            end
+        else
+            logger.error("Invalid Lua in config file", {path = file_path, error = tostring(result)})
+            return nil, "Invalid Lua in config file: " .. file_path .. " (" .. tostring(result) .. ")"
+        end
+    end
+
     -- Simple key=value parser for other files
     local result = config.parse_key_value(content)
     logger.info("Loaded key-value configuration", {path = file_path})
@@ -294,48 +147,7 @@ end
 -- On POSIX systems the `env` command is used to enumerate all variables;
 -- on Windows the `set` command is used.
 function config.load_env(prefix)
-    local result = {}
-    local filter = prefix and (prefix .. "_") or ""
-
-    local is_windows = package.config:sub(1,1) == "\\"
-    local cmd
-    if is_windows then
-        cmd = "set 2>nul"
-    else
-        cmd = "env 2>/dev/null"
-    end
-
-    local handle = io.popen(cmd)
-    if not handle then
-        logger.debug("config.load_env: could not enumerate environment variables")
-        return result
-    end
-
-    for line in handle:lines() do
-        -- Guard against multi-line values embedded in a single popen line:
-        -- only process lines that contain an '=' sign.
-        local key, value = line:match("^([^=\n]+)=(.*)")
-        if key then
-            local match = filter == "" or key:sub(1, #filter) == filter
-            if match then
-                local short_key = (filter ~= "" and key:sub(#filter + 1) or key):lower()
-                if short_key ~= "" then
-                    if value == "true" then
-                        result[short_key] = true
-                    elseif value == "false" then
-                        result[short_key] = false
-                    elseif tonumber(value) then
-                        result[short_key] = tonumber(value)
-                    else
-                        result[short_key] = value
-                    end
-                end
-            end
-        end
-    end
-    handle:close()
-
-    return result
+    return env_loader.load(prefix)
 end
 
 -- Validate a configuration table against a schema.
@@ -372,6 +184,22 @@ function config.load_validated(path, schema)
         return nil, "Validation failed: " .. table.concat(errors, "; ")
     end
     return data
+end
+
+-- Simple shallow merge of two tables
+function config.merge(base, override)
+    local result = {}
+    if base then
+        for k, v in pairs(base) do
+            result[k] = v
+        end
+    end
+    if override then
+        for k, v in pairs(override) do
+            result[k] = v
+        end
+    end
+    return result
 end
 
 -- Merge configurations with priority: flags > env > config_file > defaults

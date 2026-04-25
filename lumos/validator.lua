@@ -14,52 +14,78 @@ function validator.validate_args(cmd, parsed_args)
     end
     
     for i, arg_def in ipairs(cmd.args) do
-        local value = parsed_args.args[i]
+        local value
+        if arg_def.variadic then
+            value = {}
+            for j = i, #parsed_args.args do
+                table.insert(value, parsed_args.args[j])
+            end
+        else
+            value = parsed_args.args[i]
+        end
         
         -- Apply default if argument is missing
         if value == nil and arg_def.default ~= nil then
             value = arg_def.default
         end
         
-        repeat
-            -- Required check
-            if arg_def.required and (value == nil or value == "") then
-                table.insert(errors, "Argument '" .. arg_def.name .. "' is required")
-                break
+        -- Required check
+        local missing = false
+        if arg_def.required then
+            if arg_def.variadic then
+                missing = #value == 0
+            else
+                missing = (value == nil or value == "")
             end
-            
-            -- Skip further validation if value is still nil (and not required)
-            if value == nil then
-                table.insert(validated, value)
-                break
-            end
-            
+        end
+        if missing then
+            table.insert(errors, "Argument '" .. arg_def.name .. "' is required")
+        elseif value == nil then
+            table.insert(validated, value)
+        else
             -- Type validation via flags module (reuse flag_def shape)
-            local fake_flag = {
-                type = arg_def.type,
-                min = arg_def.min,
-                max = arg_def.max
-            }
-            local valid, result = flags.validate_flag(fake_flag, value)
-            if not valid then
-                table.insert(errors, "Argument '" .. arg_def.name .. "' " .. result)
-                break
-            end
+            local values_to_validate = arg_def.variadic and value or {value}
+            local validated_values = {}
+            local failed = false
             
-            -- Custom validator
-            if arg_def.validate then
-                local ok, err_msg = pcall(arg_def.validate, result)
-                if not ok then
-                    table.insert(errors, "Argument '" .. arg_def.name .. "' validation failed: " .. tostring(err_msg))
-                    break
-                elseif err_msg == false then
-                    table.insert(errors, "Argument '" .. arg_def.name .. "' is invalid")
+            for _, v in ipairs(values_to_validate) do
+                local fake_flag = {
+                    type = arg_def.type,
+                    min = arg_def.min,
+                    max = arg_def.max
+                }
+                local valid, result = flags.validate_flag(fake_flag, v)
+                if not valid then
+                    table.insert(errors, "Argument '" .. arg_def.name .. "' " .. result)
+                    failed = true
                     break
                 end
+                
+                -- Custom validator
+                if arg_def.validate then
+                    local ok, err_msg = pcall(arg_def.validate, result)
+                    if not ok then
+                        table.insert(errors, "Argument '" .. arg_def.name .. "' validation failed: " .. tostring(err_msg))
+                        failed = true
+                        break
+                    elseif err_msg == false then
+                        table.insert(errors, "Argument '" .. arg_def.name .. "' is invalid")
+                        failed = true
+                        break
+                    end
+                end
+                
+                table.insert(validated_values, result)
             end
             
-            table.insert(validated, result)
-        until true
+            if not failed then
+                if arg_def.variadic then
+                    table.insert(validated, validated_values)
+                else
+                    table.insert(validated, validated_values[1])
+                end
+            end
+        end
     end
     
     return validated, errors
@@ -69,6 +95,7 @@ end
 function validator.validate_and_merge_flags(app, cmd, parsed_flags)
     local merged_flags = {}
     local errors = {}
+    local known_flags = {}
     
     -- Helper function to validate a flag
     local function validate_single_flag(flag_name, flag_value, flag_def)
@@ -94,6 +121,8 @@ function validator.validate_and_merge_flags(app, cmd, parsed_flags)
     local function process_flag_defs(flag_defs)
         if not flag_defs then return end
         for flag_name, flag_def in pairs(flag_defs) do
+            known_flags[flag_name] = true
+            if flag_def.short then known_flags[flag_def.short] = true end
             local env_value = nil
             if flag_def.env then
                 env_value = os.getenv(flag_def.env)
@@ -123,9 +152,17 @@ function validator.validate_and_merge_flags(app, cmd, parsed_flags)
     -- Add command-specific flags
     process_flag_defs(cmd and cmd.flags or nil)
     
-    -- Copy remaining parsed flags that weren't validated
+    -- Detect unknown flags and suggest alternatives
     for flag_name, flag_value in pairs(parsed_flags) do
-        if merged_flags[flag_name] == nil then
+        if not known_flags[flag_name] then
+            local suggestion = require('lumos.parser').suggest_flag(app, cmd, flag_name)
+            local msg = "Unknown flag --" .. flag_name
+            if suggestion then
+                msg = msg .. ". Did you mean '--" .. suggestion .. "'?"
+            end
+            table.insert(errors, msg)
+        elseif merged_flags[flag_name] == nil then
+            -- Known flag that was not validated (e.g. value came from parsed_flags directly)
             merged_flags[flag_name] = flag_value
         end
     end

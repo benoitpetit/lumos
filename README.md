@@ -31,7 +31,7 @@
 - **Middleware Chain** - Express-like middleware with auth, dry-run, retry, rate-limiting, and more
 - **Advanced Flags** - int, float, array, enum, path, url, email with built-in validation
 - **Hidden & Deprecated Flags** - Evolve your CLI without breaking users
-- **Shell Integration** - Auto-completion, man pages, and documentation generation
+- **Shell Integration** - Bash, Zsh, Fish, and PowerShell completions with enum/subcommand support, plus man pages and docs generation
 - **Configuration Management** - JSON, YAML, TOML, and key=value files, environment variables, built-in cache
 - **Test-Ready** - Generated projects include a Busted configuration and a starter test file
 - **Minimal Dependencies** - Only requires `luafilesystem`, modular architecture
@@ -128,7 +128,7 @@ local color = require('lumos.color')
 
 local app = lumos.new_app({
     name = "my-awesome-cli",
-    version = "0.3.7",
+    version = "0.3.8",
     description = "My awesome CLI application"
 })
 
@@ -186,7 +186,7 @@ luarocks make --local lumos-dev-1.rockspec
 ### Verify Installation
 ```bash
 lumos version
-# Should output: Lumos CLI Framework v0.3.7
+# Should output: Lumos CLI Framework v0.3.8
 ```
 
 ## The Runtime & Distribution Model
@@ -401,8 +401,21 @@ bundle.minimal("src/main.lua", "dist/myapp.lua", { minify = true })
 
 ### Shell Integration
 ```lua
--- Generate completions
-local completion = app:generate_completion("bash")
+-- Auto-add a completion command to your app
+app:add_completion_command()
+
+-- Generate completions for any supported shell
+local bash = app:generate_completion("bash")
+local zsh  = app:generate_completion("zsh")
+local fish = app:generate_completion("fish")
+local ps   = app:generate_completion("powershell")
+
+-- Generate all shells at once
+app:generate_completion("all", "./completions")
+
+-- Custom completion values for flags
+cmd:flag_enum("--env", "Environment", {"dev", "staging", "prod"})
+   :complete({"dev", "staging", "prod"})
 
 -- Generate man pages
 local manpage = app:generate_manpage()
@@ -562,11 +575,11 @@ make install && make test
 
 ## Project Status
 
-- **Version:** 0.3.7
+- **Version:** 0.3.8
 - **License:** MIT
 - **Lua Versions:** 5.1, 5.2, 5.3, 5.4, LuaJIT
 - **Platforms:** Linux, macOS, Windows (native)
-- **Tests:** 528 passing tests
+- **Tests:** 624 passing tests
 - **Dependencies:** luafilesystem
 
 ## Acknowledgments

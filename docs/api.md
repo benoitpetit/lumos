@@ -23,7 +23,7 @@ Creates a new CLI application.
 local lumos = require('lumos')
 local app = lumos.new_app({
     name = "myapp",
-    version = "0.3.7",
+    version = "0.3.8",
     description = "My CLI application"
 })
 ```
@@ -43,7 +43,7 @@ Lumos exports the following modules:
 - `lumos.table` - Table formatting
 - `lumos.json` - JSON utilities (full spec support, nested objects, unicode)
 - `lumos.config` - Configuration file management
-- `lumos.completion` - Shell completion
+- `lumos.completion` - Shell completion (bash, zsh, fish, powershell)
 - `lumos.manpage` - Man page generation
 - `lumos.markdown` - Markdown documentation
 - `lumos.security` - Input sanitization and validation
@@ -57,6 +57,7 @@ Lumos exports the following modules:
 - `lumos.terminal` - Terminal control and capabilities
 - `lumos.profiler` - Performance profiling
 - `lumos.config_cache` - In-memory configuration cache
+- `lumos.stdin` - Standard input reading utilities
 - `lumos.http` - Lightweight HTTP client (GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS)
 
 ## Application Methods
@@ -128,13 +129,22 @@ end)
 
 ## Command Methods
 
-### `cmd:arg(name, description)`
+### `cmd:arg(name, description, options)`
 
 Adds a positional argument.
 
 ```lua
 cmd:arg("environment", "Target environment")
+cmd:arg("count", "Number of items", {type = "int", required = true})
+cmd:arg("files", "Source files", {variadic = true, required = true})
 ```
+
+**Options:**
+- `required` (boolean): Argument is required
+- `type` (string): Expected type (`"string"`, `"int"`, `"number"`, `"boolean"`, `"path"`)
+- `default`: Default value if not provided
+- `validate` (function): Custom validator function
+- `variadic` (boolean): Capture all remaining positional arguments as a table
 
 ### `cmd:flag(spec, description)`
 
@@ -166,6 +176,14 @@ Adds an alias for the command.
 
 ```lua
 cmd:alias("d")  -- 'deploy' can now be called as 'd'
+```
+
+### `cmd:category(name)`
+
+Groups the command under a category in the help output.
+
+```lua
+cmd:category("Network")
 ```
 
 ### `cmd:action(function)`
@@ -292,6 +310,37 @@ URL flag with scheme and host validation.
 
 ```lua
 cmd:flag_url("--endpoint", "API endpoint", { schemes = {"https"}, require_path = true, allow_localhost = false })
+```
+
+### `cmd:flag_duration(spec, description, min, max)`
+
+Duration flag that parses human-readable durations into seconds.
+
+Supports: `s` (seconds), `m` (minutes), `h` (hours), `d` (days), `w` (weeks).
+
+```lua
+cmd:flag_duration("--timeout", "Request timeout", 1, 3600)
+-- User passes: --timeout 5m30s → 330 (seconds)
+```
+
+### `cmd:flag_map(spec, description)`
+
+Map flag that accumulates `key=value` pairs into a table.
+
+```lua
+cmd:flag_map("--label", "Add a label")
+-- User passes: --label env=prod --label team=backend
+-- ctx.flags.label → { env = "prod", team = "backend" }
+```
+
+### `cmd:group(name)`
+
+Groups the most recently added flag under a named section in help output.
+
+```lua
+cmd:flag_string("--host", "Host address"):group("Connection")
+cmd:flag_int("--port", "Port number"):group("Connection")
+cmd:flag_string("--format", "Output format"):group("Output")
 ```
 
 ### `cmd:mutex_group(name, flags, options)`
@@ -704,6 +753,27 @@ loader.start("Loading", "dots")      -- ., .., ...
 loader.start("Loading", "bounce")    -- spinning characters
 ```
 
+### Instantiable Loaders
+
+You can create independent loader instances for concurrent or isolated animations:
+
+```lua
+local ld = loader.new("Task A", "dots")
+ld:start()
+for i = 1, 10 do
+    ld:next()
+end
+ld:success()
+
+-- Instance methods mirror the module-level API
+local ld2 = loader.new()
+ld2:run(function(self)
+    -- self is the loader instance
+    self:update("Step 2")
+    return result
+end, "Working", "bounce")
+```
+
 ## Table Module (`lumos.table`)
 
 ### Simple Boxed Lists
@@ -1093,10 +1163,50 @@ end
 
 ### Shell Completion
 
+Generate completion scripts for **Bash**, **Zsh**, **Fish**, and **PowerShell**.
+
 ```lua
 local completion_script = app:generate_completion("bash")
 app:generate_completion("all", "./completions")
 ```
+
+#### `app:add_completion_command(config)`
+
+Automatically adds a `completion` command to your application that prints shell completion scripts on demand.
+
+```lua
+-- Add with defaults (command name: "completion", supports bash/zsh/fish/powershell)
+app:add_completion_command()
+
+-- Customize
+app:add_completion_command({
+    name = "complete",
+    description = "Print shell completions",
+    shells = {"bash", "zsh", "fish"}
+})
+```
+
+Usage after adding:
+```bash
+myapp completion bash
+myapp completion zsh
+myapp completion fish
+myapp completion powershell
+```
+
+#### `cmd:complete(choices)`
+
+Define custom completion values for the most recently added flag. These values are embedded into generated completion scripts.
+
+```lua
+cmd:flag_enum("--env", "Environment", {"dev", "staging", "prod"})
+    :complete({"dev", "staging", "prod"})
+
+cmd:flag_string("--region", "Region")
+    :complete({"us-east", "eu-west", "ap-south"})
+```
+
+The completion engine automatically uses `flag_enum` choices, but `:complete()` lets you override or extend them.
 
 ### Man Pages
 
@@ -1347,6 +1457,71 @@ local resp, err = http.request({
 - `json()` (function) — lazily decodes body as JSON, returns `data, err`
 
 **Backend:** Uses `curl` under the hood (available on virtually all systems). No extra Lua dependencies required.
+
+## Stdin Module
+
+```lua
+local stdin = require('lumos.stdin')
+```
+
+### `stdin.is_pipe()`
+
+Returns `true` if stdin is a pipe or redirect (not a TTY).
+
+### `stdin.read()`
+
+Reads all data from stdin.
+
+```lua
+local data, err = stdin.read()
+```
+
+### `stdin.read_lines()`
+
+Reads stdin line by line into a table.
+
+```lua
+local lines, err = stdin.read_lines()
+```
+
+### `stdin.read_json()`
+
+Reads stdin and parses as JSON.
+
+```lua
+local data, err = stdin.read_json()
+```
+
+## Parser Features
+
+### Flag Negation
+
+Boolean flags support `--no-` prefix to explicitly set them to `false`.
+
+```lua
+cmd:flag("--verbose", "Enable verbose output")
+-- myapp cmd --verbose      → ctx.flags.verbose = true
+-- myapp cmd --no-verbose   → ctx.flags.verbose = false
+```
+
+### Unknown Flag Detection
+
+The parser validates flags and suggests close matches when an unknown flag is used.
+
+```bash
+$ myapp cmd --verboose
+Error: Unknown flag --verboose. Did you mean '--verbose'?
+```
+
+### Command Suggestions
+
+Unknown commands trigger Levenshtein-based suggestions.
+
+```bash
+$ myapp deplpy
+Error: Unknown command 'deplpy'
+Did you mean 'deploy'?
+```
 
 ## Bundle Minimal (Tree-Shaking)
 

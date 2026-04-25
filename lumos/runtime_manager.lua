@@ -5,7 +5,15 @@ local runtime_manager = {}
 
 local fs = require("lumos.fs")
 local security = require("lumos.security")
-local lfs = require("lfs")
+
+local lfs
+local function get_lfs()
+    if lfs == nil then
+        local ok, mod = pcall(require, "lfs")
+        lfs = ok and mod or false
+    end
+    return lfs
+end
 
 local PATH_SEP = _G.package.config:sub(1, 1)
 local IS_WINDOWS = PATH_SEP == "\\"
@@ -218,6 +226,10 @@ local function find_luarocks_runtime_dirs(module_dir)
     if not module_dir or module_dir == "" or module_dir == "lumos" then
         return dirs
     end
+    local lfs = get_lfs()
+    if not lfs then
+        return dirs
+    end
     -- Heuristic: if module_dir is inside a LuaRocks tree (share/lua/X.Y/lumos),
     -- look for runtime in lib/luarocks/rocks-X.Y/lumos/<version>/runtime
     local tree_root = module_dir:match("^(.-)[/\\]share[/\\]lua[/\\]%d+%.%d+[/\\]lumos$")
@@ -249,7 +261,7 @@ function runtime_manager.get_runtime_dirs()
 
     local env_runtime = os.getenv("LUMOS_RUNTIME_DIR")
     if env_runtime and env_runtime ~= "" and fs.is_dir(env_runtime) then
-        add_unique(dirs, env_runtime)
+        add_unique(dirs, fs.normalize_path(env_runtime))
     end
 
     local module_dir = get_module_dir()
@@ -258,7 +270,7 @@ function runtime_manager.get_runtime_dirs()
         for _ = 1, 8 do
             local candidate = cursor .. PATH_SEP .. "runtime"
             if fs.is_dir(candidate) then
-                add_unique(dirs, candidate)
+                add_unique(dirs, fs.normalize_path(candidate))
             end
             local parent = dirname(cursor)
             if not parent or parent == cursor then
@@ -268,13 +280,13 @@ function runtime_manager.get_runtime_dirs()
         end
 
         for _, candidate in ipairs(find_luarocks_runtime_dirs(module_dir)) do
-            add_unique(dirs, candidate)
+            add_unique(dirs, fs.normalize_path(candidate))
         end
     end
 
     local cache_runtime = runtime_manager.get_cache_runtime_dir()
     if fs.is_dir(cache_runtime) then
-        add_unique(dirs, cache_runtime)
+        add_unique(dirs, fs.normalize_path(cache_runtime))
     end
 
     return dirs
@@ -299,12 +311,19 @@ end
 
 function runtime_manager.list_targets()
     local targets = {}
+    local lfs_mod = get_lfs()
+    if not lfs_mod then
+        return {}
+    end
     for _, runtime_dir in ipairs(runtime_manager.get_runtime_dirs()) do
-        for file in lfs.dir(runtime_dir) do
-            if file:match("^lumos%-launcher%-") then
-                local target = parse_launcher_target(file)
-                if target then
-                    targets[target] = true
+        local ok, iter, state = pcall(lfs_mod.dir, runtime_dir)
+        if ok and iter then
+            for file in iter, state do
+                if file:match("^lumos%-launcher%-") then
+                    local target = parse_launcher_target(file)
+                    if target then
+                        targets[target] = true
+                    end
                 end
             end
         end
@@ -322,10 +341,10 @@ function runtime_manager.find_launcher(target)
     for _, runtime_dir in ipairs(runtime_manager.get_runtime_dirs()) do
         local launcher_path = runtime_dir .. PATH_SEP .. "lumos-launcher-" .. target
         if fs.path_exists(launcher_path) then
-            return launcher_path
+            return fs.normalize_path(launcher_path)
         end
         if fs.path_exists(launcher_path .. ".exe") then
-            return launcher_path .. ".exe"
+            return fs.normalize_path(launcher_path .. ".exe")
         end
     end
     return nil

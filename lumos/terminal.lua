@@ -13,15 +13,16 @@ end
 
 --- Determines if colors should be used
 function terminal.should_use_colors()
-    local p = get_platform()
-    if p.is_piped() then
-        return false
+    -- Environment overrides take precedence over TTY detection
+    if os.getenv("FORCE_COLOR") then
+        return true
     end
     if os.getenv("NO_COLOR") then
         return false
     end
-    if os.getenv("FORCE_COLOR") then
-        return true
+    local p = get_platform()
+    if p.is_piped() then
+        return false
     end
     return p.supports_colors()
 end
@@ -37,70 +38,56 @@ function terminal.supports_interactive_prompts()
     return get_platform().is_interactive()
 end
 
+-- Internal: run a shell command and return its stdout
+local function shell_output(cmd)
+    local handle = io.popen(cmd .. " 2>/dev/null")
+    if handle then
+        local out = handle:read("*a") or ""
+        handle:close()
+        return out
+    end
+    return ""
+end
+
+-- Internal: extract a number from text using a pattern
+local function extract_num(text, pattern)
+    local m = text:match(pattern)
+    if m then
+        return tonumber(m)
+    end
+    return nil
+end
+
 --- Returns terminal width in columns
 function terminal.width()
-    local w = 80
+    local w = nil
     local p = get_platform()
     if p.is_windows() then
-        local handle = io.popen("mode con 2>nul")
-        if handle then
-            local out = handle:read("*a") or ""
-            handle:close()
-            local cols = out:match("Columns:%s*(%d+)")
-            if cols then
-                w = tonumber(cols)
-            end
-        end
+        w = extract_num(shell_output("mode con"), "Columns:%s*(%d+)")
     else
-        local handle = io.popen("stty size 2>/dev/null")
-        if handle then
-            local out = handle:read("*a") or ""
-            handle:close()
-            local _, cols = out:match("(%d+)%s+(%d+)")
-            if cols then
-                w = tonumber(cols)
-            end
-        end
+        local out = shell_output("stty size")
+        local _, cols = out:match("(%d+)%s+(%d+)")
+        w = tonumber(cols)
     end
-    if w == 80 then
-        local env = os.getenv("COLUMNS")
-        if env then
-            w = tonumber(env) or 80
-        end
+    if not w then
+        w = tonumber(os.getenv("COLUMNS")) or 80
     end
     return w
 end
 
 --- Returns terminal height in rows
 function terminal.height()
-    local h = 24
+    local h = nil
     local p = get_platform()
     if p.is_windows() then
-        local handle = io.popen("mode con 2>nul")
-        if handle then
-            local out = handle:read("*a") or ""
-            handle:close()
-            local rows = out:match("Lines:%s*(%d+)")
-            if rows then
-                h = tonumber(rows)
-            end
-        end
+        h = extract_num(shell_output("mode con"), "Lines:%s*(%d+)")
     else
-        local handle = io.popen("stty size 2>/dev/null")
-        if handle then
-            local out = handle:read("*a") or ""
-            handle:close()
-            local rows = out:match("(%d+)%s+%d+")
-            if rows then
-                h = tonumber(rows)
-            end
-        end
+        local out = shell_output("stty size")
+        local rows = out:match("(%d+)%s+%d+")
+        h = tonumber(rows)
     end
-    if h == 24 then
-        local env = os.getenv("LINES")
-        if env then
-            h = tonumber(env) or 24
-        end
+    if not h then
+        h = tonumber(os.getenv("LINES")) or 24
     end
     return h
 end
@@ -114,9 +101,9 @@ function terminal.clear()
     end
 end
 
+-- Internal: write an ANSI sequence only when output is not piped
 local function ansi_write(seq)
-    local p = get_platform()
-    if not p.is_windows() or (p.supports_colors and p.supports_colors()) then
+    if not get_platform().is_piped() then
         io.write(seq)
     end
 end

@@ -262,6 +262,66 @@ local function json_parse(tokens, index)
     end
 end
 
+function json.encode_pretty(obj, indent)
+    indent = indent or 2
+    
+    local function encode_value(val, depth)
+        local t = type(val)
+        if t == "string" then
+            return '"' .. escape_string(val) .. '"'
+        elseif t == "number" then
+            if val ~= val then
+                return '"NaN"'
+            elseif val == math.huge then
+                return '"Infinity"'
+            elseif val == -math.huge then
+                return '"-Infinity"'
+            else
+                return tostring(val)
+            end
+        elseif t == "boolean" then
+            return val and "true" or "false"
+        elseif t == "nil" then
+            return "null"
+        elseif t == "table" then
+            local is_array = true
+            local max_index = 0
+            for k, v in pairs(val) do
+                if type(k) ~= "number" or k <= 0 or k ~= math.floor(k) then
+                    is_array = false
+                    break
+                end
+                max_index = math.max(max_index, k)
+            end
+            
+            local spaces = string.rep(" ", depth * indent)
+            local inner_spaces = string.rep(" ", (depth + 1) * indent)
+            
+            if is_array and max_index > 0 then
+                local result = {}
+                for i = 1, max_index do
+                    table.insert(result, inner_spaces .. encode_value(val[i], depth + 1))
+                end
+                return "[\n" .. table.concat(result, ",\n") .. "\n" .. spaces .. "]"
+            else
+                local result = {}
+                for k, v in pairs(val) do
+                    local key = type(k) == "string" and k or tostring(k)
+                    table.insert(result, inner_spaces .. '"' .. escape_string(key) .. '": ' .. encode_value(v, depth + 1))
+                end
+                if #result == 0 then
+                    return "{}"
+                end
+                return "{\n" .. table.concat(result, ",\n") .. "\n" .. spaces .. "}"
+            end
+        else
+            return '"' .. tostring(val) .. '"'
+        end
+    end
+    
+    return encode_value(obj, 0)
+end
+
 function json.decode(str)
     if type(str) ~= "string" then
         error("json.decode expects a string, got " .. type(str))

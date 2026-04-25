@@ -36,7 +36,7 @@ function profiler.wrap(name, fn)
         profiler.start(name)
         local result = { fn(...) }
         profiler.stop(name)
-        return table.unpack(result)
+        return (unpack or table.unpack)(result)
     end
 end
 

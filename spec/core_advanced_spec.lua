@@ -426,6 +426,64 @@ describe('Advanced Core Module', function()
         end)
     end)
 
+    describe('suggest_flag()', function()
+        it('suggests a close flag name', function()
+            local test_app = app.new_app({name = 'myapp'})
+            test_app:flag('--verbose -v', 'Verbose')
+            local cmd = test_app:command('deploy', 'Deploy')
+            cmd:flag('--dry-run', 'Dry run')
+
+            local suggestion = core.suggest_flag(test_app, cmd, 'verboose')
+            assert.are.equal('verbose', suggestion)
+        end)
+
+        it('suggests a close flag name across all flag scopes', function()
+            local test_app = app.new_app({name = 'myapp'})
+            test_app:flag('--verbose -v', 'Verbose')
+            local cmd = test_app:command('deploy', 'Deploy')
+            cmd:flag('--dry-run', 'Dry run')
+
+            local suggestion = core.suggest_flag(test_app, cmd, 'vebose')
+            assert.are.equal('verbose', suggestion)
+        end)
+
+        it('returns nil when no close match', function()
+            local test_app = app.new_app({name = 'myapp'})
+            test_app:command('build', 'Build')
+
+            local suggestion = core.suggest_flag(test_app, nil, 'xyz')
+            assert.is_nil(suggestion)
+        end)
+    end)
+
+    describe('Unknown flag validation', function()
+        it('rejects unknown flags with a suggestion', function()
+            local test_app = app.new_app({name = 'myapp'})
+            local cmd = test_app:command('deploy', 'Deploy')
+            cmd:flag('--verbose -v', 'Verbose')
+
+            local parsed_flags = {verboose = true}
+            local merged, errors = core.validate_and_merge_flags(test_app, cmd, parsed_flags)
+
+            assert.are.equal(0, #merged)
+            assert.are.equal(1, #errors)
+            assert.is_not_nil(errors[1]:match('Unknown flag'))
+            assert.is_not_nil(errors[1]:match('verbose'))
+        end)
+
+        it('accepts known flags', function()
+            local test_app = app.new_app({name = 'myapp'})
+            local cmd = test_app:command('deploy', 'Deploy')
+            cmd:flag('--verbose -v', 'Verbose')
+
+            local parsed_flags = {verbose = true}
+            local merged, errors = core.validate_and_merge_flags(test_app, cmd, parsed_flags)
+
+            assert.are.equal(0, #errors)
+            assert.is_true(merged.verbose)
+        end)
+    end)
+
     describe('Hooks', function()
         it('executes pre_run and post_run hooks', function()
             local test_app = app.new_app({name = 'testapp'})

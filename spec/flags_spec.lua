@@ -45,4 +45,15 @@ describe('Flags Module', function()
     local result = flags.parse_single_flag('-n', {'-n', '-42'}, 1)
     assert.are.same({name = 'n', value = '-42', next_index = 3}, result)
   end)
+
+  -- parse_single_flag: --no-flag negation
+  it('parses --no-flag as false value', function()
+    local result = flags.parse_single_flag('--no-verbose', {'--no-verbose'}, 1)
+    assert.are.same({name = 'verbose', value = false, next_index = 2}, result)
+  end)
+
+  it('parses --no-dry-run as false value with hyphen', function()
+    local result = flags.parse_single_flag('--no-dry-run', {'--no-dry-run'}, 1)
+    assert.are.same({name = 'dry_run', value = false, next_index = 2}, result)
+  end)
 end)

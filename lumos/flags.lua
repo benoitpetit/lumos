@@ -137,6 +137,48 @@ function flags.validate_flag(flag_def, value)
         return true, items
     end
 
+    -- === DURATION ===
+    if flag_type == "duration" then
+        local str = tostring(value)
+        local total = 0
+        for num, unit in str:gmatch("(%d+)([smhdw])") do
+            local n = tonumber(num)
+            if unit == "s" then total = total + n
+            elseif unit == "m" then total = total + n * 60
+            elseif unit == "h" then total = total + n * 3600
+            elseif unit == "d" then total = total + n * 86400
+            elseif unit == "w" then total = total + n * 604800
+            end
+        end
+        if total == 0 then
+            local n = tonumber(str)
+            if n then total = n end
+        end
+        if total == 0 and str ~= "0" and str ~= "0s" then
+            return false, "must be a valid duration (e.g. 10s, 5m, 1h30m)"
+        end
+        if flag_def.min and total < flag_def.min then
+            return false, "must be >= " .. flag_def.min .. "s"
+        end
+        if flag_def.max and total > flag_def.max then
+            return false, "must be <= " .. flag_def.max .. "s"
+        end
+        return true, total
+    end
+
+    -- === MAP / DICT ===
+    if flag_type == "map" then
+        if type(value) == "table" then
+            -- Already accumulated by parser
+            return true, value
+        end
+        local key, val = tostring(value):match("^([^=]+)=(.*)$")
+        if not key then
+            return false, "must be in key=value format"
+        end
+        return true, {[key] = val}
+    end
+
     -- === ENUM ===
     if flag_type == "enum" then
         local str = tostring(value)
@@ -364,6 +406,12 @@ function flags.parse_single_flag(arg, args, start_index)
         end
         -- Normalize hyphens to underscores so --dry-run → ctx.flags.dry_run
         name = name:gsub("-", "_")
+        -- Support negation: --no-verbose → verbose = false
+        local negated = name:match("^no_(.+)")
+        if negated then
+            name = negated
+            value = false
+        end
     elseif arg:sub(1, 1) == "-" then
         -- Short flag
         name = arg:sub(2, 2)

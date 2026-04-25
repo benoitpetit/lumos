@@ -120,6 +120,9 @@ function package.create(options)
         if n and n > 0 then
             MAX_PAYLOAD_MB = math.floor(n)
         end
+        if MAX_PAYLOAD_MB <= 0 then
+            MAX_PAYLOAD_MB = 1
+        end
     end
     local MAX_PAYLOAD = MAX_PAYLOAD_MB * 1024 * 1024
     if #lua_code > MAX_PAYLOAD then

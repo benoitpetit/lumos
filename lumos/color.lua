@@ -37,28 +37,32 @@ local colors = {
     bg_white = "\27[47m"
 }
 
--- Check if terminal supports colors
+-- Check if terminal supports colors (single source of truth: terminal module)
 local function supports_color()
-    -- Check for LUMOS_NO_COLOR environment variable
-    if os.getenv("LUMOS_NO_COLOR") or os.getenv("NO_COLOR") then
+    local ok, term = pcall(require, "lumos.terminal")
+    if ok and term and term.should_use_colors then
+        return term.should_use_colors()
+    end
+    -- Fallback
+    if os.getenv("NO_COLOR") then
         return false
     end
-
-    -- Check for TERM environment variable
-    local term = os.getenv("TERM")
-    if term and (term:match("color") or term:match("xterm") or term:match("screen")) then
+    if os.getenv("FORCE_COLOR") then
         return true
     end
-
-    -- Fallback to terminal detection (pipe-aware, platform-aware)
-    local ok, term = pcall(require, "lumos.terminal")
-    if ok and term then
-        return term.should_use_colors()
+    local t = os.getenv("TERM")
+    if t and (t:match("color") or t:match("xterm") or t:match("screen")) then
+        return true
     end
     return false
 end
 
 local color_enabled = supports_color()
+
+-- Allow external refresh (e.g. when NO_COLOR is set after module load)
+function color.refresh()
+    color_enabled = supports_color()
+end
 
 -- Colorize text with the given color
 function color.colorize(text, color_name)
@@ -125,6 +129,11 @@ function color.dim(text)
     return "\27[2m" .. text .. "\27[0m"
 end
 
+function color.underline(text)
+    if not color_enabled then return text end
+    return "\27[4m" .. text .. "\27[0m"
+end
+
 -- Enable/disable colors
 function color.enable()
     color_enabled = true
@@ -136,6 +145,11 @@ end
 
 function color.is_enabled()
     return color_enabled
+end
+
+function color.strip(text)
+    if type(text) ~= "string" then return text end
+    return text:gsub("\27%[[0-9;]*m", "")
 end
 
 -- Contextual color helpers
@@ -154,6 +168,38 @@ color.log = {
 }
 
 -- Progress-based coloring
+function color.bg_black(text)
+    return color.colorize(text, "bg_black")
+end
+
+function color.bg_red(text)
+    return color.colorize(text, "bg_red")
+end
+
+function color.bg_green(text)
+    return color.colorize(text, "bg_green")
+end
+
+function color.bg_yellow(text)
+    return color.colorize(text, "bg_yellow")
+end
+
+function color.bg_blue(text)
+    return color.colorize(text, "bg_blue")
+end
+
+function color.bg_magenta(text)
+    return color.colorize(text, "bg_magenta")
+end
+
+function color.bg_cyan(text)
+    return color.colorize(text, "bg_cyan")
+end
+
+function color.bg_white(text)
+    return color.colorize(text, "bg_white")
+end
+
 function color.progress_color(percentage)
     if percentage < 33 then
         return "red"

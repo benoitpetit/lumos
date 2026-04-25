@@ -48,8 +48,7 @@ doc:
 # Run examples
 examples:
 	@echo "Running examples..."
-	@cd examples && lua basic_app.lua --help
-	@cd examples && lua advanced_features.lua user list
+	@for f in examples/*.lua; do lua "$$f" --help >/dev/null 2>&1 && echo "OK: $$f" || echo "FAIL: $$f"; done
 
 # Build placeholder (delegates to install-prod)
 build: install-prod

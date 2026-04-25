@@ -90,8 +90,13 @@ local function mkdir_p(path)
     -- Normalize mixed separators to native separator
     path = path:gsub("[/\\]", sep)
     local p = ''
+    local is_absolute = path:sub(1, 1) == sep
     for dir in string.gmatch(path, "[^" .. sep .. "]+") do
-        p = p == '' and dir or (p .. sep .. dir)
+        if p == '' then
+            p = is_absolute and (sep .. dir) or dir
+        else
+            p = p .. sep .. dir
+        end
         if not lfs.attributes(p, 'mode') then
             local ok, err = lfs.mkdir(p)
             if not ok then
@@ -383,22 +388,29 @@ local function run_new_project(ctx)
         
         local description = prompt.input("Project description", "A CLI app built with Lumos") or "A CLI app built with Lumos"
         print(color.yellow("Creating project structure for " .. project_name .. " ..."))
-        
+
+        -- Extract basename for internal file names
+        local project_basename = project_name:match("[/\\]([^/\\]+)$") or project_name
+
         -- Create directories
-        mkdir_p(project_name .. "/src")
+        local ok_dirs = mkdir_p(project_name .. "/src")
+        if not ok_dirs then
+            print(color.red("Failed to create project directories."))
+            return false
+        end
         mkdir_p(project_name .. "/tests")
         mkdir_p(project_name .. "/docs")
-        
+
         -- Create files
-        write_file(project_name .. "/src/main.lua", get_main_template(project_name, description))
-        local app_lua = get_module_template(project_name, description)
+        write_file(project_name .. "/src/main.lua", get_main_template(project_basename, description))
+        local app_lua = get_module_template(project_basename, description)
         app_lua = app_lua:gsub('"__APP_VERSION__"', '"0.1.0"')
         write_file(project_name .. "/src/app.lua", app_lua)
-        write_file(project_name .. "/tests/app_spec.lua", get_test_template(project_name))
-        write_file(project_name .. "/README.md", get_readme_template(project_name))
+        write_file(project_name .. "/tests/app_spec.lua", get_test_template(project_basename))
+        write_file(project_name .. "/README.md", get_readme_template(project_basename))
 
         -- Create rockspec
-        write_file(project_name .. "/" .. project_name .. "-dev-1.rockspec", get_rockspec_template(project_name, description))
+        write_file(project_name .. "/" .. project_basename .. "-dev-1.rockspec", get_rockspec_template(project_basename, description))
         
         -- Create Makefile
         write_file(project_name .. "/Makefile", string.format([[# %s CLI Project Makefile
@@ -517,7 +529,7 @@ ensure-dist:
 	@mkdir -p $(DIST_DIR)
 
 .PHONY: check-lumos install test run help dev bundle package build package-linux package-linux-aarch64 package-windows package-macos-x64 package-macos-arm64 build-linux build-linux-aarch64 build-windows dist dist-all clean ensure-dist
-]], project_name, project_name))
+]], project_basename, project_basename))
         
         -- Create .gitignore
         write_file(project_name .. "/.gitignore", [[# IDE files
@@ -580,7 +592,7 @@ app:command("create", "Alias for 'new'")
 
 app:command("version", "Show Lumos version")
     :action(function(ctx)
-        print("Lumos CLI Framework v" .. (lumos.version or "0.3.7"))
+        print("Lumos CLI Framework v" .. (lumos.version or "0.3.8"))
         print("A modern CLI framework for Lua")
         print("https://github.com/benoitpetit/lumos")
         return true
@@ -589,7 +601,7 @@ app:command("version", "Show Lumos version")
 app:command("update", "Update Lumos to the latest version via LuaRocks")
     :action(function(ctx)
         print(color.cyan("Updating Lumos..."))
-        print(color.white("Current version: v" .. (lumos.version or "0.3.7")))
+        print(color.white("Current version: v" .. (lumos.version or "0.3.8")))
         print("")
 
         local cmd = "luarocks install lumos"
@@ -1071,5 +1083,7 @@ package_cmd:action(function(ctx)
     
     return true
 end)
+
+app:add_completion_command()
 
 os.exit(app:run(arg))

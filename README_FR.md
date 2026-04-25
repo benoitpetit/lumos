@@ -31,7 +31,7 @@
 - **Chaîne de middleware** - Middleware style Express avec auth, dry-run, retry, rate-limiting, etc.
 - **Flags avancés** - int, float, array, enum, path, url, email avec validation intégrée
 - **Flags cachés et dépréciés** - Faites évoluer votre CLI sans casser vos utilisateurs
-- **Intégration shell** - Auto-complétion, pages man, génération de documentation
+- **Intégration shell** - Completions Bash, Zsh, Fish et PowerShell avec support enum/sous-commandes, plus pages man et génération de documentation
 - **Gestion de configuration** - Fichiers JSON, TOML, et key=value, variables d'environnement, cache intégré
 - **Prêt pour les tests** - Les projets générés incluent Busted et un fichier de test de démarrage
 - **Dépendances minimales** - Nécessite seulement `luafilesystem`, architecture modulaire
@@ -128,7 +128,7 @@ local color = require('lumos.color')
 
 local app = lumos.new_app({
     name = "my-awesome-cli",
-    version = "0.3.7",
+    version = "0.3.8",
     description = "My awesome CLI application"
 })
 
@@ -186,7 +186,7 @@ luarocks make --local lumos-dev-1.rockspec
 ### Vérifier l'installation
 ```bash
 lumos version
-# Devrait afficher : Lumos CLI Framework v0.3.7
+# Devrait afficher : Lumos CLI Framework v0.3.8
 ```
 
 ## Le runtime & modèle de distribution
@@ -367,8 +367,21 @@ bundle.minimal("src/main.lua", "dist/myapp.lua", { minify = true })
 
 ### Intégration shell
 ```lua
--- Générer les completions
-local completion = app:generate_completion("bash")
+-- Ajouter automatiquement une commande de completion
+app:add_completion_command()
+
+-- Générer les completions pour chaque shell
+local bash = app:generate_completion("bash")
+local zsh  = app:generate_completion("zsh")
+local fish = app:generate_completion("fish")
+local ps   = app:generate_completion("powershell")
+
+-- Générer tous les shells d'un coup
+app:generate_completion("all", "./completions")
+
+-- Valeurs de completion personnalisées pour les flags
+cmd:flag_enum("--env", "Environnement", {"dev", "staging", "prod"})
+   :complete({"dev", "staging", "prod"})
 
 -- Générer les pages man
 local manpage = app:generate_manpage()
@@ -528,11 +541,11 @@ make install && make test
 
 ## Statut du projet
 
-- **Version :** 0.3.7
+- **Version :** 0.3.8
 - **Licence :** MIT
 - **Versions Lua :** 5.1, 5.2, 5.3, 5.4, LuaJIT
 - **Plateformes :** Linux, macOS, Windows (natif)
-- **Tests :** 455 tests passants
+- **Tests :** 624 tests passants
 - **Dépendances :** luafilesystem
 
 ## Remerciements

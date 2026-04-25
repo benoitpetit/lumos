@@ -13,6 +13,13 @@ local function has_stty()
     return ok == 0 or ok == true
 end
 
+-- Restore terminal settings and cursor visibility
+local function restore_terminal()
+    io.write("\27[?25h") -- show cursor
+    io.flush()
+    os.execute("stty sane 2>/dev/null")
+end
+
 -- Basic text input prompt
 function prompt.input(message, default)
     io.write(message)
@@ -37,18 +44,23 @@ function prompt.password(message)
     local input
     if not platform.is_windows() and has_stty() then
         -- Unix-like systems: disable echo with guaranteed restore
+        os.execute("stty -echo 2>/dev/null")
         local ok, err = pcall(function()
-            os.execute("stty -echo 2>/dev/null")
             input = io.read("*l")
         end)
         os.execute("stty echo 2>/dev/null")
+        io.write("\n")
+        io.flush()
         if not ok then error(err, 2) end
     elseif platform.is_windows() then
         -- Windows: try PowerShell for secure input
-        local tmpfile = os.tmpname()
+        local security = require("lumos.security")
+        local tmpfile = security.temp_file()
+        -- Escape single quotes for PowerShell string literal
+        local safe_msg = tostring(message):gsub("'", "''")
         local ps_cmd = string.format(
             'powershell -Command "$p = Read-Host -AsSecureString -Prompt \'%s\'; [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($p)) | Out-File -FilePath %s -Encoding utf8 -NoNewline" 2>nul',
-            message, tmpfile
+            safe_msg, security.shell_escape(tmpfile)
         )
         local ok_ps = os.execute(ps_cmd)
         if ok_ps == 0 or ok_ps == true then
@@ -68,7 +80,6 @@ function prompt.password(message)
         input = io.read("*l")
     end
     
-    io.write("\n")
     return input
 end
 
@@ -141,7 +152,10 @@ function prompt.select(message, options, default)
         return prompt.simple_select(message, options, default)
     end
     local current = default or 1
-    local function render_menu()
+    local result = nil
+    local ok, err = pcall(function()
+        os.execute("stty -icanon -echo 2>/dev/null")
+        io.write("\27[?25l") -- hide cursor
         io.write(message .. "\n")
         for i, option in ipairs(options) do
             local marker = (i == current) and ">" or " "
@@ -149,22 +163,6 @@ function prompt.select(message, options, default)
         end
         io.write("Use up/down to navigate, Enter to confirm.\n")
         io.flush()
-    end
-    local function update_selection()
-        -- Move cursor up by n+1 lines (n options + instructions)
-        io.write(string.format("\27[%dA", #options + 1))
-        for i, option in ipairs(options) do
-            local marker = (i == current) and ">" or " "
-            io.write(string.format("\r%s %d) %s\27[K\n", marker, i, option))
-        end
-        io.write("\rUse up/down to navigate, Enter to confirm.\27[K\n")
-        io.flush()
-    end
-    os.execute("stty -icanon -echo")
-    io.write("\27[?25l") -- hide cursor
-    render_menu()
-    local result = nil
-    local ok, err = pcall(function()
         while not result do
             local c = io.read(1)
             if c == "\27" then -- escape
@@ -173,10 +171,23 @@ function prompt.select(message, options, default)
                     local c3 = io.read(1)
                     if c3 == "A" then -- up
                         current = current > 1 and current - 1 or #options
-                        update_selection()
+                        -- Move cursor up by n+1 lines (n options + instructions)
+                        io.write(string.format("\27[%dA", #options + 1))
+                        for i, option in ipairs(options) do
+                            local marker = (i == current) and ">" or " "
+                            io.write(string.format("\r%s %d) %s\27[K\n", marker, i, option))
+                        end
+                        io.write("\rUse up/down to navigate, Enter to confirm.\27[K\n")
+                        io.flush()
                     elseif c3 == "B" then -- down
                         current = current < #options and current + 1 or 1
-                        update_selection()
+                        io.write(string.format("\27[%dA", #options + 1))
+                        for i, option in ipairs(options) do
+                            local marker = (i == current) and ">" or " "
+                            io.write(string.format("\r%s %d) %s\27[K\n", marker, i, option))
+                        end
+                        io.write("\rUse up/down to navigate, Enter to confirm.\27[K\n")
+                        io.flush()
                     end
                 end
             elseif c == "\r" or c == "\n" then -- enter
@@ -184,9 +195,9 @@ function prompt.select(message, options, default)
             end
         end
     end)
-    io.write("\27[?25h") -- show cursor
-    os.execute("stty sane")
+    restore_terminal()
     io.write("\n")
+    io.flush()
     if not ok then error(err, 2) end
     return result[1], result[2]
 end
@@ -200,11 +211,14 @@ function prompt.multiselect(message, options)
         print("(Interactive multi-selection not available on this platform)")
         return {}
     end
-    print(message)
     local selected = {}
     for i = 1, #options do selected[i] = false end
     local current = 1
-    local function render_menu()
+    local result = {}
+    local quit = false
+    local ok, err = pcall(function()
+        os.execute("stty -icanon -echo 2>/dev/null")
+        io.write("\27[?25l") -- hide cursor
         io.write(message .. "\n")
         for i, option in ipairs(options) do
             local marker = selected[i] and "[x]" or "[ ]"
@@ -213,24 +227,7 @@ function prompt.multiselect(message, options)
         end
         io.write("Use up/down to navigate, Space to select, Enter to confirm, q to quit.\n")
         io.flush()
-    end
-    local function update_selection()
-        io.write(string.format("\27[%dA", #options + 1))
-        for i, option in ipairs(options) do
-            local marker = selected[i] and "[x]" or "[ ]"
-            local pointer = (i == current) and ">" or " "
-            io.write(string.format("\r%s %s %s\27[K\n", pointer, marker, option))
-        end
-        io.write("\rUse up/down to navigate, Space to select, Enter to confirm, q to quit.\27[K\n")
-        io.flush()
-    end
-    os.execute("stty -icanon -echo")
-    io.write("\27[?25l") -- hide cursor
-    render_menu()
-    local done = false
-    local quit = false
-    local ok, err = pcall(function()
-        while not done and not quit do
+        while true do
             local c = io.read(1)
             if c == "\27" then -- escape
                 local c2 = io.read(1)
@@ -238,28 +235,49 @@ function prompt.multiselect(message, options)
                     local c3 = io.read(1)
                     if c3 == "A" then -- up
                         current = current > 1 and current - 1 or #options
-                        update_selection()
+                        io.write(string.format("\27[%dA", #options + 1))
+                        for i, option in ipairs(options) do
+                            local marker = selected[i] and "[x]" or "[ ]"
+                            local pointer = (i == current) and ">" or " "
+                            io.write(string.format("\r%s %s %s\27[K\n", pointer, marker, option))
+                        end
+                        io.write("\rUse up/down to navigate, Space to select, Enter to confirm, q to quit.\27[K\n")
+                        io.flush()
                     elseif c3 == "B" then -- down
                         current = current < #options and current + 1 or 1
-                        update_selection()
+                        io.write(string.format("\27[%dA", #options + 1))
+                        for i, option in ipairs(options) do
+                            local marker = selected[i] and "[x]" or "[ ]"
+                            local pointer = (i == current) and ">" or " "
+                            io.write(string.format("\r%s %s %s\27[K\n", pointer, marker, option))
+                        end
+                        io.write("\rUse up/down to navigate, Space to select, Enter to confirm, q to quit.\27[K\n")
+                        io.flush()
                     end
                 end
             elseif c == " " then -- space
                 selected[current] = not selected[current]
-                update_selection()
+                io.write(string.format("\27[%dA", #options + 1))
+                for i, option in ipairs(options) do
+                    local marker = selected[i] and "[x]" or "[ ]"
+                    local pointer = (i == current) and ">" or " "
+                    io.write(string.format("\r%s %s %s\27[K\n", pointer, marker, option))
+                end
+                io.write("\rUse up/down to navigate, Space to select, Enter to confirm, q to quit.\27[K\n")
+                io.flush()
             elseif c == "q" then
                 quit = true
+                break
             elseif c == "\r" or c == "\n" then -- enter
-                done = true
+                break
             end
         end
     end)
-    io.write("\27[?25h") -- show cursor
-    os.execute("stty sane")
+    restore_terminal()
     io.write("\n")
+    io.flush()
     if not ok then error(err, 2) end
     if quit then return {} end
-    local result = {}
     for i, sel in ipairs(selected) do
         if sel then table.insert(result, {index = i, value = options[i]}) end
     end
@@ -386,7 +404,7 @@ function prompt.editor(message, default)
             editor = "vi"
         end
     end
-    local tmpfile = os.tmpname()
+    local tmpfile = security.temp_file()
     local f = io.open(tmpfile, "w")
     if not f then
         error("Could not create temporary file for editor")

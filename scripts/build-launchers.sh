@@ -216,6 +216,7 @@ case "$TARGET" in
         ;;
     all)
         build_linux
+        build_linux_aarch64
         build_windows
         build_macos
         ;;

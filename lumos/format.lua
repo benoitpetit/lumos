@@ -38,20 +38,19 @@ end
 -- Expose is_tty so other modules (e.g. color) can reuse it without a second spawn
 format.is_tty = is_tty
 
--- Check if terminal supports formatting
+-- Check if terminal supports formatting (single source of truth: terminal module)
 local function supports_formatting()
-    -- Check for NO_COLOR environment variables
-    if os.getenv("LUMOS_NO_COLOR") or os.getenv("NO_COLOR") then
+    local ok, term = pcall(require, "lumos.terminal")
+    if ok and term and term.should_use_colors then
+        return term.should_use_colors()
+    end
+    -- Fallback
+    if os.getenv("NO_COLOR") then
         return false
     end
-
-    -- Check for TERM environment variable
-    local term = os.getenv("TERM")
-    if term and (term:match("color") or term:match("xterm") or term:match("screen")) then
+    if os.getenv("FORCE_COLOR") then
         return true
     end
-
-    -- Check if output is a TTY (cross-platform)
     return is_tty()
 end
 

@@ -21,6 +21,7 @@ end
 
 -- Parsing functions
 function core.suggest_command(...) return parser.suggest_command(...) end
+function core.suggest_flag(...) return parser.suggest_flag(...) end
 function core.parse_arguments(...) return parser.parse_arguments(...) end
 function core.find_command(...) return parser.find_command(...) end
 function core.find_subcommand(...) return parser.find_subcommand(...) end

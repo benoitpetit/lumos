@@ -30,6 +30,11 @@ describe("Terminal Module", function()
     end)
 
     it('cursor controls write ANSI codes', function()
+        -- Mock platform.is_piped so ansi_write produces output in test environment
+        local platform = require('lumos.platform')
+        local orig_is_piped = platform.is_piped
+        platform.is_piped = function() return false end
+
         -- Capture io.write output to verify sequences
         local original_write = io.write
         local captured = {}
@@ -45,6 +50,8 @@ describe("Terminal Module", function()
         terminal.show_cursor()
 
         io.write = original_write
+        platform.is_piped = orig_is_piped
+
         local output = table.concat(captured)
         assert.is_not_nil(output:find("\27%[s"))
         assert.is_not_nil(output:find("\27%[u"))

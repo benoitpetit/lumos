@@ -27,12 +27,12 @@ describe('HTTP Module', function()
     end
 
     io.open = function(path, mode)
-      if path == "/tmp/lumos_http_h" then
+      if path:find("/tmp/lumos_http_h") == 1 then
         return {
           read = function(_, fmt) return mock_headers_content end,
           close = function() end
         }
-      elseif path == "/tmp/lumos_http_b" then
+      elseif path:find("/tmp/lumos_http_b") == 1 then
         return {
           read = function(_, fmt) return mock_body_content end,
           close = function() end

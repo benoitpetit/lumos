@@ -120,7 +120,7 @@ function security.safe_open(path, mode)
     end
     
     -- Check if trying to write to system directories
-    if (mode == "w" or mode == "a" or mode == "w+" or mode == "a+") then
+    if mode:match("^[wa]") then
         if sanitized:match("^/etc/") or sanitized:match("^/sys/") or sanitized:match("^/proc/") then
             return nil, "Cannot write to system directory"
         end
@@ -132,6 +132,19 @@ function security.safe_open(path, mode)
     end
     
     return file
+end
+
+-- Generate a safer temporary file name than os.tmpname()
+-- Adds random entropy to avoid predictable names and collisions.
+function security.temp_file()
+    local base = os.tmpname()
+    local entropy = tostring(math.random(0, 0xFFFFFFFF))
+    return base .. "_" .. entropy
+end
+
+-- Generate a safer temporary directory name
+function security.temp_dir()
+    return security.temp_file() .. "_dir"
 end
 
 -- Validate email format
@@ -186,16 +199,7 @@ function security.sanitize_output(text)
     text = tostring(text)
     
     -- Remove control characters except newline (\n = 0x0A) and tab (\t = 0x09)
-    -- Range: 0x00-0x08, 0x0B-0x0C, 0x0E-0x1F, 0x7F
-    local clean = {}
-    for i = 1, #text do
-        local byte = text:byte(i)
-        -- Keep printable chars (>= 32 and < 127) or newline (10) or tab (9)
-        if byte == 9 or byte == 10 or (byte >= 32 and byte < 127) then
-            table.insert(clean, string.char(byte))
-        end
-    end
-    text = table.concat(clean)
+    text = text:gsub("[%z\1-\8\11\12\14-\31\127]", "")
     
     -- Remove ANSI escape sequences that aren't from our color module
     -- Covers all CSI sequences: ESC [ <params> <final-byte>

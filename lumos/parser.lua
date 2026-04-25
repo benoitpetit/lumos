@@ -60,23 +60,77 @@ function parser.suggest_subcommand(command, input_name)
     return best_match
 end
 
--- Check if a flag name is defined as countable in the app (global, persistent, or command-level)
-local function is_countable(app, flag_name)
-    if not app then return false end
+-- Suggest a similar flag name when input is unknown
+function parser.suggest_flag(app, cmd, input_name)
+    local best_match = nil
+    local best_distance = math.huge
+    local candidates = {}
+
+    local function collect_flags(flag_defs)
+        if not flag_defs then return end
+        for name, def in pairs(flag_defs) do
+            table.insert(candidates, name)
+            if def.short then table.insert(candidates, def.short) end
+        end
+    end
+
+    collect_flags(app and app.global_flags or nil)
+    collect_flags(app and app.persistent_flags or nil)
+    collect_flags(cmd and cmd.flags or nil)
+    collect_flags(cmd and cmd.persistent_flags or nil)
+
+    for _, name in ipairs(candidates) do
+        local dist = levenshtein(input_name, name)
+        if dist < best_distance and dist <= 2 then
+            best_distance = dist
+            best_match = name
+        end
+    end
+
+    return best_match
+end
+
+-- Build an O(1) lookup index of all countable flags for the given app
+local function build_countable_index(app)
+    local idx = {}
+    if not app then return idx end
     local collections = {app.global_flags, app.persistent_flags}
-    -- Also inspect command-level flags so cmd:flag("-v --verbose"):countable() works
     for _, cmd in ipairs(app.commands or {}) do
         table.insert(collections, cmd.flags)
         table.insert(collections, cmd.persistent_flags)
     end
     for _, flag_defs in ipairs(collections) do
         for name, def in pairs(flag_defs or {}) do
-            if (name == flag_name or def.short == flag_name) and def.countable then
-                return true
+            if def.countable then
+                idx[name] = true
+                if def.short then idx[def.short] = true end
             end
         end
     end
-    return false
+    return idx
+end
+
+-- Look up the type of a flag across app/command definitions
+local function get_flag_type(app, flag_name)
+    if not app then return nil end
+    local collections = {app.global_flags, app.persistent_flags}
+    for _, cmd in ipairs(app.commands or {}) do
+        table.insert(collections, cmd.flags)
+        table.insert(collections, cmd.persistent_flags)
+    end
+    for _, flag_defs in ipairs(collections) do
+        local def = flag_defs and flag_defs[flag_name]
+        if def then
+            return def.type
+        end
+        -- Also search by short name
+        for _, d in pairs(flag_defs or {}) do
+            if d.short == flag_name then
+                return d.type
+            end
+        end
+    end
+    return nil
 end
 
 -- Parse command line arguments into structured data with subcommand support
@@ -93,9 +147,17 @@ function parser.parse_arguments(args, app)
         return parsed
     end
     
+    -- Clone args to avoid mutating the caller's table
+    local cloned = {}
+    for _, v in ipairs(args) do
+        table.insert(cloned, v)
+    end
+    args = cloned
+    
     local i = 1
     local command_count = 0
     local end_of_options = false
+    local countable_index = build_countable_index(app)
     
     while i <= #args do
         local arg = args[i]
@@ -116,10 +178,23 @@ function parser.parse_arguments(args, app)
         -- Handle flags (starting with - or --)
         elseif not end_of_options and arg:match('^%-%-?') then
             local flag_result = flags.parse_single_flag(arg, args, i)
-            if is_countable(app, flag_result.name) then
+            if countable_index[flag_result.name] then
                 -- Countable flags never consume the next token as a value
                 parsed.flags[flag_result.name] = (parsed.flags[flag_result.name] or 0) + 1
                 i = i + 1
+            elseif get_flag_type(app, flag_result.name) == "map" then
+                local key, val = tostring(flag_result.value):match("^([^=]+)=(.*)$")
+                if key then
+                    local existing = parsed.flags[flag_result.name]
+                    if type(existing) ~= "table" then
+                        existing = {}
+                    end
+                    existing[key] = val
+                    parsed.flags[flag_result.name] = existing
+                else
+                    parsed.flags[flag_result.name] = flag_result.value
+                end
+                i = flag_result.next_index
             else
                 parsed.flags[flag_result.name] = flag_result.value
                 i = flag_result.next_index
